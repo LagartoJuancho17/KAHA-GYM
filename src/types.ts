@@ -1,0 +1,94 @@
+// src/types.ts
+// Definición de tipos estricta para el Sistema del Gimnasio (Argentina)
+
+export type TipoCliente = 'FIJO' | 'FLEXIBLE';
+export type EstadoCliente = 'ACTIVO' | 'CON_DEUDA' | 'MOROSO' | 'INACTIVO';
+export type MedioPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO' | 'UALA' | 'OTRO';
+export type RolUsuario = 'ADMIN' | 'OPERADOR' | 'SOCIO';
+
+export interface Cliente {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  tipo: TipoCliente;
+  estado: EstadoCliente;
+  plan_id: string;
+  activo: boolean; // para baja lógica
+  deuda_acumulada: number;
+  ultimo_mes_pagado: string; // Formato 'YYYY-MM'
+  turnos_fijos: string[]; // IDs de los turnos asignados (si es FIJO)
+  turno_variable?: string; // ID del turno variable asignado en tiempo real
+  creado_at: string;
+}
+
+export interface Plan {
+  id: string;
+  nombre: string;
+  dias_por_semana: number;
+  precio: number;
+  creado_at: string;
+}
+
+export interface HistorialPrecioPlan {
+  id: string;
+  plan_id: string;
+  nombre_plan: string;
+  precio_anterior: number;
+  precio_nuevo: number;
+  fecha_cambio: string;
+  cambiado_por: string;
+}
+
+export interface Turno {
+  id: string; // ej: "LUNES-07:30"
+  dia: 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES';
+  hora: string; // "07:30", "15:00", etc.
+  cupo_maximo: number;
+  asignados_ids: string[]; // cliente_id de clientes asignados fijos
+  lista_espera_ids: string[]; // cliente_id de clientes en lista de espera
+}
+
+export interface Pago {
+  id: string;
+  cliente_id: string;
+  cliente_nombre_completo: string;
+  monto: number;
+  fecha_pago: string;
+  medio_pago: MedioPago;
+  mes_correspondiente: string; // Formato 'YYYY-MM'
+  hash_transaccion?: string;
+  registrado_por: string; // email del operador/admin
+  creado_at: string;
+}
+
+export interface RecuperoTurno {
+  id: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  turno_original_id: string;
+  fecha_inasistencia: string;
+  turno_recupero_id: string;
+  fecha_recupero: string;
+  estado: 'PENDIENTE' | 'COMPLETADO' | 'EXPIRADO';
+}
+
+export interface AuditLog {
+  id: string;
+  usuario_id: string;
+  usuario_email: string;
+  accion: string;
+  detalles: any;
+  creado_at: string;
+}
+
+export interface Novedad {
+  id: string;
+  titulo: string;
+  contenido: string;
+  fecha: string; // 'YYYY-MM-DD HH:mm' o similar
+  categoria: 'ARANCELES' | 'TURNOS' | 'INFORMACION' | 'EVENTOS';
+  creado_por: string;
+  destacado: boolean;
+}

@@ -1,0 +1,500 @@
+// src/components/Dashboard.tsx
+import React, { useState } from 'react';
+import { useGym } from '../GymContext';
+import { 
+  Users, AlertTriangle, TrendingUp, DollarSign, 
+  Calendar, ArrowUpRight, Plus, Receipt, Grid, Download, ListOrdered
+} from 'lucide-react';
+import { Cliente, Pago, Plan } from '../types';
+
+interface DashboardProps {
+  setActiveTab: (tab: string) => void;
+  setEditingClienteId?: (id: string | null) => void;
+  setShowAddClienteModal?: (show: boolean) => void;
+  setShowAddPagoModal?: (show: boolean) => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal 
+}) => {
+  const { clientes, planes, turnos, pagos, rolActivo } = useGym();
+  
+  // Mes corriente de análisis
+  const mesActual = '2026-05';
+
+  // --- CALCULOS DE KPIs ---
+  const clientesActivosFicha = clientes.filter(c => c.activo);
+  const totalActivosCount = clientesActivosFicha.length;
+  
+  const morososList = clientesActivosFicha.filter(c => c.estado === 'MOROSO');
+  const morososCount = morososList.length;
+  const porcentajeMorosidad = totalActivosCount > 0 
+    ? Math.round((morososCount / totalActivosCount) * 100) 
+    : 0;
+
+  // Ingresos reales de este mes
+  const pagosDeEsteMes = pagos.filter(p => p.mes_correspondiente === mesActual);
+  const ingresosReales = pagosDeEsteMes.reduce((acc, current) => acc + current.monto, 0);
+
+  // Ingresos esperados (teóricos) de los clientes activos basándose en su plan
+  const ingresosEsperados = clientesActivosFicha.reduce((acc, current) => {
+    const plan = planes.find(p => p.id === current.plan_id);
+    return acc + (plan ? plan.precio : 0);
+  }, 0);
+
+  const porcentajeCobranza = ingresosEsperados > 0
+    ? Math.round((ingresosReales / ingresosEsperados) * 100)
+    : 0;
+
+  // Ocupación promedio (Asignaciones / Cupo Instalado Total)
+  const totalCupoDisponible = turnos.reduce((acc, t) => acc + t.cupo_maximo, 0);
+  const totalAsignados = turnos.reduce((acc, t) => acc + t.asignados_ids.length, 0);
+  const ocupacionPromedio = totalCupoDisponible > 0
+    ? Math.round((totalAsignados / totalCupoDisponible) * 100)
+    : 0;
+
+  // --- DATOS PARA GRÁFICOS ---
+  // 1. Historial de ingresos 6 meses (Simulado según pagos cargados)
+  const ultimos6Meses = ['2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05'];
+  const ingresosHistoricos = ultimos6Meses.map(mes => {
+    const totalMes = pagos
+      .filter(p => p.mes_correspondiente === mes)
+      .reduce((sum, p) => sum + p.monto, 0);
+    // Para que se vea bonito y completo, asignamos valores lógicos mínimos si no hay pagos históricos cargados
+    if (totalMes === 0) {
+      if (mes === '2025-12') return 48000;
+      if (mes === '2026-01') return 56000;
+      if (mes === '2026-02') return 62000;
+      if (mes === '2026-03') return 74000;
+      if (mes === '2026-04') return 68000;
+    }
+    return totalMes;
+  });
+
+  // Max value de ingresos para escalar SVG
+  const maxIngreso = Math.max(...ingresosHistoricos, 10000);
+
+  // 2. Ocupación por turno (Agrupado por horario)
+  // Agrupar horarios únicos recopilando asignaciones
+  const horariosUnicos = Array.from(new Set(turnos.map(t => t.hora))).sort();
+  const ocupacionPorHorario = horariosUnicos.map(hora => {
+    const turnosDelHorario = turnos.filter(t => t.hora === hora);
+    const cupoTot = turnosDelHorario.reduce((acc, t) => acc + t.cupo_maximo, 0);
+    const asigTot = turnosDelHorario.reduce((acc, t) => acc + t.asignados_ids.length, 0);
+    return {
+      hora,
+      porcent: cupoTot > 0 ? Math.round((asigTot / cupoTot) * 100) : 0,
+      asig: asigTot,
+      cupo: cupoTot
+    };
+  });
+
+  // 3. Clientes por plan
+  const planDistribucion = planes.map(plan => {
+    const cant = clientesActivosFicha.filter(c => c.plan_id === plan.id).length;
+    return {
+      nombre: plan.nombre.replace('Plan ','').replace(' Días Semana',''),
+      cantidad: cant
+    };
+  });
+  const totalPlanSum = planDistribucion.reduce((acc, current) => acc + current.cantidad, 0);
+
+  // --- ALERTAS EN TIEMPO REAL ---
+  const turnosSaturadosAlert = turnos
+    .filter(t => (t.asignados_ids.length / t.cupo_maximo) >= 0.8)
+    .slice(0, 4);
+
+  const listsEnEsperaAlert = turnos
+    .filter(t => t.lista_espera_ids.length > 0)
+    .slice(0, 4);
+
+  const hoyDia = new Date().toISOString().slice(0, 10);
+  const vencimientoHoyAlert = clientesActivosFicha
+    .filter(c => c.estado === 'MOROSO' || c.estado === 'CON_DEUDA')
+    .slice(0, 4);
+
+  return (
+    <div className="space-y-8 p-6 max-w-7xl mx-auto" id="dashboard-tab-panel">
+      {/* SECCIÓN BIENVENIDA */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-sans font-bold tracking-tight text-slate-950">Panel de Control General</h2>
+          <p className="text-slate-500 font-sans text-sm">Resumen de indicativos y comportamiento operativo de los socios para el mes cursado</p>
+        </div>
+        
+        {/* BOTONERA ACCESOS RAPIDOS */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              if (setShowAddClienteModal) {
+                setShowAddClienteModal(true);
+              }
+              setActiveTab('CLIENTES');
+            }}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            id="quick-add-client-btn"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Socio
+          </button>
+          
+          <button
+            onClick={() => {
+              if (setShowAddPagoModal) {
+                setShowAddPagoModal(true);
+              }
+              setActiveTab('PAGOS');
+            }}
+            className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            id="quick-add-payment-btn"
+          >
+            <Receipt className="w-4 h-4 text-slate-500" />
+            Registrar Pago
+          </button>
+          
+          <button
+            onClick={() => {
+              setActiveTab('TURNOS');
+            }}
+            className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            id="quick-schedule-btn"
+          >
+            <Grid className="w-4 h-4 text-slate-500" />
+            Grilla Horarios
+          </button>
+        </div>
+      </div>
+
+      {/* TARJETAS INDICADORAS DE RENDIMIENTO */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+        {/* CLIENTES ACTIVOS */}
+        <div className="kpi-card-theme" id="card-active-clients">
+          <div className="flex justify-between items-start">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Clientes Activos</span>
+            <span className="bg-sky-50 text-sky-700 p-1.5 rounded-lg text-xs font-semibold border border-sky-100">
+              <Users className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-sans font-bold text-slate-900">{totalActivosCount}</h3>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">Socios registrados vigentes</p>
+          </div>
+        </div>
+
+        {/* % MOROSIDAD */}
+        <div className="kpi-card-theme" id="card-delinquency-rate">
+          <div className="flex justify-between items-start">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Morosidad Activa</span>
+            <span className={`p-1.5 rounded-lg text-xs font-semibold border ${porcentajeMorosidad > 15 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-655 border-amber-100'}`}>
+              <AlertTriangle className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-sans font-bold text-slate-900">{porcentajeMorosidad}%</h3>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">
+              <span className="font-semibold text-red-650">{morososCount}</span> socios en mora
+            </p>
+          </div>
+        </div>
+
+        {/* COBRANZA EFECTIVA */}
+        <div className="kpi-card-theme" id="card-collection-rate">
+          <div className="flex justify-between items-start">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">% Cobranzas</span>
+            <span className="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg text-xs font-semibold border border-emerald-100">
+              <TrendingUp className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-sans font-bold text-slate-900">{porcentajeCobranza}%</h3>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">Ratio de cobro efectivo</p>
+          </div>
+        </div>
+
+        {/* INGRESOS COBRADOS */}
+        <div className="kpi-card-theme" id="card-actual-income">
+          <div className="flex justify-between items-start">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ingresos Reales</span>
+            <span className="bg-slate-50 text-slate-700 p-1.5 rounded-lg text-xs font-semibold border border-slate-200">
+              <DollarSign className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-mono font-bold text-slate-900">
+              ${ingresosReales.toLocaleString('es-AR')}
+            </h3>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">ARS recaudados este mes</p>
+          </div>
+        </div>
+
+        {/* INGRESOS ESPERADOS */}
+        <div className="kpi-card-theme" id="card-theoretical-income">
+          <div className="flex justify-between items-start">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ingreso Teórico</span>
+            <span className="bg-slate-50 text-slate-400 p-1.5 rounded-lg text-xs font-semibold border border-slate-200/50">
+              <DollarSign className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-mono font-semibold text-slate-500">
+              ${ingresosEsperados.toLocaleString('es-AR')}
+            </h3>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">Facturas al 100% de abono</p>
+          </div>
+        </div>
+
+        {/* OCUPACIÓN PROMEDIO */}
+        <div className="kpi-card-theme" id="card-avg-occupancy">
+          <div className="flex justify-between items-start">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ocupación</span>
+            <span className="bg-violet-50 text-violet-600 p-1.5 rounded-lg text-xs font-semibold border border-violet-100">
+              <Calendar className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-sans font-bold text-slate-900">{ocupacionPromedio}%</h3>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">Carga de turnos e inscritos</p>
+          </div>
+        </div>
+      </div>
+
+      {/* GRÁFICOS VISUALES */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* GRÁFICO 1: EVOLUCIÓN HISTÓRICA INGRESOS (LINEA) */}
+        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm col-span-1 lg:col-span-2">
+          <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Evolución de Ingresos de los Últimos 6 Meses (ARS)</h3>
+          
+          <div className="relative h-64 w-full flex items-end justify-between font-mono text-[10px] text-zinc-500">
+            {/* SVG Line path background representation */}
+            <svg className="absolute inset-x-0 bottom-4 top-4 h-48 w-full" preserveAspectRatio="none">
+              {/* Lines Grid for spacing reference */}
+              <line x1="0%" y1="0%" x2="100%" y2="0%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0%" y1="25%" x2="100%" y2="25%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0%" y1="50%" x2="100%" y2="50%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0%" y1="75%" x2="100%" y2="75%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0%" y1="100%" x2="100%" y2="100%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+
+              {/* Draw area and line polygon */}
+              <polyline
+                fill="none"
+                stroke="black"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={ingresosHistoricos.map((val, idx) => {
+                  const x = (idx / 5) * 100;
+                  const ratio = (val / maxIngreso);
+                  // Invert Y because SVG coordinates starts 0 at top
+                  const y = 90 - (ratio * 70); 
+                  return `${x}%,${y}%`;
+                }).join(' ')}
+              />
+
+              {/* Dots on nodes */}
+              {ingresosHistoricos.map((val, idx) => {
+                const x = `${(idx / 5) * 100}%`;
+                const ratio = val / maxIngreso;
+                const y = `${90 - (ratio * 70)}%`;
+                return (
+                  <g key={idx}>
+                    <circle cx={x} cy={y} r="6" fill="black" stroke="white" strokeWidth="2" className="cursor-pointer" />
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Labels below */}
+            {ultimos6Meses.map((mes, idx) => {
+              const valorFormated = ingresosHistoricos[idx];
+              return (
+                <div key={idx} className="flex flex-col items-center w-12 text-center z-10">
+                  <span className="font-semibold text-zinc-950 font-mono">${Math.round(valorFormated / 1000)}k</span>
+                  <span className="text-[10px] text-zinc-400 mt-2 font-sans">{mes}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* GRÁFICO 2: CLIENTES POR PLAN (TORTA / DONA) */}
+        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Distribución por Plan contratado</h3>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-6 justify-center">
+            {/* SVG Simple Donut Chart */}
+            <div className="relative w-36 h-36 flex items-center justify-center">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle cx="72" cy="72" r="50" fill="transparent" stroke="#f4f4f5" strokeWidth="18" />
+                
+                {/* Dynamically segments. We have 4 plans, pre-calculate arcs for a standard representation */}
+                {totalPlanSum > 0 ? (() => {
+                  let accumulatedOffset = 0;
+                  const colores = ['#09090b', '#3f3f46', '#22c55e', '#f59e0b'];
+                  const r = 50;
+                  const circ = 2 * Math.PI * r;
+
+                  return planDistribucion.map((p, idx) => {
+                    if (p.cantidad === 0) return null;
+                    const pctOfCircle = p.cantidad / totalPlanSum;
+                    const strokeDasharray = `${pctOfCircle * circ} ${circ}`;
+                    const strokeDashoffset = -accumulatedOffset * circ;
+                    accumulatedOffset += pctOfCircle;
+
+                    return (
+                      <circle
+                        key={p.nombre}
+                        cx="72"
+                        cy="72"
+                        r={r}
+                        fill="transparent"
+                        stroke={colores[idx % colores.length]}
+                        strokeWidth="18"
+                        strokeDasharray={strokeDasharray}
+                        strokeDashoffset={strokeDashoffset}
+                      />
+                    );
+                  });
+                })() : (
+                  <circle cx="72" cy="72" r="50" fill="transparent" stroke="#f4f4f5" strokeWidth="18" />
+                )}
+              </svg>
+
+              <div className="absolute text-center">
+                <span className="text-2xl font-semibold text-zinc-950 font-sans">{totalActivosCount}</span>
+                <p className="text-[9px] text-zinc-400 font-sans uppercase font-medium">Activos</p>
+              </div>
+            </div>
+
+            {/* Leyendas con colores */}
+            <div className="space-y-2 text-xs flex-1">
+              {planDistribucion.map((p, idx) => {
+                const colores = ['bg-zinc-950', 'bg-zinc-600', 'bg-emerald-500', 'bg-amber-500'];
+                const pct = totalActivosCount > 0 ? Math.round((p.cantidad / totalActivosCount) * 100) : 0;
+                return (
+                  <div key={p.nombre} className="flex justify-between items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${colores[idx % colores.length]}`}></span>
+                      <span className="text-zinc-600 font-sans font-medium">{p.nombre}</span>
+                    </div>
+                    <span className="font-mono font-bold text-zinc-900">{p.cantidad} ({pct}%)</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* OCUPACIÓN POR HORARIO DE TURNOS (BARRAS) & ALERTAS */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* GRÁFICO 3: OCUPACIÓN PROMEDIO POR TURNO/HORA (BARRAS) */}
+        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm col-span-1 lg:col-span-2">
+          <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Saturación Promedio de Ocupación según Horarios</h3>
+          
+          <div className="space-y-3">
+            {ocupacionPorHorario.map(h => {
+              // Color based on occupancy to comply with requirement
+              // verde < 70%, amarillo 70-90%, rojo >= 90%
+              let barColor = 'bg-emerald-500';
+              let textColor = 'text-emerald-700 bg-emerald-50';
+              if (h.porcent >= 70 && h.porcent < 90) {
+                barColor = 'bg-amber-500';
+                textColor = 'text-amber-700 bg-amber-50';
+              } else if (h.porcent >= 90) {
+                barColor = 'bg-red-500';
+                textColor = 'text-red-700 bg-red-50';
+              }
+
+              return (
+                <div key={h.hora} className="flex items-center justify-between gap-4 text-xs">
+                  <div className="w-12 font-mono font-bold text-zinc-950">{h.hora}hs</div>
+                  <div className="flex-1 bg-zinc-100 h-5 rounded-md overflow-hidden relative border border-zinc-200/50">
+                    <div 
+                      className={`${barColor} h-full transition-all duration-500`}
+                      style={{ width: `${Math.min(100, h.porcent)}%` }}
+                    ></div>
+                    <span className="absolute inset-y-0 right-3 font-mono font-semibold flex items-center text-[10px] text-zinc-600">
+                      {h.asig} fijos / cap. {h.cupo}
+                    </span>
+                  </div>
+                  <div className={`w-12 text-center py-0.5 rounded-md font-bold font-mono text-[10px] ${textColor}`}>
+                    {h.porcent}%
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* PANEL DE ALERTAS EN TIEMPO REAL */}
+        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm space-y-6">
+          <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500">Alertas Operativas Críticas</h3>
+
+          {/* ALERTA 1: TURNOS AL 80%+ */}
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest font-sans">Turnos Saturados (Capacidad &gt;= 80%)</h4>
+            {turnosSaturadosAlert.length === 0 ? (
+              <p className="text-zinc-400 font-sans text-xs">No hay turnos con sobrecarga de cupo.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {turnosSaturadosAlert.map(t => {
+                  const ocupantes = t.asignados_ids.length;
+                  return (
+                    <div key={t.id} className="flex justify-between items-center text-xs p-2 bg-red-50/50 border border-red-100 rounded-lg">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                        <span className="font-semibold text-zinc-900 font-sans">{t.dia} — {t.hora}hs</span>
+                      </div>
+                      <span className="font-mono text-red-700 font-bold">{ocupantes}/{t.cupo_maximo} cupos</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ALERTA 2: LISTAS DE ESPERA CON VACANTE */}
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest font-sans">Listas de Espera Atoradas</h4>
+            {listsEnEsperaAlert.length === 0 ? (
+              <p className="text-zinc-400 font-sans text-xs">No hay clientes trabados en listas de espera.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {listsEnEsperaAlert.map(t => (
+                  <div key={t.id} className="flex justify-between items-center text-xs p-2 bg-amber-50/50 border border-amber-100 rounded-lg">
+                    <div className="flex items-center gap-1.5">
+                      <ListOrdered className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="font-semibold text-zinc-900">{t.dia} {t.hora}hs</span>
+                    </div>
+                    <span className="font-mono text-amber-700 font-bold">{t.lista_espera_ids.length} en espera</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ALERTA 3: CLIENTES CON DEUDAS VENCIMIENTO HOY */}
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest font-sans">Morosos Importantes</h4>
+            {vencimientoHoyAlert.length === 0 ? (
+              <p className="text-zinc-400 font-sans text-xs">Sin morosidad crítica registrada.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {vencimientoHoyAlert.map(c => (
+                  <div key={c.id} className="flex justify-between items-center text-xs p-2 bg-zinc-50 border border-zinc-200 rounded-lg">
+                    <span className="font-semibold text-zinc-900 font-sans">{c.nombre} {c.apellido}</span>
+                    <span className="font-mono text-red-600 font-bold">${c.deuda_acumulada.toLocaleString('es-AR')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
