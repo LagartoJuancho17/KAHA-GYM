@@ -965,7 +965,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (
       cleanMail === 'tobiasarraiza17@gmail.com' ||
       cleanMail === 'totoarr17@gmail.com' ||
-      cleanMail === 'jmferrariprofe@gmail.com'
+      cleanMail === 'jmferrariprofe@gmail.com' ||
+      cleanMail === 'lagartojuancho24avl@gmail.com'
     ) {
       detectedRole = 'ADMIN';
     } else if (cleanMail === 'profe@gimnasio.com.ar' || cleanMail === 'profe@aresgym.com') {
