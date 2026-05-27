@@ -962,7 +962,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let detectedRole: RolUsuario = 'SOCIO';
     let targetSocioId: string | null = null;
 
-    if (cleanMail === 'tobiasarraiza17@gmail.com' || cleanMail === 'totoarr17@gmail.com') {
+    if (
+      cleanMail === 'tobiasarraiza17@gmail.com' ||
+      cleanMail === 'totoarr17@gmail.com' ||
+      cleanMail === 'jmferrariprofe@gmail.com'
+    ) {
       detectedRole = 'ADMIN';
     } else if (cleanMail === 'profe@gimnasio.com.ar' || cleanMail === 'profe@aresgym.com') {
       detectedRole = 'OPERADOR';
