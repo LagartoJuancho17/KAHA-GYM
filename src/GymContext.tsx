@@ -2,7 +2,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, 
-  RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad 
+  RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
+  ReservaIndividual, ClaseSuspendida
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -47,6 +48,9 @@ interface GymContextType {
   agregarRecupero: (recupero: Omit<RecuperoTurno, 'id' | 'estado'>) => { success: boolean; message: string };
   actualizarEstadoRecupero: (id: string, estado: 'PENDIENTE' | 'COMPLETADO' | 'EXPIRADO') => void;
   modificarPrecioOCupoTurno: (turnoId: string, nuevoCupo: number) => void;
+  crearReservaIndividual: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
+  cancelarReservaIndividual: (clienteId: string, reservaId: string) => { success: boolean; message: string };
+  suspenderClaseFija: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
 
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
@@ -749,6 +753,182 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('CUPO_TURNO_EDITADO', { turno_id: turnoId, nuevo_cupo: nuevoCupo });
   };
 
+  const crearReservaIndividual = (clienteId: string, turnoId: string, fecha: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const turno = turnos.find(t => t.id === turnoId);
+    if (!turno) return { success: false, message: 'Turno no encontrado.' };
+
+    // Check capacity: fijos + other individual bookings on this same date for this turn
+    const fijosCount = turno.asignados_ids.length;
+    // Count individual bookings on this date for this turn
+    const individualCount = clientes.reduce((acc, c) => {
+      const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha);
+      return acc + bookingsOnDate.length;
+    }, 0);
+
+    const totalOccupied = fijosCount + individualCount;
+    if (totalOccupied >= turno.cupo_maximo) {
+      return { success: false, message: `El turno ya está completo para esa fecha (${totalOccupied}/${turno.cupo_maximo}).` };
+    }
+
+    // Check duplicate: cannot have two bookings on the same date
+    const hasBookingOnDate = (cliente.reservas_individuales || []).some(r => r.fecha === fecha) || 
+                             (cliente.turnos_fijos.some(tfId => {
+                               const tfTurn = turnos.find(t => t.id === tfId);
+                               if (!tfTurn) return false;
+                               const dateObj = new Date(fecha + 'T00:00:00');
+                               const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+                               const dateDayName = days[dateObj.getDay()];
+                               if (tfTurn.dia === dateDayName) {
+                                 // Check if they suspended it for this date
+                                 const isSuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === fecha);
+                                 return !isSuspended;
+                               }
+                               return false;
+                             }));
+
+    if (hasBookingOnDate) {
+      return { success: false, message: `Ya tienes una sesión programada para el día ${fecha}.` };
+    }
+
+    const nuevaReserva: ReservaIndividual = {
+      id: `res-${Date.now()}`,
+      turno_id: turnoId,
+      fecha,
+      creado_at: new Date().toISOString()
+    };
+
+    const updatedClientes = clientes.map(c => {
+      if (c.id === clienteId) {
+        return {
+          ...c,
+          reservas_individuales: [...(c.reservas_individuales || []), nuevaReserva]
+        };
+      }
+      return c;
+    });
+
+    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    addAuditLog('RESERVA_INDIVIDUAL_CREADA', { 
+      cliente: `${cliente.nombre} ${cliente.apellido}`, 
+      turno_id: turnoId, 
+      fecha 
+    });
+
+    return { success: true, message: 'Reserva agendada exitosamente.' };
+  };
+
+  const cancelarReservaIndividual = (clienteId: string, reservaId: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const reserva = (cliente.reservas_individuales || []).find(r => r.id === reservaId);
+    if (!reserva) return { success: false, message: 'Reserva no encontrada.' };
+
+    const turno = turnos.find(t => t.id === reserva.turno_id);
+    const horaClase = turno ? turno.hora : '00:00';
+    
+    // Check 3 hours notice
+    const now = new Date();
+    const classDateTime = new Date(`${reserva.fecha}T${horaClase}:00`);
+    const diffHours = (classDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    const reintegrado = diffHours >= 3.0;
+
+    const updatedClientes = clientes.map(c => {
+      if (c.id === clienteId) {
+        const filtradas = (c.reservas_individuales || []).filter(r => r.id !== reservaId);
+        
+        const clasesSuspendidas = [...(c.clases_suspendidas || [])];
+        clasesSuspendidas.push({
+          turno_id: reserva.turno_id,
+          fecha: reserva.fecha,
+          reintegrado,
+          creado_at: new Date().toISOString()
+        });
+
+        return {
+          ...c,
+          reservas_individuales: filtradas,
+          clases_suspendidas: clasesSuspendidas
+        };
+      }
+      return c;
+    });
+
+    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    addAuditLog('RESERVA_INDIVIDUAL_CANCELADA', { 
+      cliente: `${cliente.nombre} ${cliente.apellido}`, 
+      turno_id: reserva.turno_id, 
+      fecha: reserva.fecha, 
+      reintegrado 
+    });
+
+    if (reintegrado) {
+      return { success: true, message: 'Reserva cancelada. Cupo reintegrado a tu balance mensual.' };
+    } else {
+      return { success: true, message: 'Reserva liberada para el gimnasio. El cupo no se reintegra por cancelarse con menos de 3 horas de anticipación.' };
+    }
+  };
+
+  const suspenderClaseFija = (clienteId: string, turnoId: string, fecha: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    if (!cliente.turnos_fijos.includes(turnoId)) {
+      return { success: false, message: 'No tienes este turno asignado como fijo.' };
+    }
+
+    const alreadySuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha);
+    if (alreadySuspended) {
+      return { success: false, message: 'Esta sesión ya ha sido suspendida para esta fecha.' };
+    }
+
+    const turno = turnos.find(t => t.id === turnoId);
+    const horaClase = turno ? turno.hora : '00:00';
+
+    // Check 3 hours notice
+    const now = new Date();
+    const classDateTime = new Date(`${fecha}T${horaClase}:00`);
+    const diffHours = (classDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    const reintegrado = diffHours >= 3.0;
+
+    const updatedClientes = clientes.map(c => {
+      if (c.id === clienteId) {
+        const clasesSuspendidas = [...(c.clases_suspendidas || [])];
+        clasesSuspendidas.push({
+          turno_id: turnoId,
+          fecha,
+          reintegrado,
+          creado_at: new Date().toISOString()
+        });
+
+        return {
+          ...c,
+          clases_suspendidas: clasesSuspendidas
+        };
+      }
+      return c;
+    });
+
+    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    addAuditLog('CLASE_FIJA_SUSPENDIDA', { 
+      cliente: `${cliente.nombre} ${cliente.apellido}`, 
+      turno_id: turnoId, 
+      fecha, 
+      reintegrado 
+    });
+
+    if (reintegrado) {
+      return { success: true, message: 'Sesión suspendida. Cupo de recuperación acreditado en tus disponibles.' };
+    } else {
+      return { success: true, message: 'Sesión suspendida. El cupo no se acredita por suspender con menos de 3 horas de anticipación.' };
+    }
+  };
+
   // CLIENT PAGOS OPERATIONS
   const registrarPago = (pagoData: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => {
     const cli = clientes.find(c => c.id === pagoData.cliente_id);
@@ -1092,6 +1272,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addCliente, updateCliente, bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, modificarPrecioOCupoTurno,
+      crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija,
       registrarPago, importarPagosCSV,
       addNovedad, updateNovedad, deleteNovedad,
       ejecutarCronMorosidad,

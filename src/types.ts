@@ -6,6 +6,20 @@ export type EstadoCliente = 'ACTIVO' | 'CON_DEUDA' | 'MOROSO' | 'INACTIVO';
 export type MedioPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO' | 'UALA' | 'OTRO';
 export type RolUsuario = 'ADMIN' | 'OPERADOR' | 'SOCIO';
 
+export interface ReservaIndividual {
+  id: string;
+  turno_id: string;
+  fecha: string; // Formato 'YYYY-MM-DD'
+  creado_at: string;
+}
+
+export interface ClaseSuspendida {
+  turno_id: string;
+  fecha: string; // Formato 'YYYY-MM-DD'
+  reintegrado: boolean; // Indica si se le devolvió el cupo al socio (aviso > 3 horas)
+  creado_at: string;
+}
+
 export interface Cliente {
   id: string;
   nombre: string;
@@ -20,6 +34,8 @@ export interface Cliente {
   ultimo_mes_pagado: string; // Formato 'YYYY-MM'
   turnos_fijos: string[]; // IDs de los turnos asignados (si es FIJO)
   turno_variable?: string; // ID del turno variable asignado en tiempo real
+  reservas_individuales?: ReservaIndividual[];
+  clases_suspendidas?: ClaseSuspendida[];
   creado_at: string;
 }
 

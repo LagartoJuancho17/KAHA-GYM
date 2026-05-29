@@ -92,17 +92,11 @@ export const GoogleSignIn: React.FC = () => {
         
         {/* BRAND HEADER */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 rounded-full border border-indigo-500/20 text-indigo-650 font-mono text-[9px] uppercase tracking-widest">
-            <Sparkles className="w-3 h-3 animate-pulse text-indigo-500" />
-            Google OAuth 2.0 Integration
-          </div>
+
           <div className="flex justify-center items-center gap-2 mt-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-650 flex items-center justify-center shadow-lg shadow-sky-500/20">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
             <div className="text-left">
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">ARES GYM</h2>
-              <p className="text-indigo-600 text-[10px] uppercase font-mono tracking-widest -mt-1">Servicio de Autenticación</p>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">KAHA GYM</h2>
+              <p className="text-green-600 text-[10px] uppercase font-mono tracking-widest -mt-1">Servicio de Autenticación</p>
             </div>
           </div>
           <p className="text-slate-650 text-xs mt-3">
@@ -113,9 +107,9 @@ export const GoogleSignIn: React.FC = () => {
         {loading ? (
           <div className="py-12 flex flex-col items-center justify-center space-y-4">
             <div className="relative">
-              <div className="w-12 h-12 rounded-full border-4 border-slate-100 border-t-indigo-600 animate-spin"></div>
+              <div className="w-12 h-12 rounded-full border-4 border-slate-100 border-t-green-600 animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <svg className="w-5 h-5 text-indigo-600" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 5.48 1 0 6.48 0 13s5.48 12 12.24 12c7.06 0 11.758-4.965 11.758-11.965 0-.807-.087-1.427-.193-1.75H12.24z"/>
                 </svg>
               </div>
@@ -132,7 +126,7 @@ export const GoogleSignIn: React.FC = () => {
               <div id="google-real-btn-container" className="min-h-[44px] flex items-center justify-center">
                 {/* Fallback spinner before library is loaded */}
                 <div className="text-slate-600 text-xs flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full border-2 border-slate-250 border-t-indigo-500 animate-spin"></div>
+                  <div className="w-4 h-4 rounded-full border-2 border-slate-250 border-t-green-500 animate-spin"></div>
                   <span>Cargando componente de Google...</span>
                 </div>
               </div>
@@ -156,11 +150,6 @@ export const GoogleSignIn: React.FC = () => {
             )}
           </div>
         )}
-
-        <div className="text-center text-slate-500 text-[10px] flex items-center justify-center gap-1.5">
-          <Lock className="w-3.5 h-3.5 text-slate-400" />
-          <span>Acceso certificado por Google Identity SSO</span>
-        </div>
 
       </div>
     </div>

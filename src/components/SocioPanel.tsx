@@ -31,8 +31,9 @@ function getNextOccurrenceOfWeekday(dayName: 'LUNES' | 'MARTES' | 'MIERCOLES' | 
 
 export const SocioPanel: React.FC = () => {
   const { 
-    clientes, turnos, pagos, selectedSocioId, asignarTurnoVariable, planes, googleUser, signOutGoogle,
-    recuperos, agregarRecupero, novedades, setRolActivo, rolActivo
+    clientes, turnos, pagos, selectedSocioId, planes, googleUser, signOutGoogle,
+    novedades, setRolActivo, rolActivo,
+    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija
   } = useGym();
 
   // Navigation tabs: HOME | PERFIL | RESERVAS | PAGOS | NOVEDADES
@@ -50,14 +51,11 @@ export const SocioPanel: React.FC = () => {
   const [phoneInput, setPhoneInput] = useState('');
   const [isEditingPhone, setIsEditingPhone] = useState(false);
 
-  // States for Baja and Alta Ocasional (Inasistencia y Recuperos)
-  const [showRecuperoModal, setShowRecuperoModal] = useState(false);
-  const [recuperoForm, setRecuperoForm] = useState({
-    turno_original_id: '',
-    fecha_inasistencia: '',
-    turno_recupero_id: '',
-    fecha_recupero: ''
-  });
+  // States for booking dates selection
+  const [bookingTurnId, setBookingTurnId] = useState<string | null>(null);
+  const [reprogramTurnId, setReprogramTurnId] = useState<string | null>(null);
+
+
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -95,11 +93,7 @@ export const SocioPanel: React.FC = () => {
       .sort((a, b) => new Date(b.fecha_pago).getTime() - new Date(a.fecha_pago).getTime());
   }, [pagos, socio]);
 
-  // Recuperos list
-  const misRecuperos = useMemo(() => {
-    if (!socio) return [];
-    return recuperos.filter(r => r.cliente_id === socio.id);
-  }, [recuperos, socio]);
+
 
   // Daily slots for current tab
   const turnosDelDia = useMemo(() => {
@@ -112,113 +106,167 @@ export const SocioPanel: React.FC = () => {
     return planes.find(p => p.id === socio.plan_id) || null;
   }, [planes, socio]);
 
-  // Track the reserved slots (both turnos fijos and turno variable)
-  const misTurnosReservados = useMemo(() => {
-    if (!socio) return [];
-    const list: { id: string; dia: string; hora: string; tipo: 'FIJO' | 'VARIABLE' }[] = [];
+  const paidMonth = useMemo(() => {
+    return socio?.ultimo_mes_pagado || new Date().toISOString().slice(0, 7);
+  }, [socio]);
+
+  const isDateInPaidMonth = (dateStr: string) => {
+    return dateStr.startsWith(paidMonth);
+  };
+  const getDatesOfWeekdayInMonth = (dayName: string, monthStr: string): string[] => {
+    const daysMap = { 'DOMINGO': 0, 'LUNES': 1, 'MARTES': 2, 'MIERCOLES': 3, 'JUEVES': 4, 'VIERNES': 5, 'SABADO': 6 };
+    const targetDay = daysMap[dayName as keyof typeof daysMap] ?? 1;
+    const [year, month] = monthStr.split('-').map(Number);
     
-    // 1. Fijos
-    if (socio.turnos_fijos && Array.isArray(socio.turnos_fijos)) {
-      socio.turnos_fijos.forEach(id => {
-        const found = turnos.find(t => t.id === id);
-        if (found) {
-          list.push({ id: found.id, dia: found.dia, hora: found.hora, tipo: 'FIJO' });
-        }
-      });
-    }
-
-    // 2. Variable
-    if (socio.turno_variable) {
-      const found = turnos.find(t => t.id === socio.turno_variable);
-      if (found) {
-        list.push({ id: found.id, dia: found.dia, hora: found.hora, tipo: 'VARIABLE' });
+    const dates: string[] = [];
+    const date = new Date(year, month - 1, 1);
+    while (date.getMonth() === month - 1) {
+      if (date.getDay() === targetDay) {
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        dates.push(`${yyyy}-${mm}-${dd}`);
       }
+      date.setDate(date.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const getOccupiedCountOnDate = (turnoId: string, dateStr: string) => {
+    const turn = turnos.find(t => t.id === turnoId);
+    if (!turn) return 0;
+    const fijosCount = turn.asignados_ids.length;
+    const individualCount = clientes.reduce((acc, c) => {
+      const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === dateStr);
+      return acc + bookingsOnDate.length;
+    }, 0);
+    return fijosCount + individualCount;
+  };
+
+  const getAvailableDatesForTurn = (dayName: string) => {
+    const daysMap = { 'DOMINGO': 0, 'LUNES': 1, 'MARTES': 2, 'MIERCOLES': 3, 'JUEVES': 4, 'VIERNES': 5, 'SABADO': 6 };
+    const targetDay = daysMap[dayName as keyof typeof daysMap] ?? 1;
+    const [year, month] = paidMonth.split('-').map(Number);
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0);
+    const minDate = new Date(startOfMonth);
+    minDate.setDate(minDate.getDate() - 15);
+    const maxDate = new Date(endOfMonth);
+    maxDate.setDate(maxDate.getDate() + 15);
+    const dates: string[] = [];
+    const current = new Date(minDate);
+    while (current <= maxDate) {
+      if (current.getDay() === targetDay) {
+        const yyyy = current.getFullYear();
+        const mm = String(current.getMonth() + 1).padStart(2, '0');
+        const dd = String(current.getDate()).padStart(2, '0');
+        dates.push(`${yyyy}-${mm}-${dd}`);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  };
+  const totalMonthlySlots = useMemo(() => {
+    if (!planSocio) return 12; // default
+    return planSocio.dias_por_semana * 4;
+  }, [planSocio]);
+
+  const fixedDaysCount = useMemo(() => {
+    return socio ? socio.turnos_fijos.length : 0;
+  }, [socio]);
+
+  const totalFixedSlotsForMonth = useMemo(() => {
+    return fixedDaysCount * 4;
+  }, [fixedDaysCount]);
+
+  const activeIndividualReservations = useMemo(() => {
+    if (!socio) return [];
+    return (socio.reservas_individuales || []).filter(r => isDateInPaidMonth(r.fecha));
+  }, [socio, paidMonth]);
+
+  const suspendedClassesThisMonth = useMemo(() => {
+    if (!socio) return [];
+    return (socio.clases_suspendidas || []).filter(s => isDateInPaidMonth(s.fecha));
+  }, [socio, paidMonth]);
+
+  const reintegratedSuspensionsCount = useMemo(() => {
+    return suspendedClassesThisMonth.filter(s => s.reintegrado).length;
+  }, [suspendedClassesThisMonth]);
+
+  const usedSlots = useMemo(() => {
+    return Math.max(0, totalFixedSlotsForMonth - reintegratedSuspensionsCount + activeIndividualReservations.length);
+  }, [totalFixedSlotsForMonth, reintegratedSuspensionsCount, activeIndividualReservations]);
+
+  const availableSlots = useMemo(() => {
+    return Math.max(0, totalMonthlySlots - usedSlots);
+  }, [totalMonthlySlots, usedSlots]);
+
+  // Unified sessions lists (Fijos + Individuales) in course month
+  const sesionesDelMes = useMemo(() => {
+    if (!socio) return [];
+    
+    interface SesionInfo {
+      id: string; // unique key
+      tipo: 'FIJO' | 'INDIVIDUAL';
+      turnoId: string;
+      diaNombre: string;
+      hora: string;
+      fecha: string;
+      isSuspended: boolean;
+      suspendedInfo?: any;
+      originalReserva?: any;
     }
 
-    // Sort order by Day (Lunes to Viernes) and hour
-    const diasOrder = { 'LUNES': 1, 'MARTES': 2, 'MIERCOLES': 3, 'JUEVES': 4, 'VIERNES': 5 };
+    let list: SesionInfo[] = [];
+
+    // 1. Generate from fixed days
+    socio.turnos_fijos.forEach(tfId => {
+      const turn = turnos.find(t => t.id === tfId);
+      if (!turn) return;
+      
+      const dates = getDatesOfWeekdayInMonth(turn.dia, paidMonth);
+      dates.forEach(date => {
+        const susp = (socio.clases_suspendidas || []).find(s => s.turno_id === tfId && s.fecha === date);
+        list.push({
+          id: `fixed-${tfId}-${date}`,
+          tipo: 'FIJO',
+          turnoId: tfId,
+          diaNombre: turn.dia,
+          hora: turn.hora,
+          fecha: date,
+          isSuspended: !!susp,
+          suspendedInfo: susp
+        });
+      });
+    });
+
+    // 2. Add individual bookings
+    (socio.reservas_individuales || []).forEach(r => {
+      if (!isDateInPaidMonth(r.fecha)) return;
+      const turn = turnos.find(t => t.id === r.turno_id);
+      if (!turn) return;
+
+      list.push({
+        id: `indiv-${r.id}`,
+        tipo: 'INDIVIDUAL',
+        turnoId: r.turno_id,
+        diaNombre: turn.dia,
+        hora: turn.hora,
+        fecha: r.fecha,
+        isSuspended: false,
+        originalReserva: r
+      });
+    });
+
+    // Sort chronologically
     list.sort((a, b) => {
-      const dayDiff = (diasOrder[a.dia as keyof typeof diasOrder] || 99) - (diasOrder[b.dia as keyof typeof diasOrder] || 99);
-      if (dayDiff !== 0) return dayDiff;
+      const dateDiff = a.fecha.localeCompare(b.fecha);
+      if (dateDiff !== 0) return dateDiff;
       return a.hora.localeCompare(b.hora);
     });
 
     return list;
-  }, [socio, turnos]);
-
-  const handleAsignarVariable = (turnoId: string) => {
-    if (!socio) return;
-    setSuccessMessage(null);
-    setErrorMessage(null);
-
-    const res = asignarTurnoVariable(socio.id, turnoId);
-    if (res.success) {
-      setSuccessMessage(res.message);
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } else {
-      setErrorMessage(res.message);
-      setTimeout(() => setErrorMessage(null), 3000);
-    }
-  };
-
-  const handleLiberarVariable = () => {
-    if (!socio) return;
-    setSuccessMessage(null);
-    setErrorMessage(null);
-
-    const res = asignarTurnoVariable(socio.id, null);
-    if (res.success) {
-      setSuccessMessage(res.message);
-      setTimeout(() => setSuccessMessage(null), 3500);
-    } else {
-      setErrorMessage(res.message);
-      setTimeout(() => setErrorMessage(null), 3500);
-    }
-  };
-
-  const handleRegistrarRecuperoSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!socio) return;
-    setSuccessMessage(null);
-    setErrorMessage(null);
-
-    if (!recuperoForm.turno_original_id || !recuperoForm.fecha_inasistencia || !recuperoForm.turno_recupero_id || !recuperoForm.fecha_recupero) {
-      setErrorMessage("Por favor completa todos los campos para realizar el cambio ocasional.");
-      setTimeout(() => setErrorMessage(null), 4000);
-      return;
-    }
-
-    const tOrig = turnos.find(t => t.id === recuperoForm.turno_original_id);
-    const tRec = turnos.find(t => t.id === recuperoForm.turno_recupero_id);
-
-    if (tOrig?.dia === tRec?.dia) {
-      // Small logic sanity check or helper message
-    }
-
-    const res = agregarRecupero({
-      cliente_id: socio.id,
-      cliente_nombre: `${socio.nombre} ${socio.apellido}`,
-      turno_original_id: recuperoForm.turno_original_id,
-      fecha_inasistencia: recuperoForm.fecha_inasistencia,
-      turno_recupero_id: recuperoForm.turno_recupero_id,
-      fecha_recupero: recuperoForm.fecha_recupero,
-    });
-
-    if (res.success) {
-      setSuccessMessage("¡Baja ocasional reportada y Alta ocasional agendada exitosamente!");
-      setShowRecuperoModal(false);
-      setRecuperoForm({
-        turno_original_id: '',
-        fecha_inasistencia: '',
-        turno_recupero_id: '',
-        fecha_recupero: ''
-      });
-      setTimeout(() => setSuccessMessage(null), 4000);
-    } else {
-      setErrorMessage(res.message);
-      setTimeout(() => setErrorMessage(null), 4000);
-    }
-  };
+  }, [socio, turnos, paidMonth]);
 
   if (!socio) {
     return (
@@ -613,68 +661,53 @@ export const SocioPanel: React.FC = () => {
       {activeTabSection === 'HOME' && (
         <div className="space-y-6 animate-fade-in" id="socio-section-home">
           
-          {/* Welcome Premium Header banner */}
-          <div className="bg-gradient-to-r from-slate-900 to-emerald-950 text-white rounded-3xl p-6.5 relative overflow-hidden shadow-md">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.15),transparent_60%)] pointer-events-none"></div>
-            <div className="relative z-10 space-y-2 max-w-xl">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-[8px] uppercase tracking-wider font-extrabold">
-                <Award className="w-3 h-3 text-emerald-400" />
-                Ingreso Verificado
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white uppercase col-span-2">
-                ¡Hola de nuevo, {socio.nombre}!
-              </h2>
-              <p className="text-slate-300 text-xs leading-relaxed font-medium">
-                Bienvenido al portal inteligente KAHA GYM. Desde aquí puedes descargar tu pase digital con código de barras QR, consultar turnos variables vacantes y visualizar tu abono vigente.
-              </p>
-            </div>
-            {/* Background geometric decorative label */}
-            <span className="absolute bottom-1 right-4 text-white/[0.04] font-black text-6xl select-none font-sans uppercase tracking-tight hidden sm:block">KAHA</span>
-          </div>
+
 
           {/* SECCIÓN PRESTIGIO: CARTELERA DE NOVEDADES EN HOME */}
           {novedades.length > 0 && (
-            <div className="bg-gradient-to-tr from-amber-500/5 to-emerald-50/30 rounded-3xl border border-emerald-150 p-5 space-y-4 shadow-xs" id="home-novedades-preview">
-              <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
+            <div className="bg-gradient-to-r from-slate-900 to-emerald-950 text-white rounded-3xl p-6.5 relative overflow-hidden shadow-md space-y-4 animate-fade-in" id="home-novedades-preview">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.15),transparent_60%)] pointer-events-none"></div>
+              
+              <div className="relative z-10 flex justify-between items-center pb-2.5 border-b border-white/10">
                 <div className="flex items-center gap-2">
-                  <Megaphone className="w-5 h-5 text-emerald-700 animate-bounce shrink-0" />
+                  <Megaphone className="w-5 h-5 text-emerald-400 animate-bounce shrink-0" />
                   <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider font-mono">CARTELERA DE NOVEDADES</h3>
-                    <p className="text-[10px] text-slate-450 font-sans">Anuncios oficiales del gimnasio para alumnos</p>
+                    <h3 className="text-xs font-black text-white uppercase tracking-wider font-mono">CARTELERA DE NOVEDADES</h3>
+                    <p className="text-[10px] text-slate-300 font-sans">Anuncios oficiales del gimnasio para alumnos</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setActiveTabSection('NOVEDADES')}
-                  className="text-[10px] font-bold text-emerald-700 bg-emerald-50/80 border border-emerald-150 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition-all cursor-pointer"
+                  className="text-[10px] font-bold text-white bg-emerald-600/80 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl hover:bg-emerald-500/95 transition-all cursor-pointer relative z-10"
                 >
                   Ver Cartelera Completa
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {novedades.slice(0, 2).map((nov) => {
                   return (
                     <div 
                       key={nov.id} 
                       onClick={() => setActiveTabSection('NOVEDADES')}
-                      className={`bg-white rounded-2xl border p-4 flex flex-col justify-between gap-3 text-xs shadow-xs transition-transform hover:scale-101 cursor-pointer relative overflow-hidden ${
-                        nov.destacado ? 'border-amber-300 ring-2 ring-amber-500/5' : 'border-slate-205'
+                      className={`bg-white/5 backdrop-blur-md border p-4 flex flex-col justify-between gap-3 text-xs shadow-xs transition-transform hover:scale-101 cursor-pointer relative overflow-hidden rounded-2xl ${
+                        nov.destacado ? 'border-amber-400/60 ring-2 ring-amber-500/10' : 'border-white/10 hover:border-white/20'
                       }`}
                     >
                       {nov.destacado && (
-                        <span className="absolute top-0 right-0 bg-amber-500 text-white px-2 py-0.5 rounded-bl-lg text-[8px] font-black uppercase tracking-wider font-mono">
+                        <span className="absolute top-0 right-0 bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-bl-lg text-[8px] font-black uppercase tracking-wider font-mono">
                           IMPORTANTE
                         </span>
                       )}
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-[9px] text-slate-400 font-mono">
-                          <span className="bg-slate-100 px-1.5 py-0.2 rounded border uppercase font-bold text-slate-600">
+                          <span className="bg-emerald-500/20 px-1.5 py-0.2 rounded border border-emerald-500/30 uppercase font-bold text-emerald-300">
                             {nov.categoria}
                           </span>
                           <span>{nov.fecha}</span>
                         </div>
-                        <h4 className="font-bold text-slate-800 leading-tight pr-14 text-[12px]">{nov.titulo}</h4>
-                        <p className="text-slate-500 text-[11px] line-clamp-2 mt-1">{nov.contenido}</p>
+                        <h4 className="font-bold text-white leading-tight pr-14 text-[12px]">{nov.titulo}</h4>
+                        <p className="text-slate-300 text-[11px] line-clamp-2 mt-1">{nov.contenido}</p>
                       </div>
                     </div>
                   );
@@ -683,84 +716,184 @@ export const SocioPanel: React.FC = () => {
             </div>
           )}
 
-          {/* MIS DÍAS RESERVADOS DE ENTRENAMIENTO (USER REQUEST) */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4" id="socio-active-reservations-dashboard">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          {/* NUEVO BALANCE UNIFICADO: CONTROL DE CUPOS Y TURNOS */}
+          <div className="bg-white border border-slate-205 rounded-3xl p-6 shadow-sm space-y-6" id="socio-control-cupos-hero">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-sm font-black text-slate-805 tracking-tight flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>MIS DÍAS RESERVADOS DE ENTRENAMIENTO</span>
+                <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-md font-mono font-bold uppercase tracking-wider">
+                  Balance de Reservas
+                </span>
+                <h3 className="text-base font-black text-slate-800 tracking-tight mt-1.5 flex items-center gap-2">
+                  <CalendarDays className="w-5.5 h-5.5 text-emerald-600 shrink-0" />
+                  <span>CONTROL DE CUPOS Y TURNOS</span>
                 </h3>
-                <p className="text-slate-550 text-[11px] font-medium leading-relaxed mt-0.5">
-                  Estos son los días y horarios que tenés reservados de forma fija o variable para esta semana.
-                </p>
               </div>
               <button 
                 onClick={() => setActiveTabSection('RESERVAS')}
-                className="text-[11px] font-bold text-emerald-600 hover:text-emerald-850 transition-colors cursor-pointer flex items-center gap-1 shrink-0 self-start sm:self-auto"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0 self-start sm:self-auto"
                 id="home-go-to-reservations-shortcut"
               >
-                <span>Administrar mis reservas</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Reservar nuevo cupo</span>
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {misTurnosReservados.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 px-4 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-                <CalendarDays className="w-10 h-10 text-slate-300 mb-2.5 animate-pulse" />
-                <p className="font-bold text-xs text-slate-705">No tenés días reservados esta semana</p>
-                <p className="text-[10px] text-slate-500 mt-1 max-w-sm leading-relaxed">
-                  Para poder asistir a entrenar, recordá reservar un turno variable o solicitar un turno fijo.
-                </p>
-                <button
-                  onClick={() => setActiveTabSection('RESERVAS')}
-                  className="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-bold px-4 py-2 rounded-xl transition-all shadow-xs cursor-pointer"
-                >
-                  Ver turnos disponibles
-                </button>
+            {/* Metrics Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50/50 p-4.5 rounded-2xl border border-slate-150">
+              <div className="space-y-1">
+                <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Cupos Mensuales Plan</p>
+                <p className="text-lg font-black text-slate-800">{totalMonthlySlots} <span className="text-xs text-slate-400 font-medium">clases</span></p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {misTurnosReservados.map(r => (
-                  <div 
-                    key={r.id} 
-                    className={`p-4 rounded-2xl border flex items-center justify-between gap-4 transition-all hover:scale-[1.01] shadow-2xs ${
-                      r.tipo === 'FIJO' 
-                        ? 'bg-sky-50/40 border-sky-200' 
-                        : 'bg-emerald-50/40 border-emerald-205'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                        r.tipo === 'FIJO' 
-                          ? 'bg-sky-100 text-sky-700 border-sky-150' 
-                          : 'bg-emerald-100 text-emerald-700 border-emerald-150'
-                      }`}>
-                        <CalendarDays className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-mono text-[10px] font-extrabold text-slate-450 uppercase tracking-wide leading-none">
-                          {r.dia === 'MIERCOLES' ? 'MIÉRCOLES' : r.dia}
-                        </p>
-                        <p className="text-sm font-black text-slate-800 leading-none mt-1.5">{r.hora} hs</p>
-                      </div>
-                    </div>
+              <div className="space-y-1">
+                <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Cupos Asignados / Usados</p>
+                <p className="text-lg font-black text-emerald-700">{usedSlots} / {totalMonthlySlots}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Cupos Libres por Asignar</p>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                  <p className="text-lg font-black text-slate-800">{availableSlots}</p>
+                </div>
+              </div>
+            </div>
 
-                    <span className={`text-[8px] font-bold tracking-wider px-2 py-0.5 rounded font-mono border ${
-                      r.tipo === 'FIJO' 
-                        ? 'bg-sky-50 text-sky-850 border-sky-200' 
-                        : 'bg-emerald-50 text-emerald-805 border-emerald-200'
-                    }`}>
-                      {r.tipo === 'FIJO' ? 'FIJO SEMANAL' : 'TURNO VARIABLE'}
-                    </span>
-                  </div>
-                ))}
+            {/* Progress bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
+                <div 
+                  className="bg-emerald-600 h-full rounded-full transition-all" 
+                  style={{ width: `${Math.min((usedSlots / totalMonthlySlots) * 100, 100)}%` }}
+                ></div>
               </div>
-            )}
+            </div>
+
+            {/* Agenda List of the Month */}
+            <div className="space-y-3.5">
+              <h4 className="text-xs font-black text-slate-450 uppercase tracking-widest font-mono">Mis Sesiones Programadas ({paidMonth})</h4>
+              
+              {sesionesDelMes.length === 0 ? (
+                <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                  <Calendar className="w-9 h-9 text-slate-300 mx-auto mb-2" />
+                  <p className="font-bold text-xs text-slate-700">No tienes sesiones programadas para este mes</p>
+                  <p className="text-[10px] text-slate-500 mt-1 max-w-sm mx-auto">
+                    Tus días fijos y reservas aparecerán aquí. Presiona "Reservar nuevo cupo" para agendar clases.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {sesionesDelMes.map(sesion => {
+                    const dateFormatted = new Date(sesion.fecha + 'T00:00:00').toLocaleDateString('es-AR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'short'
+                    });
+
+                    return (
+                      <div 
+                        key={sesion.id} 
+                        className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 transition-all relative overflow-hidden ${
+                          sesion.isSuspended 
+                            ? 'bg-slate-50/80 border-slate-200 opacity-60' 
+                            : sesion.tipo === 'FIJO' 
+                              ? 'bg-sky-50/40 border-sky-200 hover:border-sky-300' 
+                              : 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 z-10">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                              sesion.isSuspended 
+                                ? 'bg-slate-100 text-slate-400 border-slate-200'
+                                : sesion.tipo === 'FIJO' 
+                                  ? 'bg-sky-100 text-sky-700 border-sky-150' 
+                                  : 'bg-emerald-100 text-emerald-700 border-emerald-150'
+                            }`}>
+                              <Calendar className="w-4.5 h-4.5" />
+                            </div>
+                            <div>
+                              <p className={`text-xs font-black text-slate-800 uppercase tracking-tight leading-none ${sesion.isSuspended ? 'line-through text-slate-400' : ''}`}>
+                                {dateFormatted}
+                              </p>
+                              <p className={`text-[10px] text-slate-500 font-mono mt-1 ${sesion.isSuspended ? 'line-through' : ''}`}>
+                                {sesion.hora} hs • {sesion.tipo === 'FIJO' ? 'Clase Fija Semanal' : 'Reserva Individual'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Status Badge */}
+                          {sesion.isSuspended ? (
+                            <span className={`text-[8px] font-bold tracking-wider px-2 py-0.5 rounded font-mono border ${
+                              sesion.suspendedInfo?.reintegrado 
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                : 'bg-rose-50 text-rose-800 border-rose-200'
+                            }`}>
+                              {sesion.suspendedInfo?.reintegrado ? 'SUSPENDIDA (REINTEGRADO)' : 'SUSPENDIDA (SIN REINTEGRO)'}
+                            </span>
+                          ) : (
+                            <span className={`text-[8px] font-bold tracking-wider px-2 py-0.5 rounded font-mono border ${
+                              sesion.tipo === 'FIJO' 
+                                ? 'bg-sky-50 text-sky-850 border-sky-200' 
+                                : 'bg-emerald-50 text-emerald-805 border-emerald-200'
+                            }`}>
+                              {sesion.tipo === 'FIJO' ? 'FIJO' : 'INDIVIDUAL'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Suspension / Cancellation buttons */}
+                        {!sesion.isSuspended && (
+                          <div className="flex justify-end pt-2 border-t border-slate-100/50 z-10">
+                            {sesion.tipo === 'FIJO' ? (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`¿Confirmas suspender la clase fija del ${dateFormatted} a las ${sesion.hora} hs? Si suspendes con más de 3 horas de anticipación, se te reintegrará el cupo.`)) {
+                                    const res = suspenderClaseFija(socio.id, sesion.turnoId, sesion.fecha);
+                                    if (res.success) {
+                                      setSuccessMessage(res.message);
+                                      setTimeout(() => setSuccessMessage(null), 4000);
+                                    } else {
+                                      setErrorMessage(res.message);
+                                      setTimeout(() => setErrorMessage(null), 4000);
+                                    }
+                                  }
+                                }}
+                                className="text-[9px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Suspender clase
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`¿Confirmas cancelar esta reserva individual del ${dateFormatted} a las ${sesion.hora} hs? Si cancelas con más de 3 horas de anticipación, se te reintegrará el cupo.`)) {
+                                    const res = cancelarReservaIndividual(socio.id, sesion.originalReserva.id);
+                                    if (res.success) {
+                                      setSuccessMessage(res.message);
+                                      setTimeout(() => setSuccessMessage(null), 4000);
+                                    } else {
+                                      setErrorMessage(res.message);
+                                      setTimeout(() => setErrorMessage(null), 4000);
+                                    }
+                                  }
+                                }}
+                                className="text-[9px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Cancelar reserva
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* BENTO GRID DE INFORMACIÓN DE PERFIL */}
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="socio-bento-dashboard">
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-6" id="socio-bento-dashboard">
             
             {/* CARD A: TARJETA DIGITAL DE MIEMBRO (Light Minimalist Visa design) */}
             <div className="bg-gradient-to-tr from-slate-50 via-white to-emerald-50/20 border border-slate-205 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm transition-all hover:border-emerald-400 group" id="socio-card-member">
@@ -837,52 +970,6 @@ export const SocioPanel: React.FC = () => {
                   <span className="font-mono text-slate-700 text-[11px] font-bold">
                     {socio.ultimo_mes_pagado ? `${socio.ultimo_mes_pagado.split('-')[1]}/ ${socio.ultimo_mes_pagado.split('-')[0]}` : 'Sin datos'}
                   </span>
-                </div>
-              </div>
-            </div>
-
-            {/* CARD C: RÉGIMEN DE CRÉDITO DE TURNOS */}
-            <div className="bg-white border border-slate-205 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm hover:border-slate-300 transition-all" id="socio-card-credits">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] font-mono text-violet-700 bg-violet-50 border border-violet-105 px-2.5 py-0.5 rounded-full tracking-wider uppercase font-bold">
-                    Balance de Reservas
-                  </span>
-                  <h3 className="text-base font-black text-slate-800 tracking-tight mt-2.5">CRÉDITOS DE TURNOS</h3>
-                  <p className="text-slate-500 text-xs mt-1 leading-normal">
-                    Disponibilidad calculada de acuerdo a las políticas de reserva del centro KAHA GYM.
-                  </p>
-                </div>
-                <div className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-violet-500">
-                  <CalendarDays className="w-4.5 h-4.5 text-violet-600" />
-                </div>
-              </div>
-
-              <div className="space-y-2.5 pb-0.5">
-                <div>
-                  <div className="flex justify-between text-[11px] mb-1 font-mono text-slate-600">
-                    <span>1. Turnos Fijos Asignados:</span>
-                    <span className="font-bold text-slate-800">{socio.turnos_fijos.length} / 2</span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-                    <div 
-                      className="bg-sky-500 h-full rounded-full transition-all" 
-                      style={{ width: `${Math.min((socio.turnos_fijos.length / 2) * 100, 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-[11px] mb-1 font-mono text-slate-600">
-                    <span>2. Turno Variable Reservable:</span>
-                    <span className="font-bold text-slate-800">{socio.turno_variable ? '1 / 1' : '0 / 1'}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-                    <div 
-                      className="bg-violet-500 h-full rounded-full transition-all" 
-                      style={{ width: `${socio.turno_variable ? 100 : 0}%` }}
-                    ></div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1100,9 +1187,7 @@ export const SocioPanel: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* 3. SECCION: RESERVAS Y HORARIOS */}
-      {activeTabSection === 'RESERVAS' && (
+           {activeTabSection === 'RESERVAS' && (
         <section className="bg-white border border-slate-205 rounded-3xl p-6.5 lg:p-8 shadow-sm relative animate-fade-in" id="socio-agenda-block">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_90%,rgba(16,185,129,0.01),transparent_40%)] pointer-events-none"></div>
 
@@ -1112,96 +1197,72 @@ export const SocioPanel: React.FC = () => {
                 <CalendarDays className="w-5.5 h-5.5 text-emerald-650" />
                 INSCRIPCIONES Y HORARIOS DISPONIBLES
               </h2>
-              <p className="text-slate-500 text-xs font-sans mt-1 col-span-2">
-                Consulta los cupos libres en vivo del gimnasio para reservar tu cupo variable de inmediato.
+              <p className="text-slate-500 text-xs font-sans mt-1">
+                Administra tus días de entrenamiento y reserva los cupos libres mensuales de tu plan.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2.5 text-[10px] text-slate-450 font-mono">
               <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-                <span className="w-2.5 h-2.5 bg-sky-200 border border-sky-450 rounded-full inline-block"></span> 
-                <span className="text-slate-600 font-semibold">Tus Fijos Semanales</span>
+                <span className="w-2.5 h-2.5 bg-sky-200 border border-sky-400 rounded-full inline-block"></span> 
+                <span className="text-slate-600 font-semibold">Tus Días Fijos</span>
               </span>
               <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-                <span className="w-2.5 h-2.5 bg-violet-200 border border-violet-400 rounded-full inline-block"></span> 
-                <span className="text-slate-600 font-semibold">Tu Reserva Variable</span>
+                <span className="w-2.5 h-2.5 bg-emerald-200 border border-emerald-400 rounded-full inline-block"></span> 
+                <span className="text-slate-600 font-semibold">Tus Reservas Individuales</span>
               </span>
             </div>
           </div>
 
-          {/* SECCIÓN DE GESTIÓN DE RECUPEROS (BAJAS Y ALTAS OCASIONALES) */}
-          <div className="mb-8 p-5 rounded-2xl border border-emerald-150 bg-gradient-to-tr from-slate-50 to-emerald-50/20 shadow-xs relative overflow-hidden" id="socio-recuperos-dashboard">
-            <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500"></div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-              <div>
-                <h3 className="text-xs font-black text-emerald-950 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <RefreshCw className="w-4 h-4 text-emerald-650 animate-spin-slow" />
-                  MIS CAMBIOS OCASIONALES (BAJAS Y ALTAS)
-                </h3>
-                <p className="text-slate-500 text-[11px] font-sans mt-1">
-                  ¿No puedes asistir a un turno fijo semanal? Notifica tu falta (baja ocasional) y reserva una clase de reemplazo (alta ocasional).
+          {/* SUMMARY BOX: INFO REQUESTED BY USER */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
+            <div className="space-y-1.5">
+              <p className="text-[10px] text-slate-450 font-mono uppercase tracking-wider font-extrabold">1. Cupos Disponibles por Asignar este Mes</p>
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                <p className="text-lg font-black text-slate-800">
+                  {availableSlots} <span className="text-xs text-slate-500 font-medium">de {totalMonthlySlots} cupos totales</span>
                 </p>
               </div>
-              
-              <button
-                onClick={() => {
-                  setRecuperoForm({
-                    turno_original_id: socio.turnos_fijos[0] || '',
-                    fecha_inasistencia: socio.turnos_fijos[0] ? getNextOccurrenceOfWeekday(turnos.find(t => t.id === socio.turnos_fijos[0])?.dia || 'LUNES') : '',
-                    turno_recupero_id: '',
-                    fecha_recupero: ''
-                  });
-                  setShowRecuperoModal(true);
-                }}
-                disabled={socio.turnos_fijos.length === 0}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                  socio.turnos_fijos.length === 0
-                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-650 hover:scale-101'
-                }`}
-              >
-                <Plus className="w-4 h-4" />
-                Nueva Baja y Alta Ocasional
-              </button>
+              <p className="text-[10px] text-slate-500 font-sans leading-normal">
+                Puedes asignarlos libremente a cualquier horario con cupo en la grilla inferior.
+              </p>
             </div>
 
-            {misRecuperos.length === 0 ? (
-              <div className="text-center py-6 bg-white/60 border border-dashed border-slate-200 rounded-xl">
-                <p className="text-slate-400 italic text-[11px] font-sans">No tienes ninguna baja y alta ocasional reportada todavía.</p>
+            <div className="space-y-1.5">
+              <p className="text-[10px] text-slate-450 font-mono uppercase tracking-wider font-extrabold">2. Días Fijos Asignados</p>
+              <div className="flex items-center gap-2">
+                <p className="text-base font-black text-slate-800">
+                  {socio.turnos_fijos.length > 0 ? (
+                    <span>{socio.turnos_fijos.length} días fijos semanales <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded">({totalFixedSlotsForMonth}/{totalMonthlySlots} cupos)</span></span>
+                  ) : (
+                    <span className="text-slate-450 italic text-xs font-medium">No posees horarios fijos semanales (Flex)</span>
+                  )}
+                </p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {misRecuperos.map(rec => {
-                  const origTurno = turnos.find(t => t.id === rec.turno_original_id);
-                  const newTurno = turnos.find(t => t.id === rec.turno_recupero_id);
-                  
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {socio.turnos_fijos.map(tfId => {
+                  const turn = turnos.find(t => t.id === tfId);
+                  if (!turn) return null;
                   return (
-                    <div key={rec.id} className="bg-white border border-slate-250 rounded-xl p-3.5 flex flex-col justify-between gap-3 text-xs shadow-xs">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[8px] bg-emerald-50 border border-emerald-150 text-emerald-755 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
-                          CAMBIO OCASIONAL: {rec.estado}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">#{rec.id.split('-')[1]?.slice(-4)}</span>
-                      </div>
-
-                      <div className="space-y-1.5 border-l-2 border-slate-200 pl-2.5 font-sans">
-                        <div className="text-slate-600 flex items-center gap-1 text-[11px]">
-                          <span className="font-semibold text-rose-550 shrink-0">Baja Ocasional:</span>
-                          <span className="font-medium text-slate-800">{origTurno ? `${origTurno.dia} ${origTurno.hora}hs` : rec.turno_original_id}</span>
-                          <span className="text-slate-400 font-mono text-[9px]">({rec.fecha_inasistencia})</span>
-                        </div>
-                        <div className="text-slate-600 flex items-center gap-1 text-[11px]">
-                          <span className="font-semibold text-emerald-600 shrink-0">Alta Ocasional:</span>
-                          <span className="font-medium text-slate-800">{newTurno ? `${newTurno.dia} ${newTurno.hora}hs` : rec.turno_recupero_id}</span>
-                          <span className="text-slate-400 font-mono text-[9px]">({rec.fecha_recupero})</span>
-                        </div>
-                      </div>
-                    </div>
+                    <span key={tfId} className="text-[9px] font-mono font-bold text-slate-650 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-3xs">
+                      {turn.dia} {turn.hora} hs
+                    </span>
                   );
                 })}
               </div>
-            )}
+            </div>
           </div>
+
+          {/* ALL FIXED WARNING */}
+          {availableSlots === 0 && usedSlots === totalMonthlySlots && (
+            <div className="mb-8 p-4.5 bg-sky-50 border border-sky-150 rounded-2xl flex items-center gap-3">
+              <Info className="w-5 h-5 text-sky-600 shrink-0" />
+              <p className="text-[11px] text-sky-850 font-medium leading-relaxed">
+                ¡Tienes todos tus cupos mensuales asignados de forma fija! Si deseas asistir en otro horario, puedes <strong>reprogramar</strong> tus sesiones haciendo click en "Reprogramar clase" en tus días fijos o desde el listado de sesiones en la pantalla de Inicio.
+              </p>
+            </div>
+          )}
 
           {/* DIAS CALENDARIO SELECTOR TAB BAR */}
           <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-205 gap-1 lg:max-w-xl mx-auto mb-8" id="socio-agenda-tabs">
@@ -1210,7 +1271,11 @@ export const SocioPanel: React.FC = () => {
               return (
                 <button
                   key={dia}
-                  onClick={() => setActiveDayTab(dia)}
+                  onClick={() => {
+                    setActiveDayTab(dia);
+                    setBookingTurnId(null);
+                    setReprogramTurnId(null);
+                  }}
                   className={`py-3.5 text-center text-xs font-bold rounded-xl transition-all cursor-pointer select-none border ${
                     isActive 
                       ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 text-white border-transparent font-black scale-102 shadow-sm' 
@@ -1229,7 +1294,7 @@ export const SocioPanel: React.FC = () => {
           </div>
 
           {/* CONTENEDOR DE SLOTS HOY / GRID */}
-          <div className="space-y-3.5" id="socio-agenda-slots">
+          <div className="space-y-4" id="socio-agenda-slots">
             {turnosDelDia.length === 0 ? (
               <div className="text-center py-12 bg-slate-50 border border-slate-150 rounded-2xl">
                 <Info className="w-8 h-8 text-slate-400 mx-auto mb-2" />
@@ -1238,13 +1303,9 @@ export const SocioPanel: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {turnosDelDia.map(turno => {
-                  const fijosCount = turno.asignados_ids.length;
-                  const variablesCount = clientes.filter(c => c.activo && c.turno_variable === turno.id).length;
-                  const totalOccupied = fijosCount + variablesCount;
-                  
                   const holdsMyFijo = socio.turnos_fijos.includes(turno.id);
-                  const holdsMyVariable = socio.turno_variable === turno.id;
-                  const isFull = totalOccupied >= turno.cupo_maximo;
+                  const misReservasEnTurno = (socio.reservas_individuales || []).filter(r => r.turno_id === turno.id && isDateInPaidMonth(r.fecha));
+                  const holdsMyIndividual = misReservasEnTurno.length > 0;
 
                   return (
                     <div 
@@ -1253,18 +1314,18 @@ export const SocioPanel: React.FC = () => {
                         p-4.5 rounded-2xl border transition-all flex flex-col justify-between gap-4 select-none
                         ${holdsMyFijo 
                           ? 'bg-sky-50/40 border-sky-305 shadow-inner' 
-                          : holdsMyVariable 
+                          : holdsMyIndividual 
                             ? 'bg-emerald-50/50 border-emerald-305 shadow-inner' 
                             : 'bg-slate-50/30 border-slate-205 hover:border-slate-300'
                         }
                       `}
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
                           <div className={`p-2.5 rounded-xl border ${
                             holdsMyFijo 
                               ? 'bg-sky-100 text-sky-700 border-sky-200' 
-                              : holdsMyVariable 
+                              : holdsMyIndividual 
                                 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
                                 : 'bg-white text-slate-500 border-slate-200'
                           }`}>
@@ -1272,85 +1333,178 @@ export const SocioPanel: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-base font-black text-slate-800 tracking-tight">{turno.hora} hs</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded font-mono ${
-                                isFull ? 'bg-red-50 text-red-700 border border-red-150' : 'bg-white text-slate-600 border border-slate-200'
-                              }`}>
-                                Cupos: {totalOccupied} / {turno.cupo_maximo}
-                              </span>
-                              <span className="text-[9px] text-slate-450 font-mono">
-                                ({fijosCount} Fijos • {variablesCount} Variables)
-                              </span>
-                            </div>
+                            <p className="text-[10px] text-slate-450 mt-1 font-medium">
+                              Cupo máximo del salón: {turno.cupo_maximo} alumnos
+                            </p>
+                            {holdsMyIndividual && (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {misReservasEnTurno.map(res => (
+                                  <span key={res.id} className="text-[8px] font-mono font-bold text-emerald-805 bg-emerald-100/50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                    Reservado: {new Date(res.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* BADGE DE ESTADO SELECCIÓN */}
+                        {/* BADGES */}
                         {holdsMyFijo && (
-                          <span className="text-[8px] bg-sky-100 text-sky-700 border border-sky-200 font-bold px-2 py-0.5 rounded-md uppercase tracking-widest font-mono">
-                            TU FIJO (SEMANAL)
+                          <span className="text-[8px] bg-sky-100 text-sky-700 border border-sky-200 font-bold px-2 py-0.5 rounded-md uppercase tracking-widest font-mono shrink-0">
+                            TU FIJO
                           </span>
                         )}
-                        {holdsMyVariable && (
-                          <span className="text-[8px] bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded-md uppercase tracking-widest font-mono animate-pulse">
-                            RESERVA VARIABLE
+                        {holdsMyIndividual && !holdsMyFijo && (
+                          <span className="text-[8px] bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded-md uppercase tracking-widest font-mono shrink-0">
+                            RESERVADO
                           </span>
                         )}
                       </div>
 
-                      <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
-                        <div>
-                          {/* Micro Progress Bar */}
-                          <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-                            <div 
-                              className={`h-full rounded-full ${isFull ? 'bg-red-500' : 'bg-emerald-600'}`}
-                              style={{ width: `${Math.min((totalOccupied / turno.cupo_maximo) * 100, 100)}%` }}
-                            ></div>
+                      {/* Expandable Booking dates view */}
+                      {bookingTurnId === turno.id && (
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2 animate-fade-in">
+                          <p className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-wider">Fechas Disponibles:</p>
+                          <div className="grid grid-cols-1 gap-2">
+                            {getAvailableDatesForTurn(turno.dia).map(dateStr => {
+                              const occupiedCount = getOccupiedCountOnDate(turno.id, dateStr);
+                              const isFullOnDate = occupiedCount >= turno.cupo_maximo;
+                              
+                              const hasBooking = (socio.reservas_individuales || []).some(r => r.fecha === dateStr) || 
+                                                 socio.turnos_fijos.some(tfId => {
+                                                   const tfTurn = turnos.find(t => t.id === tfId);
+                                                   if (!tfTurn) return false;
+                                                   const dateObj = new Date(dateStr + 'T00:00:00');
+                                                   const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+                                                   const dateDayName = days[dateObj.getDay()];
+                                                   if (tfTurn.dia === dateDayName) {
+                                                     const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr);
+                                                     return !isSuspended;
+                                                   }
+                                                   return false;
+                                                 });
+                              
+                              const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
+                                day: 'numeric',
+                                month: 'short'
+                              });
+
+                              return (
+                                <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-150 text-xs">
+                                  <div>
+                                    <span className="font-bold text-slate-700">{dateFormatted}</span>
+                                    <span className="text-[9px] text-slate-455 font-mono ml-2">({occupiedCount}/{turno.cupo_maximo} ocupados)</span>
+                                  </div>
+
+                                  {hasBooking ? (
+                                    <span className="text-[9px] font-bold text-slate-450 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Ya tienes clase</span>
+                                  ) : isFullOnDate ? (
+                                    <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded">Lleno</span>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        const res = crearReservaIndividual(socio.id, turno.id, dateStr);
+                                        if (res.success) {
+                                          setSuccessMessage(res.message);
+                                          setTimeout(() => setSuccessMessage(null), 3500);
+                                          setBookingTurnId(null);
+                                        } else {
+                                          setErrorMessage(res.message);
+                                          setTimeout(() => setErrorMessage(null), 3500);
+                                        }
+                                      }}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs"
+                                    >
+                                      Confirmar
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Expandable Reprogram/Suspend fixed date view */}
+                      {reprogramTurnId === turno.id && (
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2 animate-fade-in">
+                          <p className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-wider">Escoge qué sesión reprogramar:</p>
+                          <div className="grid grid-cols-1 gap-2">
+                            {getDatesOfWeekdayInMonth(turno.dia, paidMonth).map(dateStr => {
+                              const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === dateStr);
+                              const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
+                                day: 'numeric',
+                                month: 'short'
+                              });
+
+                              return (
+                                <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-150 text-xs">
+                                  <span className="font-bold text-slate-700">{dateFormatted}</span>
+
+                                  {isSuspended ? (
+                                    <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded">Suspendida</span>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        if (confirm(`¿Confirmas suspender la sesión fija del ${dateFormatted} para reprogramarla?`)) {
+                                          const res = suspenderClaseFija(socio.id, turno.id, dateStr);
+                                          if (res.success) {
+                                            setSuccessMessage(res.message);
+                                            setTimeout(() => setSuccessMessage(null), 4000);
+                                            setReprogramTurnId(null);
+                                          } else {
+                                            setErrorMessage(res.message);
+                                            setTimeout(() => setErrorMessage(null), 4000);
+                                          }
+                                        }
+                                      }}
+                                      className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs"
+                                    >
+                                      Suspender
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs mt-1">
+                        <div>
+                          {/* Indicator dot */}
+                          <span className={`inline-block w-2.5 h-2.5 rounded-full ${holdsMyFijo ? 'bg-sky-400 animate-pulse' : holdsMyIndividual ? 'bg-emerald-400' : 'bg-slate-200'}`}></span>
                         </div>
 
                         <div>
                           {holdsMyFijo && (
                             <button
                               onClick={() => {
-                                setRecuperoForm({
-                                  turno_original_id: turno.id,
-                                  fecha_inasistencia: getNextOccurrenceOfWeekday(turno.dia),
-                                  turno_recupero_id: '',
-                                  fecha_recupero: ''
-                                });
-                                setShowRecuperoModal(true);
+                                setReprogramTurnId(reprogramTurnId === turno.id ? null : turno.id);
+                                setBookingTurnId(null);
                               }}
                               className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-150 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 font-sans"
                             >
-                              <AlertTriangle className="w-3.5 h-3.5 text-sky-550" />
-                              Baja Ocasional / Recuperar
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Reprogramar clase
                             </button>
                           )}
 
-                          {holdsMyVariable && (
+                          {!holdsMyFijo && (
                             <button
-                              onClick={() => handleLiberarVariable()}
-                              className="bg-rose-50 hover:bg-rose-105 text-rose-700 border border-rose-150 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 font-mono"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Liberar Reserva
-                            </button>
-                          )}
-
-                          {!holdsMyFijo && !holdsMyVariable && (
-                            <button
-                              onClick={() => handleAsignarVariable(turno.id)}
-                              disabled={isFull}
+                              onClick={() => {
+                                setBookingTurnId(bookingTurnId === turno.id ? null : turno.id);
+                                setReprogramTurnId(null);
+                              }}
                               className={`
-                                px-4  py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer font-sans
-                                ${isFull 
-                                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed' 
+                                px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer font-sans
+                                ${bookingTurnId === turno.id
+                                  ? 'bg-slate-200 text-slate-700 border border-slate-300'
                                   : 'bg-emerald-600 hover:bg-emerald-700 border border-emerald-650 text-white shadow-xs'
                                 }
                               `}
                             >
-                              {isFull ? 'SIN CUPOS' : 'RESERVAR VARIABLE'}
+                              {bookingTurnId === turno.id ? 'CERRAR PANEL' : 'RESERVAR CUPO'}
                             </button>
                           )}
                         </div>
@@ -1494,143 +1648,31 @@ export const SocioPanel: React.FC = () => {
         </section>
       )}
 
-      {/* RECUPERO / BAJA Y ALTA OCASIONAL MODAL COMPONENT */}
-      {showRecuperoModal && (
-        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs select-none">
-          <div className="bg-white rounded-3xl border border-slate-205 shadow-2xl max-w-md w-full p-6 space-y-4 animate-scale-up">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
-                  <RefreshCw className="w-4 h-4 text-emerald-650" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-805 tracking-tight uppercase">Baja y Alta Ocasional</h3>
-                  <p className="text-[10px] text-slate-500 font-sans">Reportar inasistencia y agendar reemplazo</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowRecuperoModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRegistrarRecuperoSubmit} className="space-y-4 text-xs font-sans">
-              
-              {/* ORIGEN: BAJA OCASIONAL */}
-              <div className="space-y-1.5 bg-slate-50/50 p-3 rounded-xl border border-slate-200">
-                <span className="block text-[9px] font-bold text-slate-500 uppercase font-mono tracking-wider">1. BAJA OCASIONAL (Clase a Faltar)</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Turno Fijo Semanal</label>
-                    <select
-                      value={recuperoForm.turno_original_id}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const matchedTurno = turnos.find(t => t.id === val);
-                        const calculatedDate = matchedTurno ? getNextOccurrenceOfWeekday(matchedTurno.dia) : '';
-                        setRecuperoForm(prev => ({
-                          ...prev,
-                          turno_original_id: val,
-                          fecha_inasistencia: calculatedDate
-                        }));
-                      }}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 font-semibold text-slate-850 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="">Selecciona tu turno...</option>
-                      {socio.turnos_fijos.map(tfId => {
-                        const t = turnos.find(x => x.id === tfId);
-                        return (
-                          <option key={tfId} value={tfId}>
-                            {t ? `${t.dia} ${t.hora}hs` : tfId}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Fecha de Falta</label>
-                    <input
-                      type="date"
-                      value={recuperoForm.fecha_inasistencia}
-                      onChange={(e) => setRecuperoForm(prev => ({ ...prev, fecha_inasistencia: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 font-mono font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* DESTINO: ALTA OCASIONAL */}
-              <div className="space-y-1.5 bg-slate-50/50 p-3 rounded-xl border border-slate-200">
-                <span className="block text-[9px] font-bold text-slate-500 uppercase font-mono tracking-wider">2. ALTA OCASIONAL (Clase de Reemplazo)</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Turno de Recupero</label>
-                    <select
-                      value={recuperoForm.turno_recupero_id}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const matchedTurno = turnos.find(t => t.id === val);
-                        const calculatedDate = matchedTurno ? getNextOccurrenceOfWeekday(matchedTurno.dia) : '';
-                        setRecuperoForm(prev => ({
-                          ...prev,
-                          turno_recupero_id: val,
-                          fecha_recupero: calculatedDate
-                        }));
-                      }}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 font-semibold text-slate-850 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="">Selecciona el recupero...</option>
-                      {turnos
-                        .filter(t => !socio.turnos_fijos.includes(t.id))
-                        .map(t => {
-                          const fijosCount = t.asignados_ids.length;
-                          const variablesCount = clientes.filter(c => c.activo && c.turno_variable === t.id).length;
-                          const occupied = fijosCount + variablesCount;
-                          const available = t.cupo_maximo - occupied;
-                          return (
-                            <option key={t.id} value={t.id} disabled={available <= 0}>
-                              {t.dia} {t.hora}hs {available <= 0 ? '(SIN CUPOS)' : `(${available} libres)`}
-                            </option>
-                          );
-                        })
-                      }
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Fecha de Recupero</label>
-                    <input
-                      type="date"
-                      value={recuperoForm.fecha_recupero}
-                      onChange={(e) => setRecuperoForm(prev => ({ ...prev, fecha_recupero: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 font-mono font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRecuperoModal(false)}
-                  className="flex-1 py-2.5 border border-slate-250 text-slate-600 rounded-xl font-bold bg-white hover:bg-slate-50 transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border border-emerald-650 shadow-xs transition-all cursor-pointer"
-                >
-                  Agendar Cambio
-                </button>
-              </div>
-            </form>
-          </div>
+      {/* Floating WhatsApp Button ONLY for Client/User View */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 group" id="floating-whatsapp-container">
+        {/* Chat Tooltip Bubble */}
+        <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 text-slate-800 px-3.5 py-2 rounded-2xl shadow-lg text-[11px] font-bold tracking-tight opacity-0 scale-90 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none select-none font-sans flex items-center gap-2 border-emerald-100">
+          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+          <span>¿Consultas? Chateá con nosotros</span>
         </div>
-      )}
+        
+        <a
+          href={`https://wa.me/541138032652?text=${encodeURIComponent(`Hola KAHA GYM, soy el socio ${socio.nombre} ${socio.apellido}. Me contacto desde mi portal de cliente.`)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center justify-center w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-500/35 transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 relative"
+          aria-label="Contactar por WhatsApp"
+          id="floating-whatsapp-btn"
+        >
+          {/* Animated background ping wave */}
+          <span className="absolute inset-0 rounded-full bg-emerald-500/40 animate-ping opacity-60 pointer-events-none"></span>
+          
+          {/* Official WhatsApp SVG Icon */}
+          <svg className="w-6 h-6 fill-current text-white relative z-10" viewBox="0 0 24 24">
+            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.66.986 3.284 1.48 4.909 1.481 5.482 0 9.94-4.461 9.943-9.94.002-2.654-1.029-5.15-2.901-7.025C16.726 1.795 14.237.772 11.583.772c-5.485 0-9.94 4.46-9.943 9.94-.001 1.904.5 3.76 1.45 5.421L2.09 21.65l5.557-1.496zm12.355-6.883c-.302-.15-1.787-.882-2.062-.982-.275-.1-.475-.15-.674.15-.2.3-.775.982-.95 1.182-.175.2-.35.225-.65.075-.3-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.784-1.275-2.083.175-.3.275-.475.375-.674.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.925-2.225-.244-.589-.493-.51-.674-.519-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5 0 1.475 1.075 2.9 1.225 3.1.15.2 2.11 3.22 5.11 4.52.714.31 1.272.496 1.706.634.717.228 1.37.195 1.887.118.575-.085 1.788-.73 2.038-1.43.25-.7.25-1.3.175-1.43-.075-.125-.275-.2-.575-.35z"/>
+          </svg>
+        </a>
+      </div>
 
     </div>
   );
