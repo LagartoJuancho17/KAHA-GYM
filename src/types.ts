@@ -34,6 +34,7 @@ export interface Cliente {
   ultimo_mes_pagado: string; // Formato 'YYYY-MM'
   turnos_fijos: string[]; // IDs de los turnos asignados (si es FIJO)
   turno_variable?: string; // ID del turno variable asignado en tiempo real
+  exencion_cobro?: 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO';
   reservas_individuales?: ReservaIndividual[];
   clases_suspendidas?: ClaseSuspendida[];
   creado_at: string;
@@ -64,6 +65,7 @@ export interface Turno {
   cupo_maximo: number;
   asignados_ids: string[]; // cliente_id de clientes asignados fijos
   lista_espera_ids: string[]; // cliente_id de clientes en lista de espera
+  profesor?: string; // Profesor asignado a este turno
 }
 
 export interface Pago {
@@ -85,9 +87,10 @@ export interface RecuperoTurno {
   cliente_nombre: string;
   turno_original_id: string;
   fecha_inasistencia: string;
-  turno_recupero_id: string;
-  fecha_recupero: string;
+  turno_recupero_id: string; // ID del turno de recupero, o 'PENDIENTE_DEFINICION'
+  fecha_recupero: string; // Fecha de recupero, o vacía ''
   estado: 'PENDIENTE' | 'COMPLETADO' | 'EXPIRADO';
+  fecha_limite: string; // Fecha máxima para recuperar (1 mes desde inasistencia)
 }
 
 export interface AuditLog {
@@ -108,3 +111,13 @@ export interface Novedad {
   creado_por: string;
   destacado: boolean;
 }
+
+export interface AlertaNotificacion {
+  id: string;
+  tipo: 'PAGO_REALIZADO' | 'SISTEMA' | 'DEUDA_VENCIDA';
+  titulo: string;
+  mensaje: string;
+  fecha: string; // ISO string
+  leido: boolean;
+}
+

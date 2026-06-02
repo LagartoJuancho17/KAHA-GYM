@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, 
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
-  ReservaIndividual, ClaseSuspendida
+  ReservaIndividual, ClaseSuspendida, AlertaNotificacion
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -19,10 +19,14 @@ interface GymContextType {
   recuperos: RecuperoTurno[];
   auditLogs: AuditLog[];
   novedades: Novedad[];
+  notificaciones: AlertaNotificacion[];
   rolActivo: RolUsuario;
   setRolActivo: (rol: RolUsuario) => void;
   selectedSocioId: string | null;
   setSelectedSocioId: (id: string | null) => void;
+  addNotificacion: (tipo: 'PAGO_REALIZADO' | 'SISTEMA' | 'DEUDA_VENCIDA', titulo: string, mensaje: string) => void;
+  marcarNotificacionesLeidas: () => void;
+  eliminarNotificacion: (id: string) => void;
   
   // Google Authentication simulation states
   googleUser: { email: string; name: string; picture?: string; role: RolUsuario } | null;
@@ -30,7 +34,7 @@ interface GymContextType {
   signOutGoogle: () => void;
   
   // Clientes Methods
-  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'>) => { success: boolean; message: string; duplicate?: boolean };
+  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => { success: boolean; message: string; duplicate?: boolean };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
   altaCliente: (id: string) => void;
@@ -45,9 +49,12 @@ interface GymContextType {
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
   asignarTurnoVariable: (clienteId: string, turnoId: string | null) => { success: boolean; message: string };
   checkInFlexible: (clienteId: string, turnoId: string) => { success: boolean; message: string };
-  agregarRecupero: (recupero: Omit<RecuperoTurno, 'id' | 'estado'>) => { success: boolean; message: string };
+  agregarRecupero: (recupero: Omit<RecuperoTurno, 'id' | 'estado' | 'fecha_limite'> & { fecha_limite?: string }) => { success: boolean; message: string };
   actualizarEstadoRecupero: (id: string, estado: 'PENDIENTE' | 'COMPLETADO' | 'EXPIRADO') => void;
+  programarRecuperoPendiente: (recuperoId: string, turnoRecuperoId: string, fechaRecupero: string) => { success: boolean; message: string };
   modificarPrecioOCupoTurno: (turnoId: string, nuevoCupo: number) => void;
+  asignarProfesorTurno: (turnoId: string, profesor: string) => void;
+  registrarVacaciones: (clienteId: string, fechaInicio: string, fechaFin: string) => { success: boolean; message: string };
   crearReservaIndividual: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
   cancelarReservaIndividual: (clienteId: string, reservaId: string) => { success: boolean; message: string };
   suspenderClaseFija: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
@@ -62,7 +69,7 @@ interface GymContextType {
   deleteNovedad: (id: string) => void;
 
   // Morosidad Simulation
-  ejecutarCronMorosidad: (simularFecha: string) => { procesados: number; nuevosMorosos: number; deudaTotal: number };
+  ejecutarCronMorosidad: (simularFecha: string) => { procesados: number; nuevosMorosos: number; deudaTotal: number; suspendidosSemanaCount: number; dadosBajaCount: number; logLineas: string[] };
   borrarHistorial: () => void;
 }
 
@@ -77,6 +84,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [recuperos, setRecuperos] = useState<RecuperoTurno[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [novedades, setNovedades] = useState<Novedad[]>([]);
+  const [notificaciones, setNotificaciones] = useState<AlertaNotificacion[]>([]);
   const [googleUser, setGoogleUser] = useState<{ email: string; name: string; picture?: string; role: RolUsuario } | null>(() => {
     const local = localStorage.getItem('gym_google_user');
     return local ? JSON.parse(local) : null;
@@ -128,6 +136,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const localRecuperos = localStorage.getItem('gym_recuperos');
     const localLogs = localStorage.getItem('gym_audit_logs');
     const localNovedades = localStorage.getItem('gym_novedades');
+    const localNotificaciones = localStorage.getItem('gym_notificaciones');
     const localRol = localStorage.getItem('gym_rol_activo');
 
     if (localClientes) setClientes(JSON.parse(localClientes));
@@ -136,8 +145,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('gym_clientes', JSON.stringify(INITIAL_CLIENTES));
     }
 
-    if (localPlanes) setPlanes(JSON.parse(localPlanes));
-    else {
+    if (localPlanes) {
+      const parsedPlanes = JSON.parse(localPlanes);
+      if (!parsedPlanes.some((p: any) => p.id === 'p-none')) {
+        const updated = [{ id: 'p-none', nombre: 'Aún no sabe', dias_por_semana: 5, precio: 0.00, creado_at: '2026-01-10T10:00:00Z' }, ...parsedPlanes];
+        setPlanes(updated);
+        localStorage.setItem('gym_planes', JSON.stringify(updated));
+      } else {
+        setPlanes(parsedPlanes);
+      }
+    } else {
       setPlanes(INITIAL_PLANES);
       localStorage.setItem('gym_planes', JSON.stringify(INITIAL_PLANES));
     }
@@ -188,6 +205,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     else {
       setNovedades(INITIAL_NOVEDADES);
       localStorage.setItem('gym_novedades', JSON.stringify(INITIAL_NOVEDADES));
+    }
+
+    if (localNotificaciones) setNotificaciones(JSON.parse(localNotificaciones));
+    else {
+      setNotificaciones([]);
+      localStorage.setItem('gym_notificaciones', JSON.stringify([]));
     }
 
     const localGoogleUser = localStorage.getItem('gym_google_user');
@@ -292,7 +315,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // CLIENTS CRUD
-  const addCliente = (clientData: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'>) => {
+  const addCliente = (clientData: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => {
     // Validar duplicados (email o nombre+apellido idénticos)
     if (isDuplicateFuzzy(clientData.nombre, clientData.apellido, clientData.email, clientes)) {
       return { 
@@ -307,6 +330,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const newClient: Cliente = {
       ...clientData,
+      tipo: clientData.tipo || 'FIJO',
+      exencion_cobro: clientData.exencion_cobro || 'NINGUNA',
       id: `c-${Date.now()}`,
       estado: 'ACTIVO',
       deuda_acumulada: 0,
@@ -708,26 +733,40 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: `Asistencia aprobada para ${cliente.nombre} ${cliente.apellido} en el turno ${turno.dia} ${turno.hora}.` };
   };
 
-  const agregarRecupero = (data: Omit<RecuperoTurno, 'id' | 'estado'>) => {
+  const agregarRecupero = (data: Omit<RecuperoTurno, 'id' | 'estado' | 'fecha_limite'> & { fecha_limite?: string }) => {
     const cli = clientes.find(c => c.id === data.cliente_id);
-    const recTurno = turnos.find(t => t.id === data.turno_recupero_id);
+    if (!cli) return { success: false, message: 'Cliente inválido.' };
 
-    if (!cli || !recTurno) return { success: false, message: 'Cliente o Turno de recupero inválidos.' };
+    if (data.turno_recupero_id !== 'PENDIENTE_DEFINICION') {
+      const recTurno = turnos.find(t => t.id === data.turno_recupero_id);
+      if (!recTurno) return { success: false, message: 'Turno de recupero inválido.' };
 
-    // Validar cupos en el turno de recupero
-    if (recTurno.asignados_ids.length >= recTurno.cupo_maximo) {
-      return { success: false, message: 'El turno del recupero no posee cupos disponibles.' };
+      // Validar cupos en el turno de recupero
+      if (recTurno.asignados_ids.length >= recTurno.cupo_maximo) {
+        return { success: false, message: 'El turno del recupero no posee cupos disponibles.' };
+      }
+    }
+
+    let limitStr = data.fecha_limite;
+    if (!limitStr && data.fecha_inasistencia) {
+      const inasDate = new Date(data.fecha_inasistencia + 'T00:00:00');
+      inasDate.setDate(inasDate.getDate() + 30);
+      const limitY = inasDate.getFullYear();
+      const limitM = String(inasDate.getMonth() + 1).padStart(2, '0');
+      const limitD = String(inasDate.getDate()).padStart(2, '0');
+      limitStr = `${limitY}-${limitM}-${limitD}`;
     }
 
     const nuevoRec: RecuperoTurno = {
       ...data,
       id: `rec-${Date.now()}`,
-      estado: 'PENDIENTE'
+      estado: 'PENDIENTE',
+      fecha_limite: limitStr || ''
     };
 
     const updatedRecs = [nuevoRec, ...recuperos];
     saveState(clientes, planes, historialPrecios, turnos, pagos, updatedRecs, auditLogs);
-    addAuditLog('RECUPERO_TURNO_PROGRAMADO', { cliente: data.cliente_nombre, para_fecha: data.fecha_recupero });
+    addAuditLog('RECUPERO_TURNO_PROGRAMADO', { cliente: data.cliente_nombre, para_fecha: data.fecha_recupero || 'Pendiente' });
     return { success: true, message: 'Recupero de turno agendado exitosamente.' };
   };
 
@@ -740,6 +779,57 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     saveState(clientes, planes, historialPrecios, turnos, pagos, updated, auditLogs);
     addAuditLog('RECUPERO_TURNO_ESTADO_CAMBIADO', { id, nuevo_estado: estado });
+  };
+
+  const programarRecuperoPendiente = (recuperoId: string, turnoRecuperoId: string, fechaRecupero: string) => {
+    const rec = recuperos.find(r => r.id === recuperoId);
+    if (!rec) return { success: false, message: 'Ticket de recupero no encontrado.' };
+
+    const recTurno = turnos.find(t => t.id === turnoRecuperoId);
+    if (!recTurno) return { success: false, message: 'Turno de recupero inválido.' };
+
+    // Validar cupos en el turno de recupero para la fecha destino
+    const fijosCount = recTurno.asignados_ids.length;
+    // Count fijos who suspended on this date
+    const fijosSuspendedCount = clientes.reduce((acc, c) => {
+      if (recTurno.asignados_ids.includes(c.id)) {
+        const isSusp = (c.clases_suspendidas || []).some(s => s.turno_id === turnoRecuperoId && s.fecha === fechaRecupero);
+        if (isSusp) return acc + 1;
+      }
+      return acc;
+    }, 0);
+    // Count individual/variable bookings on this date
+    const individualCount = clientes.reduce((acc, c) => {
+      const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoRecuperoId && r.fecha === fechaRecupero);
+      return acc + bookingsOnDate.length;
+    }, 0);
+    // Count other recuperos on this date
+    const recuperosCount = recuperos.filter(r => r.id !== recuperoId && r.estado === 'PENDIENTE' && r.turno_recupero_id === turnoRecuperoId && r.fecha_recupero === fechaRecupero).length;
+
+    const totalOccupied = fijosCount - fijosSuspendedCount + individualCount + recuperosCount;
+    if (totalOccupied >= recTurno.cupo_maximo) {
+      return { success: false, message: `El turno de recupero ya está completo para esa fecha (${totalOccupied}/${recTurno.cupo_maximo}).` };
+    }
+
+    const updated = recuperos.map(r => {
+      if (r.id === recuperoId) {
+        return {
+          ...r,
+          turno_recupero_id: turnoRecuperoId,
+          fecha_recupero: fechaRecupero,
+          estado: 'PENDIENTE' as const
+        };
+      }
+      return r;
+    });
+
+    saveState(clientes, planes, historialPrecios, turnos, pagos, updated, auditLogs);
+    addAuditLog('RECUPERO_PENDIENTE_PROGRAMADO', { 
+      id: recuperoId, 
+      turno_recupero_id: turnoRecuperoId, 
+      fecha_recupero: fechaRecupero 
+    });
+    return { success: true, message: 'Recupero programado exitosamente.' };
   };
 
   const modificarPrecioOCupoTurno = (turnoId: string, nuevoCupo: number) => {
@@ -929,6 +1019,116 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const asignarProfesorTurno = (turnoId: string, profesor: string) => {
+    const updated = turnos.map(t => {
+      if (t.id === turnoId) {
+        return { ...t, profesor: profesor.trim() || undefined };
+      }
+      return t;
+    });
+    saveState(clientes, planes, historialPrecios, updated, pagos, recuperos, auditLogs);
+    addAuditLog('PROFESOR_TURNO_ASIGNADO', { turno_id: turnoId, profesor });
+  };
+
+  const registrarVacaciones = (clienteId: string, fechaInicio: string, fechaFin: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const start = new Date(fechaInicio + 'T00:00:00');
+    const end = new Date(fechaFin + 'T00:00:00');
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
+      return { success: false, message: 'Rango de fechas inválido.' };
+    }
+
+    const localRecs = [...recuperos];
+    const localClientes = [...clientes];
+
+    const DAYS_NAMES = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+
+    // Loop through dates
+    const current = new Date(start);
+    let inasistenciasRegistradas = 0;
+
+    const nuevasSuspensiones: { turno_id: string; fecha: string; reintegrado: boolean; creado_at: string }[] = [];
+
+    while (current <= end) {
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dayName = DAYS_NAMES[current.getDay()];
+
+      // Check if client has a fixed shift on this weekday
+      cliente.turnos_fijos.forEach(tfId => {
+        if (tfId.startsWith(dayName)) {
+          // Check if already suspended or already registered in recuperos
+          const alreadySuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr) ||
+                                    nuevasSuspensiones.some(s => s.turno_id === tfId && s.fecha === dateStr);
+
+          if (!alreadySuspended) {
+            // Suspend class for this day (with reintegrado = true for recovery)
+            nuevasSuspensiones.push({
+              turno_id: tfId,
+              fecha: dateStr,
+              reintegrado: true,
+              creado_at: new Date().toISOString()
+            });
+
+            // Calculate expiration date (1 month = 30 days later)
+            const expDate = new Date(current);
+            expDate.setDate(expDate.getDate() + 30);
+            const expY = expDate.getFullYear();
+            const expM = String(expDate.getMonth() + 1).padStart(2, '0');
+            const expD = String(expDate.getDate()).padStart(2, '0');
+            const expDateStr = `${expY}-${expM}-${expD}`;
+
+            // Add recovery ticket
+            localRecs.push({
+              id: `rec-${Date.now()}-${inasistenciasRegistradas}`,
+              cliente_id: clienteId,
+              cliente_nombre: `${cliente.nombre} ${cliente.apellido}`,
+              turno_original_id: tfId,
+              fecha_inasistencia: dateStr,
+              turno_recupero_id: 'PENDIENTE_DEFINICION',
+              fecha_recupero: '',
+              estado: 'PENDIENTE',
+              fecha_limite: expDateStr
+            });
+
+            inasistenciasRegistradas++;
+          }
+        }
+      });
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    if (inasistenciasRegistradas > 0) {
+      const updatedClientes = localClientes.map(c => {
+        if (c.id === clienteId) {
+          return {
+            ...c,
+            clases_suspendidas: [...(c.clases_suspendidas || []), ...nuevasSuspensiones]
+          };
+        }
+        return c;
+      });
+
+      saveState(updatedClientes, planes, historialPrecios, turnos, pagos, localRecs, auditLogs);
+      addAuditLog('CLIENTE_REGISTRO_VACACIONES', { 
+        cliente: `${cliente.nombre} ${cliente.apellido}`, 
+        desde: fechaInicio, 
+        hasta: fechaFin, 
+        dias_afectados: inasistenciasRegistradas 
+      });
+
+      return { success: true, message: `Vacaciones registradas. Se dieron de baja ${inasistenciasRegistradas} clases y se habilitaron sus respectivos recuperos.` };
+    }
+
+    return { success: true, message: 'No se encontraron turnos fijos asignados en el rango de fechas seleccionado.' };
+  };
+
   // CLIENT PAGOS OPERATIONS
   const registrarPago = (pagoData: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => {
     const cli = clientes.find(c => c.id === pagoData.cliente_id);
@@ -993,6 +1193,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       mes: pagoData.mes_correspondiente, 
       medio: pagoData.medio_pago 
     }, userEmail);
+
+    addNotificacion(
+      'PAGO_REALIZADO',
+      'Pago Confirmado 💰',
+      `El socio ${cli.nombre} ${cli.apellido} abonó $${pagoData.monto.toLocaleString('es-AR')} ARS por el mes de ${pagoData.mes_correspondiente} (${pagoData.medio_pago === 'MERCADO_PAGO' ? 'Mercado Pago' : pagoData.medio_pago}).`
+    );
 
     return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
   };
@@ -1086,8 +1292,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let procesados = 0;
     let nuevosMorosos = 0;
     let deudaTotal = 0;
+    let suspendidosSemanaCount = 0;
+    let dadosBajaCount = 0;
+    const logLineas: string[] = [];
 
-    const listadoClientesActualizado = clientes.map(cli => {
+    logLineas.push(`>> [Cron Server] Iniciando proceso de control de morosidad...`);
+    logLineas.push(`>> Fecha Simulada: ${simularFecha} (Día ${diaDelMes} del mes)`);
+
+    let listadoTurnos = [...turnos];
+    let listadoClientesActualizado = clientes.map(c => ({ ...c }));
+
+    listadoClientesActualizado = listadoClientesActualizado.map(cli => {
       if (!cli.activo) return cli;
       procesados++;
 
@@ -1096,7 +1311,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let deudaActualizada = cli.deuda_acumulada;
 
       const pagoEsteMes = cli.ultimo_mes_pagado >= deMesFormato;
+      const tieneExencion = cli.exencion_cobro && cli.exencion_cobro !== 'NINGUNA';
 
+      // 1. Cargar deuda y cambiar estado a MOROSO si venció el plazo
       if (!pagoEsteMes && esFechaLimitePasada) {
         nuevoEstado = 'MOROSO';
         if (deudaActualizada < precioPlan) {
@@ -1117,6 +1334,111 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         nuevosMorosos++;
       }
 
+      // 2. Procesar reglas según el día del mes
+      if (!pagoEsteMes) {
+        if (tieneExencion) {
+          logLineas.push(`>> [EXCEPCIÓN] Socio ${cli.nombre} ${cli.apellido} exceptuado de penalizaciones por estado: ${cli.exencion_cobro}.`);
+        } else {
+          // Regla Día 1: Recordatorio
+          if (diaDelMes === 1) {
+            logLineas.push(`>> [NOTIFICACIÓN - DÍA 1] Enviando recordatorio a ${cli.nombre} ${cli.apellido}: "iniciamos el mes...acordate que el pago se realiza del 1 al 5 por favor...con el abono del plan se renuevan automáticamente tus cupos fijos"`);
+          }
+
+          // Regla Día 5: Aviso
+          if (diaDelMes === 5) {
+            logLineas.push(`>> [NOTIFICACIÓN - DÍA 5] Enviando aviso a ${cli.nombre} ${cli.apellido}: "recordá que mañana vence la fecha para el pago...de no abonar la siguiente semana los turnos fijos se borran automáticamente..."`);
+          }
+
+          // Regla Día 6 (del 6 al 10 inclusive): Suspensión momentánea de la semana 1
+          if (diaDelMes >= 6 && diaDelMes <= 10) {
+            if (cli.turnos_fijos.length > 0) {
+              const fechasSemana = [
+                `${deMesFormato}-06`,
+                `${deMesFormato}-07`,
+                `${deMesFormato}-08`,
+                `${deMesFormato}-09`,
+                `${deMesFormato}-10`
+              ];
+
+              const weekdaysMap = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+
+              let nuevasSuspensiones = [...(cli.clases_suspendidas || [])];
+              let suspendidoParaSocio = false;
+
+              fechasSemana.forEach(fechaStr => {
+                const dateObj = new Date(fechaStr + 'T00:00:00');
+                const dayName = weekdaysMap[dateObj.getDay()];
+
+                cli.turnos_fijos.forEach(tfId => {
+                  if (tfId.startsWith(dayName)) {
+                    // Check if already suspended for this date
+                    const yaSuspendido = nuevasSuspensiones.some(s => s.turno_id === tfId && s.fecha === fechaStr);
+                    if (!yaSuspendido) {
+                      nuevasSuspensiones.push({
+                        turno_id: tfId,
+                        fecha: fechaStr,
+                        reintegrado: false,
+                        creado_at: new Date().toISOString()
+                      });
+                      suspendidoParaSocio = true;
+                      suspendidosSemanaCount++;
+                      logLineas.push(`>> [ACCIÓN - DÍA 6] Suspendido turno ${tfId} para ${cli.nombre} ${cli.apellido} el día ${fechaStr} (Semana 1)`);
+                    }
+                  }
+                });
+              });
+
+              if (suspendidoParaSocio) {
+                cli.clases_suspendidas = nuevasSuspensiones;
+              }
+            }
+          }
+
+          // Regla Día 11 (11 en adelante): Baja oficial
+          if (diaDelMes >= 11) {
+            if (cli.turnos_fijos.length > 0) {
+              logLineas.push(`>> [ACCIÓN - DÍA 11] Alumno ${cli.nombre} ${cli.apellido} no pagó para el día 11. Dando de baja turnos fijos...`);
+              const turnosAQuitar = [...cli.turnos_fijos];
+              cli.turnos_fijos = [];
+              dadosBajaCount++;
+
+              turnosAQuitar.forEach(turnoId => {
+                listadoTurnos = listadoTurnos.map(t => {
+                  if (t.id === turnoId) {
+                    const filtradoAsignados = t.asignados_ids.filter(cid => cid !== cli.id);
+                    let nuevosAsignados = [...filtradoAsignados];
+                    let nuevaWaitlist = [...t.lista_espera_ids];
+
+                    // Promover desde waitlist si hay lugar
+                    if (nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
+                      const promovidoId = nuevaWaitlist[0];
+                      nuevosAsignados.push(promovidoId);
+                      nuevaWaitlist = nuevaWaitlist.slice(1);
+
+                      // Promover en listadoClientesActualizado
+                      listadoClientesActualizado = listadoClientesActualizado.map(cSub => {
+                        if (cSub.id === promovidoId) {
+                          logLineas.push(`>> [PROMOCIÓN] Promovido ${cSub.nombre} ${cSub.apellido} al turno ${turnoId} (lista de espera).`);
+                          return { ...cSub, turnos_fijos: [...cSub.turnos_fijos, turnoId] };
+                        }
+                        return cSub;
+                      });
+                    }
+
+                    return {
+                      ...t,
+                      asignados_ids: nuevosAsignados,
+                      lista_espera_ids: nuevaWaitlist
+                    };
+                  }
+                  return t;
+                });
+              });
+            }
+          }
+        }
+      }
+
       return {
         ...cli,
         estado: nuevoEstado as EstadoCliente,
@@ -1124,17 +1446,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
-    saveState(listadoClientesActualizado, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    saveState(listadoClientesActualizado, planes, historialPrecios, listadoTurnos, pagos, recuperos, auditLogs);
     addAuditLog('CRON_DETECCION_MOROSIDAD_MANUAL', { 
       simulacion_mes: deMesFormato, 
       dia_mes: diaDelMes,
       fecha_limite_pasada: esFechaLimitePasada,
       total_analizados: procesados, 
       nuevos_morosos_detectados: nuevosMorosos,
-      deuda_total_acumulada: deudaTotal
+      deuda_total_acumulada: deudaTotal,
+      suspendidos_semana: suspendidosSemanaCount,
+      bajas_oficiales: dadosBajaCount
     });
 
-    return { procesados, nuevosMorosos, deudaTotal };
+    logLineas.push(`>> [Cron Server] Control finalizado. Procesados: ${procesados} | Nuevos Morosos: ${nuevosMorosos} | Suspendidos Semana: ${suspendidosSemanaCount} | Bajas Oficiales: ${dadosBajaCount}`);
+
+    return { procesados, nuevosMorosos, deudaTotal, suspendidosSemanaCount, dadosBajaCount, logLineas };
   };
 
   const signInWithGoogle = (email: string, nameName: string, picture?: string) => {
@@ -1145,8 +1471,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (
       cleanMail === 'tobiasarraiza17@gmail.com' ||
       cleanMail === 'totoarr17@gmail.com' ||
-      cleanMail === 'jmferrariprofe@gmail.com' ||
-      cleanMail === 'lagartojuancho24avl@gmail.com'
+      cleanMail === 'jmferrariprofe@gmail.com'
     ) {
       detectedRole = 'ADMIN';
     } else if (cleanMail === 'profe@gimnasio.com.ar' || cleanMail === 'profe@aresgym.com') {
@@ -1176,6 +1501,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           deuda_acumulada: 0,
           ultimo_mes_pagado: new Date().toISOString().slice(0, 7),
           turnos_fijos: [],
+          exencion_cobro: 'NINGUNA',
           creado_at: new Date().toISOString()
         };
         
@@ -1208,6 +1534,38 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRolActivo('SOCIO');
     localStorage.setItem('gym_rol_activo', 'SOCIO');
     setSelectedSocioId(null);
+  };
+
+  const addNotificacion = (tipo: 'PAGO_REALIZADO' | 'SISTEMA' | 'DEUDA_VENCIDA', titulo: string, mensaje: string) => {
+    const newNotif: AlertaNotificacion = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      tipo,
+      titulo,
+      mensaje,
+      fecha: new Date().toISOString(),
+      leido: false
+    };
+    setNotificaciones(prev => {
+      const updated = [newNotif, ...prev];
+      localStorage.setItem('gym_notificaciones', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const marcarNotificacionesLeidas = () => {
+    setNotificaciones(prev => {
+      const updated = prev.map(n => ({ ...n, leido: true }));
+      localStorage.setItem('gym_notificaciones', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const eliminarNotificacion = (id: string) => {
+    setNotificaciones(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      localStorage.setItem('gym_notificaciones', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const addNovedad = (novData: Omit<Novedad, 'id' | 'fecha'>) => {
@@ -1257,6 +1615,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('gym_pagos');
     localStorage.removeItem('gym_recuperos');
     localStorage.removeItem('gym_novedades');
+    localStorage.removeItem('gym_notificaciones');
     localStorage.removeItem('gym_audit_logs');
     localStorage.removeItem('gym_google_user');
     localStorage.removeItem('gym_rol_activo');
@@ -1265,15 +1624,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <GymContext.Provider value={{
-      clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, novedades, rolActivo,
+      clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, novedades,
+      notificaciones, rolActivo,
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,
       googleUser, signInWithGoogle, signOutGoogle,
       addCliente, updateCliente, bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV,
       updatePrecioPlan,
-      asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, modificarPrecioOCupoTurno,
+      asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
+      asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija,
       registrarPago, importarPagosCSV,
+      addNotificacion, marcarNotificacionesLeidas, eliminarNotificacion,
       addNovedad, updateNovedad, deleteNovedad,
       ejecutarCronMorosidad,
       borrarHistorial

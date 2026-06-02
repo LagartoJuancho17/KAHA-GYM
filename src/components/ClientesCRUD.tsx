@@ -4,7 +4,8 @@ import { useGym } from '../GymContext';
 import { Cliente, TipoCliente, EstadoCliente } from '../types';
 import { 
   Plus, Search, Edit2, UserMinus, UserCheck, Eye, Download, Upload, 
-  X, AlertCircle, FileSpreadsheet, Check, ArrowRight, User, Trash2
+  X, AlertCircle, FileSpreadsheet, Check, ArrowRight, User, Trash2,
+  MoreVertical, Calendar, ChevronDown, CheckCircle
 } from 'lucide-react';
 
 interface ClientesCRUDProps {
@@ -22,7 +23,8 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
 }) => {
   const { 
     clientes, planes, pagos, turnos, addCliente, updateCliente, 
-    bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV, rolActivo 
+    bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV, rolActivo,
+    asignarClienteFijo, removerAsignacionFija
   } = useGym();
 
   const [localEditingId, setLocalEditingId] = useState<string | null>(null);
@@ -34,9 +36,16 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   const showAddClienteModal = propShowAddClienteModal !== undefined ? propShowAddClienteModal : localShowModal;
   const setShowAddClienteModal = propSetShowAddClienteModal !== undefined ? propSetShowAddClienteModal : setLocalShowModal;
 
+  // New dropdown & modal states
+  const [showHeaderDropdown, setShowHeaderDropdown] = useState(false);
+  const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
+  const [clientForTurnosModal, setClientForTurnosModal] = useState<Cliente | null>(null);
+  const [selectedTurnoToAssign, setSelectedTurnoToAssign] = useState<string>('');
+  const [turnosModalError, setTurnosModalError] = useState<string>('');
+  const [turnosModalSuccess, setTurnosModalSuccess] = useState<string>('');
+
   // --- FILTROS DE TABLA ---
   const [buscar, setBuscar] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState<string>('TODOS');
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
   const [verInactivos, setVerInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -49,7 +58,9 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     email: '',
     telefono: '',
     tipo: 'FLEXIBLE' as TipoCliente,
-    plan_id: planes[0]?.id || ''
+    plan_id: planes[0]?.id || '',
+    exencion_cobro: 'NINGUNA' as 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO',
+    deuda_acumulada: 0
   });
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
@@ -86,7 +97,9 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       email: '',
       telefono: '',
       tipo: 'FLEXIBLE',
-      plan_id: planes[0]?.id || ''
+      plan_id: planes[0]?.id || '',
+      exencion_cobro: 'NINGUNA',
+      deuda_acumulada: 0
     });
     setFormError('');
     setFormSuccess('');
@@ -101,7 +114,9 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       email: cl.email,
       telefono: cl.telefono,
       tipo: cl.tipo,
-      plan_id: cl.plan_id
+      plan_id: cl.plan_id,
+      exencion_cobro: cl.exencion_cobro || 'NINGUNA',
+      deuda_acumulada: cl.deuda_acumulada
     });
   };
 
@@ -117,7 +132,20 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     }
 
     if (editingClienteId) {
-      const res = updateCliente(editingClienteId, clienteForm);
+      const existing = clientes.find(c => c.id === editingClienteId);
+      let nuevoEstado = existing?.estado || 'ACTIVO';
+      const nuevaDeuda = Number(clienteForm.deuda_acumulada) || 0;
+      
+      if (nuevaDeuda > 0 && nuevoEstado === 'ACTIVO') {
+        nuevoEstado = 'CON_DEUDA';
+      } else if (nuevaDeuda === 0 && nuevoEstado !== 'INACTIVO') {
+        nuevoEstado = 'ACTIVO';
+      }
+
+      const res = updateCliente(editingClienteId, {
+        ...clienteForm,
+        estado: nuevoEstado
+      });
       if (res.success) {
         setFormSuccess(res.message);
         setTimeout(() => {
@@ -155,11 +183,6 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       );
     }
 
-    // Tipo
-    if (filtroTipo !== 'TODOS') {
-      result = result.filter(c => c.tipo === filtroTipo);
-    }
-
     // Estado
     if (filtroEstado !== 'TODOS') {
       result = result.filter(c => c.estado === filtroEstado);
@@ -169,7 +192,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     result = result.filter(c => c.activo === !verInactivos);
 
     return result;
-  }, [clientes, buscar, filtroTipo, filtroEstado, verInactivos]);
+  }, [clientes, buscar, filtroEstado, verInactivos]);
 
   // PAGINACIÓN
   const totalPaginas = Math.ceil(clientesFiltrados.length / filasPorPagina) || 1;
@@ -313,31 +336,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
           <p className="text-zinc-500 font-sans text-sm">Gestiona la información y el estado financiero de tus alumnos</p>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-sm justify-end w-full md:w-auto">
-          {/* IMPORT BUTTON */}
-          <button
-            onClick={() => {
-              setImportReport(null);
-              setCsvRows([]);
-              setShowImportModal(true);
-            }}
-            className="flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200 px-3 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm"
-            id="csv-import-modal-trigger"
-          >
-            <Upload className="w-4 h-4 text-zinc-500" />
-            Importar CSV
-          </button>
-
-          {/* EXPORT BUTTON */}
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200 px-3 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm"
-            id="csv-export-trigger"
-          >
-            <Download className="w-4 h-4 text-zinc-500" />
-            Exportar listado
-          </button>
-
+        <div className="flex items-center gap-2 text-sm justify-end w-full md:w-auto relative">
           {/* ADD CLIENT BUTTON */}
           <button
             onClick={() => {
@@ -345,12 +344,51 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
               setEditingClienteId(null);
               setShowAddClienteModal(true);
             }}
-            className="bg-black hover:bg-zinc-800 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+            className="bg-black hover:bg-zinc-800 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             id="add-client-modal-trigger"
           >
             <Plus className="w-4 h-4" />
             Nuevo Socio
           </button>
+
+          {/* MORE OPTIONS DROPDOWN BUTTON */}
+          <div className="relative">
+            <button
+              onClick={() => setShowHeaderDropdown(!showHeaderDropdown)}
+              className="flex items-center gap-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200 px-3 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm cursor-pointer"
+              id="header-more-options-trigger"
+            >
+              <span>Más opciones</span>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+            </button>
+
+            {showHeaderDropdown && (
+              <div className="absolute right-0 mt-1.5 w-44 bg-white border border-zinc-200 rounded-xl shadow-lg py-1 z-50 animate-fade-in font-sans text-xs">
+                <button
+                  onClick={() => {
+                    setShowHeaderDropdown(false);
+                    setImportReport(null);
+                    setCsvRows([]);
+                    setShowImportModal(true);
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-zinc-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5 text-zinc-400" />
+                  Importar CSV
+                </button>
+                <button
+                  onClick={() => {
+                    setShowHeaderDropdown(false);
+                    handleExportCSV();
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-zinc-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-zinc-400" />
+                  Exportar listado
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -372,23 +410,6 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-          {/* TIPO */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-zinc-500 font-sans font-medium">Tipo:</span>
-            <select
-              value={filtroTipo}
-              onChange={(e) => {
-                setFiltroTipo(e.target.value);
-                setPagina(1);
-              }}
-              className="border border-zinc-200 rounded-md py-1 px-2 outline-hidden text-zinc-700 bg-white"
-              id="filter-type-select"
-            >
-              <option value="TODOS">Todos</option>
-              <option value="FIJO">Fijos</option>
-              <option value="FLEXIBLE">Flexibles</option>
-            </select>
-          </div>
 
           {/* ESTADO */}
           <div className="flex items-center gap-1.5 text-xs">
@@ -434,7 +455,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
               <tr className="bg-zinc-50 text-zinc-500 font-sans font-medium uppercase tracking-wider border-b border-zinc-200">
                 <th className="p-4">Socio</th>
                 <th className="p-4">Email / Celular</th>
-                <th className="p-4">Tipo</th>
+                <th className="p-4">Días Asignados</th>
                 <th className="p-4">Plan sugerido</th>
                 <th className="p-4">Deuda</th>
                 <th className="p-4">Último Mes Pago</th>
@@ -481,69 +502,122 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                               <span className={`px-2 py-0.5 text-[9px] rounded-full font-bold border ${badgeClass}`}>
                                 {estadoLabel}
                               </span>
+                              <span className="text-[10px] text-zinc-400 font-mono">ID: {c.id}</span>
                             </div>
-                            <span className="text-[10px] text-zinc-400 font-mono">ID: {c.id}</span>
                           </div>
                         </div>
                       </td>
                       <td className="p-4 cursor-pointer" onClick={() => setSelectedCliente(c)}>
-                        <div className="text-zinc-600 font-medium">{c.email}</div>
-                        <div className="text-zinc-400 text-[10px]">{c.telefono || 'Sin celular'}</div>
+                        <div className="text-zinc-650 font-medium">{c.email}</div>
+                        <div className="text-zinc-450 text-[10px]">{c.telefono || 'Sin celular'}</div>
                       </td>
-                      <td className="p-4 cursor-pointer" onClick={() => setSelectedCliente(c)}>
-                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                          c.tipo === 'FIJO' ? 'bg-zinc-90 w-fit text-black bg-zinc-100 border border-zinc-200' : 'bg-blue-50 text-blue-800'
-                        }`}>
-                          {c.tipo}
-                        </span>
+                      <td className="p-4">
+                        <button
+                          onClick={() => {
+                            setClientForTurnosModal(c);
+                            setSelectedTurnoToAssign('');
+                            setTurnosModalError('');
+                            setTurnosModalSuccess('');
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/65 transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Click para gestionar turnos fijos asignados"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-emerald-605" />
+                          <span>
+                            {c.turnos_fijos.length} / {plan?.dias_por_semana || 5}
+                          </span>
+                        </button>
                       </td>
                       <td className="p-4 cursor-pointer" onClick={() => setSelectedCliente(c)}>
                         <span className="font-semibold text-zinc-800">{plan ? plan.nombre : 'Plan Genérico'}</span>
                       </td>
                       <td className="p-4 cursor-pointer" onClick={() => setSelectedCliente(c)}>
-                        <span className={`font-mono font-bold ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-zinc-400'}`}>
+                        <span className={`font-mono font-bold ${c.deuda_acumulada > 0 ? 'text-red-650' : 'text-zinc-400'}`}>
                           ${c.deuda_acumulada.toLocaleString('es-AR')}
                         </span>
                       </td>
-                      <td className="p-4 cursor-pointer font-mono text-zinc-600" onClick={() => setSelectedCliente(c)}>{c.ultimo_mes_pagado || 'Sin pagos'}</td>
-                      <td className="p-4">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {/* VER DETALLE */}
+                      <td className="p-4 cursor-pointer font-mono text-zinc-650" onClick={() => setSelectedCliente(c)}>{c.ultimo_mes_pagado || 'Sin pagos'}</td>
+                      <td className="p-4 relative">
+                        <div className="flex items-center justify-center">
                           <button
-                            onClick={() => setSelectedCliente(c)}
-                            className="p-1.5 text-zinc-500 hover:text-zinc-950 bg-zinc-50 hover:bg-zinc-100 rounded-md border border-zinc-200/50 transition-colors"
-                            title="Ver Perfil Individual"
-                            id={`btn-view-${c.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenRowMenuId(openRowMenuId === c.id ? null : c.id);
+                            }}
+                            className="p-1.5 text-zinc-500 hover:text-zinc-950 bg-zinc-50 hover:bg-zinc-100 rounded-md border border-zinc-200/50 transition-colors cursor-pointer"
+                            title="Más opciones"
+                            id={`btn-menu-${c.id}`}
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <MoreVertical className="w-4 h-4" />
                           </button>
 
-                          {/* EDITAR */}
-                          <button
-                            onClick={() => {
-                              handleStartEdit(c);
-                              setShowAddClienteModal(true);
-                            }}
-                            className="p-1.5 text-zinc-500 hover:text-emerald-600 bg-zinc-50 hover:bg-emerald-50 rounded-md border border-zinc-200/50 transition-colors"
-                            title="Modificar Alumno"
-                            id={`btn-edit-${c.id}`}
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+                          {openRowMenuId === c.id && (
+                            <div className="absolute right-4 mt-2 w-48 bg-white border border-zinc-200 rounded-xl shadow-lg py-1 z-40 animate-fade-in font-sans text-xs">
+                              {/* VER DETALLE */}
+                              <button
+                                onClick={() => {
+                                  setOpenRowMenuId(null);
+                                  setSelectedCliente(c);
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-zinc-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-zinc-400" />
+                                Ver Ficha Completa
+                              </button>
 
-                          {/* ELIMINAR CON DOBLE CONFIRMACION */}
-                          <button
-                            onClick={() => {
-                              setClienteParaEliminar(c);
-                              setConfirmCheck(false);
-                              setConfirmText('');
-                            }}
-                            className="p-1.5 text-red-500 hover:text-red-700 bg-red-50/50 hover:bg-red-50 rounded-md border border-red-100 transition-colors"
-                            title="Eliminar Permanente"
-                            id={`btn-delete-hard-${c.id}`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                              {/* EDITAR */}
+                              <button
+                                onClick={() => {
+                                  setOpenRowMenuId(null);
+                                  handleStartEdit(c);
+                                  setShowAddClienteModal(true);
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-zinc-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                                Modificar Socio
+                              </button>
+
+                              {/* DAR DE BAJA / ALTA LOGICA */}
+                              {c.activo ? (
+                                <button
+                                  onClick={() => {
+                                    setOpenRowMenuId(null);
+                                    bajaLogicaCliente(c.id);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-amber-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                                >
+                                  <UserMinus className="w-3.5 h-3.5 text-amber-500" />
+                                  Dar de Baja
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setOpenRowMenuId(null);
+                                    altaCliente(c.id);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-emerald-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                  Dar de Alta
+                                </button>
+                              )}
+
+                              {/* ELIMINAR PERMANENTE */}
+                              <button
+                                onClick={() => {
+                                  setOpenRowMenuId(null);
+                                  setClienteParaEliminar(c);
+                                  setConfirmCheck(false);
+                                  setConfirmText('');
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-650 font-medium flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                Eliminar Permanente
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -598,13 +672,28 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                   <p className="text-zinc-400 text-xs">Socio registrado el {new Date(selectedCliente.creado_at).toLocaleDateString()}</p>
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedCliente(null)}
-                className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors"
-                id="btn-close-profile"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    handleStartEdit(selectedCliente);
+                    setShowAddClienteModal(true);
+                    setSelectedCliente(null);
+                  }}
+                  className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-zinc-700"
+                  id="btn-edit-profile-shortcut"
+                  title="Editar ficha"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Editar</span>
+                </button>
+                <button
+                  onClick={() => setSelectedCliente(null)}
+                  className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors cursor-pointer"
+                  id="btn-close-profile"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Content body */}
@@ -628,6 +717,20 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                   <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Deuda Acumulada</span>
                   <span className={`font-mono font-bold block ${selectedCliente.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                     ${selectedCliente.deuda_acumulada.toLocaleString('es-AR')}
+                  </span>
+                </div>
+                <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 col-span-2">
+                  <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Exención / Excepción de Cobro</span>
+                  <span className="font-bold text-zinc-900 block mt-1">
+                    {selectedCliente.exencion_cobro === 'NINGUNA' || !selectedCliente.exencion_cobro ? (
+                      <span className="text-zinc-500 font-sans text-xs">Ninguna (Estándar)</span>
+                    ) : selectedCliente.exencion_cobro === 'SUSPENDIDO' ? (
+                      <span className="text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200 uppercase text-[9px] font-bold">Suspensión momentánea</span>
+                    ) : selectedCliente.exencion_cobro === 'POSTERGADO' ? (
+                      <span className="text-cyan-600 bg-cyan-50 px-2.5 py-0.5 rounded border border-cyan-200 uppercase text-[9px] font-bold">Postergación autorizada</span>
+                    ) : (
+                      <span className="text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 uppercase text-[9px] font-bold">Perdonado / Exento</span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -833,19 +936,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                 />
               </div>
 
-              {/* TIPO */}
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Tipo de Asistencia</label>
-                <select
-                  value={clienteForm.tipo}
-                  onChange={(e) => setClienteForm(prev => ({ ...prev, tipo: e.target.value as TipoCliente }))}
-                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white"
-                  id="form-tipo"
-                >
-                  <option value="FLEXIBLE">Flexible (Sin Horario fijo — entra por cupo diario)</option>
-                  <option value="FIJO">Fijo (Horarios asignados fijos semanales)</option>
-                </select>
-              </div>
+
 
               {/* PLAN ORIGINAL */}
               <div className="space-y-1">
@@ -861,6 +952,53 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                   ))}
                 </select>
               </div>
+
+              {/* TIPO DE MEMBRESÍA */}
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Tipo de Membresía</label>
+                <select
+                  value={clienteForm.tipo}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, tipo: e.target.value as TipoCliente }))}
+                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white"
+                  id="form-tipo"
+                >
+                  <option value="FLEXIBLE">Flexible (Cupos libres diarios)</option>
+                  <option value="FIJO">Fijo (Horarios fijos reservados)</option>
+                </select>
+              </div>
+
+              {/* EXENCIÓN DE COBRO */}
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Excepción / Exención de Cobro</label>
+                <select
+                  value={clienteForm.exencion_cobro}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, exencion_cobro: e.target.value as any }))}
+                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white"
+                  id="form-exencion-cobro"
+                >
+                  <option value="NINGUNA">Ninguna (Control de cobro estándar)</option>
+                  <option value="SUSPENDIDO">Suspensión de cobro momentáneo</option>
+                  <option value="POSTERGADO">Postergación de cobro autorizada</option>
+                  <option value="PERDONADO">Perdonar pago / Exento este mes</option>
+                </select>
+              </div>
+
+              {/* DEUDA ACUMULADA (Solo para edición de socios existentes) */}
+              {editingClienteId && (
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Deuda Acumulada ($ ARS)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="ej: 9500"
+                    value={clienteForm.deuda_acumulada}
+                    onChange={(e) => setClienteForm(prev => ({ ...prev, deuda_acumulada: Number(e.target.value) || 0 }))}
+                    className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden"
+                    id="form-deuda-acumulada"
+                  />
+                </div>
+              )}
 
               <div className="pt-4 border-t border-zinc-100 flex justify-end gap-2 text-xs font-semibold">
                 <button
@@ -1182,6 +1320,171 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                 id="btn-confirm-hard-delete-action"
               >
                 Eliminar Permanente
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: ASIGNAR TURNOS FIJOS DIRECTO --- */}
+      {clientForTurnosModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans" id="asignar-turnos-fijos-modal">
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-md overflow-hidden relative animate-scale-up">
+            
+            {/* Header */}
+            <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold tracking-tight">Gestionar Turnos Fijos</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Socio: {clientForTurnosModal.nombre} {clientForTurnosModal.apellido}</p>
+              </div>
+              <button
+                onClick={() => setClientForTurnosModal(null)}
+                className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-5 text-xs font-sans">
+              
+              {turnosModalError && (
+                <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-center gap-2 border border-red-200">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{turnosModalError}</span>
+                </div>
+              )}
+
+              {turnosModalSuccess && (
+                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg flex items-center gap-2 border border-emerald-250">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span>{turnosModalSuccess}</span>
+                </div>
+              )}
+
+              {/* Sugerencias Plan */}
+              {(() => {
+                const activeClient = clientes.find(c => c.id === clientForTurnosModal.id) || clientForTurnosModal;
+                const plan = planes.find(p => p.id === activeClient.plan_id);
+                return (
+                  <div className="bg-zinc-50 border border-zinc-150 p-3 rounded-lg text-[11px] text-zinc-650 space-y-1">
+                    <span className="font-semibold text-zinc-850 block">Membresía actual: {plan ? plan.nombre : 'Plan base'}</span>
+                    <span>Permite un máximo de <strong className="text-zinc-900">{plan ? plan.dias_por_semana : 5}</strong> días fijos semanales.</span>
+                    <span className="block mt-1">Ocupados actualmente: <strong className="text-zinc-900">{activeClient.turnos_fijos.length}</strong></span>
+                  </div>
+                );
+              })()}
+
+              {/* Turnos asignados fijos */}
+              <div className="space-y-2">
+                <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest block font-sans">Turnos fijos reservados</span>
+                {(() => {
+                  const activeClient = clientes.find(c => c.id === clientForTurnosModal.id) || clientForTurnosModal;
+                  if (activeClient.turnos_fijos.length === 0) {
+                    return <p className="text-zinc-400 italic text-[11px] py-1">No tiene ningún turno semanal fijo reservado.</p>;
+                  }
+                  return (
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto pr-0.5">
+                      {activeClient.turnos_fijos.map(tFid => (
+                        <div key={tFid} className="bg-zinc-50 border border-zinc-205 py-2 px-3 rounded-lg flex justify-between items-center text-zinc-900 text-xs font-semibold">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                            <span>{tFid.split('-')[0]} — {tFid.split('-')[1]} hs</span>
+                          </span>
+                          <button
+                            onClick={() => {
+                              removerAsignacionFija(activeClient.id, tFid);
+                              setTurnosModalSuccess('Horario fijo removido con éxito.');
+                              setTurnosModalError('');
+                              setTimeout(() => setTurnosModalSuccess(''), 2000);
+                            }}
+                            className="text-red-500 hover:text-red-750 p-1 bg-red-50 hover:bg-red-100 rounded-md border border-red-100 transition-colors cursor-pointer"
+                            title="Remover turno"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Formulario Asignar */}
+              {(() => {
+                const activeClient = clientes.find(c => c.id === clientForTurnosModal.id) || clientForTurnosModal;
+                const plan = planes.find(p => p.id === activeClient.plan_id);
+                const hasReachedMax = activeClient.turnos_fijos.length >= (plan ? plan.dias_por_semana : 5);
+                
+                if (hasReachedMax) {
+                  return (
+                    <div className="border-t border-zinc-150 pt-4 text-center text-zinc-400 italic text-[11px]">
+                      Has alcanzado la cantidad máxima de días permitida por el plan.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="border-t border-zinc-150 pt-4 space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest block font-sans">Reservar Nuevo Horario Fijo</label>
+                      <select
+                        value={selectedTurnoToAssign}
+                        onChange={(e) => setSelectedTurnoToAssign(e.target.value)}
+                        className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden"
+                      >
+                        <option value="">-- Elige un turno semanal --</option>
+                        {turnos
+                          .filter(t => !activeClient.turnos_fijos.includes(t.id))
+                          .map(t => {
+                            const isFull = t.asignados_ids.length >= t.cupo_maximo;
+                            return (
+                              <option key={t.id} value={t.id} disabled={isFull}>
+                                {t.dia} — {t.hora} hs ({t.asignados_ids.length}/{t.cupo_maximo} cupos) {isFull ? '[LLENO]' : ''}
+                              </option>
+                            );
+                          })}
+                      </select>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        if (!selectedTurnoToAssign) return;
+                        const res = asignarClienteFijo(activeClient.id, selectedTurnoToAssign);
+                        if (res.success) {
+                          setTurnosModalSuccess(res.message);
+                          setTurnosModalError('');
+                          setSelectedTurnoToAssign('');
+                          setTimeout(() => setTurnosModalSuccess(''), 3000);
+                        } else {
+                          setTurnosModalError(res.message);
+                          setTurnosModalSuccess('');
+                        }
+                      }}
+                      disabled={!selectedTurnoToAssign}
+                      className={`w-full font-bold text-xs py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        !selectedTurnoToAssign
+                          ? 'bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed'
+                          : 'bg-zinc-900 border border-zinc-900 text-white hover:bg-zinc-800'
+                      }`}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Asignar Turno Fijo
+                    </button>
+                  </div>
+                );
+              })()}
+
+            </div>
+
+            {/* Footer */}
+            <div className="bg-zinc-50 px-5 py-4 border-t border-zinc-150 flex justify-end font-sans">
+              <button
+                onClick={() => setClientForTurnosModal(null)}
+                className="px-5 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold font-sans transition-colors cursor-pointer"
+              >
+                Cerrar
               </button>
             </div>
 

@@ -4,7 +4,7 @@ import { useGym } from '../GymContext';
 import { Pago, MedioPago } from '../types';
 import { 
   Plus, Search, Receipt, Download, Upload, CreditCard, DollarSign, 
-  HelpCircle, Check, ArrowDownRight, ArrowUpRight, Copy, RefreshCw, X, MessageSquare 
+  HelpCircle, Check, ArrowDownRight, ArrowUpRight, Copy, RefreshCw, X, MessageSquare, Trash2 
 } from 'lucide-react';
 
 interface PagosLogProps {
@@ -23,12 +23,12 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
   // --- MANUAL FORM STATE ---
   const [pagoForm, setPagoForm] = useState({
-    cliente_id: '',
-    monto: '',
+    cliente_id: '', // Quién abona
     medio_pago: 'MERCADO_PAGO' as MedioPago,
     mes_correspondiente: '2026-05',
     hash_transaccion: ''
   });
+  const [beneficiarios, setBeneficiarios] = useState<Array<{ cliente_id: string, monto: string, mes_correspondiente: string }>>([]);
   const [formErr, setFormErr] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
@@ -41,6 +41,10 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   // --- WHATSAPP GENERATOR DIALOG ---
   const [receiptClientText, setReceiptClientText] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  
+  // --- WHATSAPP MULTIPLE RECEIPTS COMPOSER ---
+  const [recibosMultiples, setRecibosMultiples] = useState<Array<{ cliente_nombre: string, messageText: string, telefono: string, copiado: boolean }>>([]);
+  const [showRecibosModal, setShowRecibosModal] = useState(false);
 
   // Prefill price on client select
   const handleClientSelect = (clientId: string) => {
@@ -52,9 +56,51 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
     setPagoForm(prev => ({
       ...prev,
-      cliente_id: clientId,
-      monto: planPrecio.toString() // AUTOFILLED AS REQUESTED
+      cliente_id: clientId
     }));
+
+    // Autopopulate payer as first beneficiary if list is empty
+    if (beneficiarios.length === 0) {
+      setBeneficiarios([{
+        cliente_id: clientId,
+        monto: planPrecio.toString(),
+        mes_correspondiente: pagoForm.mes_correspondiente
+      }]);
+    }
+  };
+
+  const handleAddBeneficiary = (clientId: string) => {
+    if (!clientId) return;
+    if (beneficiarios.some(b => b.cliente_id === clientId)) {
+      setFormErr('El socio ya está agregado como beneficiario.');
+      return;
+    }
+    const cl = clientes.find(c => c.id === clientId);
+    if (!cl) return;
+    const plan = planes.find(p => p.id === cl.plan_id);
+    const planPrecio = plan ? plan.precio : 0;
+
+    setBeneficiarios(prev => [
+      ...prev,
+      {
+        cliente_id: clientId,
+        monto: planPrecio.toString(),
+        mes_correspondiente: pagoForm.mes_correspondiente
+      }
+    ]);
+    setFormErr('');
+  };
+
+  const handleUpdateBeneficiaryMonto = (index: number, val: string) => {
+    setBeneficiarios(prev => prev.map((b, idx) => idx === index ? { ...b, monto: val } : b));
+  };
+
+  const handleUpdateBeneficiaryMes = (index: number, val: string) => {
+    setBeneficiarios(prev => prev.map((b, idx) => idx === index ? { ...b, mes_correspondiente: val } : b));
+  };
+
+  const handleRemoveBeneficiary = (index: number) => {
+    setBeneficiarios(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleManualPagoSubmit = (e: React.FormEvent) => {
@@ -62,42 +108,96 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     setFormErr('');
     setFormSuccess('');
 
-    if (!pagoForm.cliente_id || !pagoForm.monto) {
-      setFormErr('Por favor ingrese el alumno y el monto pagado.');
+    if (!pagoForm.cliente_id) {
+      setFormErr('Por favor ingrese quién abona la transacción.');
       return;
     }
 
-    const parsedMonto = parseFloat(pagoForm.monto);
-    if (isNaN(parsedMonto) || parsedMonto <= 0) {
-      setFormErr('El monto del pago debe ser mayor a 0 pesos.');
+    if (beneficiarios.length === 0) {
+      setFormErr('Debe ingresar al menos un beneficiario para el pago.');
       return;
     }
 
-    const res = registrarPago({
-      cliente_id: pagoForm.cliente_id,
-      cliente_nombre_completo: '', // resolved inside Context
-      monto: parsedMonto,
-      medio_pago: pagoForm.medio_pago,
-      mes_correspondiente: pagoForm.mes_correspondiente,
-      hash_transaccion: pagoForm.hash_transaccion || undefined,
-      registrado_por: 'operator@gimnasio.com.ar'
-    }, 'operator@gimnasio.com.ar');
+    // Validate all amounts
+    for (let i = 0; i < beneficiarios.length; i++) {
+      const b = beneficiarios[i];
+      const parsedMonto = parseFloat(b.monto);
+      if (isNaN(parsedMonto) || parsedMonto <= 0) {
+        const c = clientes.find(x => x.id === b.cliente_id);
+        setFormErr(`El monto para el socio ${c ? c.nombre + ' ' + c.apellido : 'desconocido'} debe ser mayor a 0 pesos.`);
+        return;
+      }
+      if (!b.mes_correspondiente) {
+        setFormErr('Todos los beneficiarios deben tener un mes correspondiente asignado.');
+        return;
+      }
+    }
 
-    if (res.success) {
-      setFormSuccess(res.message);
+    const finalHash = pagoForm.hash_transaccion.trim() || `MP-${Date.now()}`;
+
+    // Loop through beneficiaries and register payments
+    const results: any[] = [];
+    const generatedReceipts: typeof recibosMultiples = [];
+
+    beneficiarios.forEach((b, idx) => {
+      const parsedMonto = parseFloat(b.monto);
+      const res = registrarPago({
+        cliente_id: b.cliente_id,
+        cliente_nombre_completo: '', // resolved inside Context
+        monto: parsedMonto,
+        medio_pago: pagoForm.medio_pago,
+        mes_correspondiente: b.mes_correspondiente,
+        hash_transaccion: finalHash,
+        registrado_por: 'operator@gimnasio.com.ar'
+      }, 'operator@gimnasio.com.ar');
+
+      results.push(res);
+
+      // Generate WhatsApp text for this beneficiary
+      const clObj = clientes.find(c => c.id === b.cliente_id);
+      if (clObj) {
+        const nombre = clObj.nombre;
+        let textMsg = '';
+        if (clObj.tipo === 'FIJO' && clObj.turnos_fijos.length > 0) {
+          const turnosStr = clObj.turnos_fijos.map(tfId => {
+            const parts = tfId.split('-');
+            return `${parts[0]} ${parts[1] || '00:00'}hs`;
+          }).join(', ');
+          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA GYM. ¡Muchas gracias por tu compromiso! Tus turnos fijos son ${turnosStr} y se renovarán automáticamente, ¿está ok? Sino comunícame con alguien para hablar y acomodar.`;
+        } else {
+          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA GYM. ¡Muchas gracias por tu compromiso! Recordá que tus cupos son variables y podés gestionar tus reservas en el portal del socio.`;
+        }
+
+        generatedReceipts.push({
+          cliente_nombre: `${clObj.apellido}, ${clObj.nombre}`,
+          messageText: textMsg,
+          telefono: clObj.telefono || '5491123456789',
+          copiado: false
+        });
+      }
+    });
+
+    const failed = results.find(r => !r.success);
+    if (failed) {
+      setFormErr(failed.message);
+    } else {
+      setFormSuccess('Cobro múltiple registrado exitosamente en el sistema.');
       setPagoForm({
         cliente_id: '',
-        monto: '',
         medio_pago: 'MERCADO_PAGO',
         mes_correspondiente: '2026-05',
         hash_transaccion: ''
       });
+      setBeneficiarios([]);
+      
+      // Load generated WhatsApp receipts to show in the composer modal
+      setRecibosMultiples(generatedReceipts);
+
       setTimeout(() => {
         setShowAddPagoModal(false);
         setFormSuccess('');
-      }, 1500);
-    } else {
-      setFormErr(res.message);
+        setShowRecibosModal(true); // Open the WhatsApp broadcast receipts composer modal!
+      }, 1200);
     }
   };
 
@@ -204,7 +304,16 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     const cl = clientes.find(c => c.id === p.cliente_id);
     const nombre = cl ? cl.nombre : p.cliente_nombre_completo;
     
-    const textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA GYM. ¡Muchas gracias por tu compromiso! Código de transacción: ${p.hash_transaccion}.`;
+    let textMsg = '';
+    if (cl && cl.tipo === 'FIJO' && cl.turnos_fijos.length > 0) {
+      const turnosStr = cl.turnos_fijos.map(tfId => {
+        const parts = tfId.split('-');
+        return `${parts[0]} ${parts[1] || '00:00'}hs`;
+      }).join(', ');
+      textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA GYM. ¡Muchas gracias por tu compromiso! Tus turnos fijos son ${turnosStr} y se renovarán automáticamente, ¿está ok? Sino comunícame con alguien para hablar y acomodar.`;
+    } else {
+      textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA GYM. ¡Muchas gracias por tu compromiso! Recordá que tus cupos son variables y podés gestionar tus reservas en el portal del socio.`;
+    }
     
     setReceiptClientText(textMsg);
     setCopiado(false);
@@ -426,11 +535,17 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       {/* --- MODAL CARGA MANUAL PAGO --- */}
       {showAddPagoModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans" id="payment-form-modal">
-          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-sm overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-xl overflow-hidden">
             <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
-              <h3 className="text-base font-bold tracking-tight">Cargar Transacción / Recibo</h3>
+              <div>
+                <h3 className="text-base font-bold tracking-tight">Cargar Transacción Contable</h3>
+                <p className="text-[10px] text-zinc-400">Permite registrar cobros individuales o agrupados (ej: padres pagando por hijos)</p>
+              </div>
               <button
-                onClick={() => setShowAddPagoModal(false)}
+                onClick={() => {
+                  setShowAddPagoModal(false);
+                  setBeneficiarios([]);
+                }}
                 className="text-zinc-400 hover:text-white"
                 id="btn-close-payment"
               >
@@ -451,104 +566,181 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 </div>
               )}
 
-              {/* CHOOSE CLIENT WITH AUTOCOMPLETE / SELECT */}
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Alumno</label>
-                <select
-                  required
-                  value={pagoForm.cliente_id}
-                  onChange={(e) => handleClientSelect(e.target.value)}
-                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden"
-                  id="pago-cliente-select"
-                >
-                  <option value="">-- Elige alumno --</option>
-                  {clientes
-                    .filter(c => c.activo)
-                    .map(c => {
-                      const pl = planes.find(p => p.id === c.plan_id);
-                      return (
-                        <option key={c.id} value={c.id}>
-                          {c.apellido}, {c.nombre} (Plan {pl?.nombre} — Deuda: ${c.deuda_acumulada})
-                        </option>
-                      );
-                    })}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* CHOOSE CLIENT WITH AUTOCOMPLETE / SELECT */}
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Quién Abona (Pagador)</label>
+                  <select
+                    required
+                    value={pagoForm.cliente_id}
+                    onChange={(e) => handleClientSelect(e.target.value)}
+                    className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                    id="pago-cliente-select"
+                  >
+                    <option value="">-- Seleccionar pagador --</option>
+                    {clientes
+                      .filter(c => c.activo)
+                      .map(c => {
+                        const pl = planes.find(p => p.id === c.plan_id);
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.apellido}, {c.nombre} (Plan {pl?.nombre} — Deuda: ${c.deuda_acumulada})
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+
+                {/* ADD BENEFICIARY DROPDOWN */}
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Agregar Alumno (Destinatario del pago)</label>
+                  <select
+                    value=""
+                    onChange={(e) => handleAddBeneficiary(e.target.value)}
+                    className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                    id="add-beneficiary-select"
+                  >
+                    <option value="">-- Buscar y agregar otro socio --</option>
+                    {clientes
+                      .filter(c => c.activo)
+                      .map(c => {
+                        const pl = planes.find(p => p.id === c.plan_id);
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.apellido}, {c.nombre} (Plan: {pl?.nombre})
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
               </div>
 
-              {/* MONTO PREFILLED ON COMPONENT ACTIONS */}
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Monto a Cobrar (Prefilled con precio plan)</label>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-2 text-zinc-400 font-mono">$</span>
+              {/* BENEFICIARIES LIST */}
+              <div className="space-y-2">
+                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">
+                  Detalle de Socios Cubiertos por esta Transacción
+                </label>
+                
+                {beneficiarios.length === 0 ? (
+                  <div className="border border-dashed border-zinc-200 rounded-lg p-4 text-center text-zinc-400 italic">
+                    No se han seleccionado destinatarios para el abono todavía.
+                  </div>
+                ) : (
+                  <div className="border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50 max-h-48 overflow-y-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-zinc-150 text-zinc-650 font-bold border-b border-zinc-200 text-[10px] uppercase">
+                          <th className="p-2">Socio</th>
+                          <th className="p-2 w-32">Mes a Cubrir</th>
+                          <th className="p-2 w-28">Monto ARS</th>
+                          <th className="p-2 text-center w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200">
+                        {beneficiarios.map((b, idx) => {
+                          const cl = clientes.find(c => c.id === b.cliente_id);
+                          return (
+                            <tr key={b.cliente_id} className="hover:bg-zinc-100/50">
+                              <td className="p-2 font-semibold text-zinc-900">
+                                {cl ? `${cl.apellido}, ${cl.nombre}` : 'Desconocido'}
+                              </td>
+                              <td className="p-2">
+                                <input
+                                  type="month"
+                                  required
+                                  value={b.mes_correspondiente}
+                                  onChange={(e) => handleUpdateBeneficiaryMes(idx, e.target.value)}
+                                  className="w-full border border-zinc-200 rounded-md p-1 bg-white font-mono text-xs outline-hidden"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <div className="relative">
+                                  <span className="absolute left-1.5 top-1 text-zinc-400 font-mono text-[10px]">$</span>
+                                  <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    value={b.monto}
+                                    onChange={(e) => handleUpdateBeneficiaryMonto(idx, e.target.value)}
+                                    className="w-full border border-zinc-200 rounded-md p-1 pl-4 bg-white font-mono text-xs font-bold outline-hidden"
+                                  />
+                                </div>
+                              </td>
+                              <td className="p-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveBeneficiary(idx)}
+                                  className="p-1 hover:bg-red-50 text-zinc-400 hover:text-red-650 rounded-md transition-colors"
+                                  title="Quitar destinatario"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* MEDIO DE PAGO */}
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Vía o Canal de Pago</label>
+                  <select
+                    value={pagoForm.medio_pago}
+                    onChange={(e) => setPagoForm(prev => ({ ...prev, medio_pago: e.target.value as MedioPago }))}
+                    className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden"
+                    id="pago-medio"
+                  >
+                    <option value="EFECTIVO">Efectivo</option>
+                    <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+                    <option value="MERCADO_PAGO">Mercado Pago</option>
+                    <option value="UALA">Uala</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
+
+                {/* TRANSACCION ID HASH */}
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Ref / ID Transacción Bancaria</label>
                   <input
-                    type="number"
-                    required
-                    min="1"
-                    placeholder="Monto ARS"
-                    value={pagoForm.monto}
-                    onChange={(e) => setPagoForm(prev => ({ ...prev, monto: e.target.value }))}
-                    className="w-full border border-zinc-200 rounded-lg p-2 pl-6 text-xs font-mono font-bold focus:ring-1 focus:ring-black outline-hidden"
-                    id="pago-monto"
+                    type="text"
+                    placeholder="ej: MP-90382211 (opcional)"
+                    value={pagoForm.hash_transaccion}
+                    onChange={(e) => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))}
+                    className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden"
+                    id="pago-hash"
                   />
                 </div>
               </div>
 
-              {/* MEDIO DE PAGO */}
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Vía o Canal de Pago</label>
-                <select
-                  value={pagoForm.medio_pago}
-                  onChange={(e) => setPagoForm(prev => ({ ...prev, medio_pago: e.target.value as MedioPago }))}
-                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden"
-                  id="pago-medio"
-                >
-                  <option value="EFECTIVO">Efectivo</option>
-                  <option value="TRANSFERENCIA">Transferencia Bancaria</option>
-                  <option value="MERCADO_PAGO">Mercado Pago</option>
-                  <option value="UALA">Uala</option>
-                  <option value="OTRO">Otro</option>
-                </select>
-              </div>
-
-              {/* MES CORRESPONDIENTE */}
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Mes al que corresponde la Cuota</label>
-                <input
-                  type="month"
-                  required
-                  value={pagoForm.mes_correspondiente}
-                  onChange={(e) => setPagoForm(prev => ({ ...prev, mes_correspondiente: e.target.value }))}
-                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden"
-                  id="pago-mes"
-                />
-              </div>
-
-              {/* TRANSACCION ID HASH */}
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Ref / ID Transacción Bancaria</label>
-                <input
-                  type="text"
-                  placeholder="ej: MP-90382211"
-                  value={pagoForm.hash_transaccion}
-                  onChange={(e) => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))}
-                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden"
-                  id="pago-hash"
-                />
+              {/* DYNAMIC TOTAL PREVIEW */}
+              <div className="bg-zinc-50 border border-zinc-200 p-3 rounded-lg flex justify-between items-center text-xs">
+                <span className="font-semibold text-zinc-550">Total de la Transacción:</span>
+                <span className="font-mono font-bold text-emerald-600 text-sm">
+                  ${beneficiarios.reduce((sum, b) => sum + (parseFloat(b.monto) || 0), 0).toLocaleString('es-AR')} ARS
+                </span>
               </div>
 
               <div className="pt-4 border-t border-zinc-100 flex justify-end gap-2 text-xs font-semibold">
                 <button
                   type="button"
-                  onClick={() => setShowAddPagoModal(false)}
+                  onClick={() => {
+                    setShowAddPagoModal(false);
+                    setBeneficiarios([]);
+                  }}
                   className="px-4 py-2 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-all"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-black text-white rounded-lg hover:bg-zinc-800 transition-all font-semibold"
+                  className="px-4 py-2 bg-black text-white rounded-lg hover:bg-zinc-800 transition-all font-semibold shadow-xs"
                 >
-                  Registrar Cobro
+                  Registrar Cobro (${beneficiarios.length} Socios)
                 </button>
               </div>
             </form>
@@ -596,6 +788,93 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
               >
                 Enviar por WhatsApp
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MULTIPLE RECEIPTS WHATSAPP COMPOSER --- */}
+      {showRecibosModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans">
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold tracking-tight">Comprobantes de Pago para Socios</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowRecibosModal(false);
+                  setRecibosMultiples([]);
+                }} 
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+              <p className="text-zinc-550 leading-relaxed">
+                Se registraron los cobros correctamente. Abajo tenés los mensajes listos para enviar a cada alumno o tutor por WhatsApp.
+              </p>
+
+              <div className="space-y-4">
+                {recibosMultiples.map((rec, index) => {
+                  const handleCopySingle = () => {
+                    navigator.clipboard.writeText(rec.messageText);
+                    setRecibosMultiples(prev => prev.map((r, i) => i === index ? { ...r, copiado: true } : r));
+                    setTimeout(() => {
+                      setRecibosMultiples(prev => prev.map((r, i) => i === index ? { ...r, copiado: false } : r));
+                    }, 2000);
+                  };
+
+                  return (
+                    <div key={index} className="border border-zinc-200 rounded-lg p-4 bg-zinc-50 space-y-2 animate-fade-in">
+                      <div className="flex justify-between items-center border-b border-zinc-200 pb-2">
+                        <span className="font-bold text-zinc-900">{rec.cliente_nombre}</span>
+                        <span className="text-[10px] text-zinc-450 font-mono">WhatsApp: {rec.telefono}</span>
+                      </div>
+                      
+                      <div className="bg-white border border-zinc-200 p-2.5 rounded font-mono text-[11px] text-zinc-700 italic select-all leading-normal whitespace-pre-wrap">
+                        {rec.messageText}
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleCopySingle}
+                          className="flex-1 py-1.5 border border-zinc-200 hover:bg-zinc-150 rounded text-xs font-semibold flex items-center justify-center gap-1 text-zinc-705 transition-colors cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-zinc-500" />
+                          {rec.copiado ? 'Copiado' : 'Copiar Mensaje'}
+                        </button>
+                        <a
+                          href={`https://wa.me/${rec.telefono}?text=${encodeURIComponent(rec.messageText)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-550 text-white rounded text-xs font-bold flex items-center justify-center gap-1 text-center shadow-xs transition-colors"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-white" />
+                          Enviar WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-zinc-150 bg-zinc-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRecibosModal(false);
+                  setRecibosMultiples([]);
+                }}
+                className="px-5 py-2 bg-black hover:bg-zinc-800 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer"
+              >
+                Cerrar Ventana
+              </button>
             </div>
           </div>
         </div>

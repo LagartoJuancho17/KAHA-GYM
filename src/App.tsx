@@ -17,7 +17,7 @@ import { NovedadesCRUD } from './components/NovedadesCRUD';
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
   CalendarRange, ShieldAlert, LineChart, ShieldCheck,
-  Menu, X, MapPin, Shield, Megaphone
+  Menu, X, MapPin, Shield, Megaphone, Check, Bell, Trash2
 } from 'lucide-react';
 
 type TabID = 'DASHBOARD' | 'CLIENTES' | 'PLANES' | 'TURNOS' | 'PAGOS' | 'MOROSIDAD' | 'PROYECCIONES' | 'AUDITORIA' | 'NOVEDADES';
@@ -34,10 +34,56 @@ function InnerApp() {
   const [activeTab, setActiveTab] = useState<TabID>('DASHBOARD');
   const [showAddPagoModal, setShowAddPagoModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { rolActivo, googleUser, signOutGoogle } = useGym();
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const { 
+    rolActivo, googleUser, signOutGoogle, registrarPago, clientes,
+    notificaciones, marcarNotificacionesLeidas, eliminarNotificacion
+  } = useGym();
 
   const [timeString, setTimeString] = useState('');
   const [dateString, setDateString] = useState('');
+
+  // --- MERCADO PAGO SUCCESS REDIRECT PROCESSING ---
+  const [paymentSuccessData, setPaymentSuccessData] = useState<{ clientName: string; amount: number } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mpStatus = params.get('mp_status');
+    const clientId = params.get('clientId');
+    const amountStr = params.get('amount');
+    const preferenceId = params.get('preference_id');
+
+    if (mpStatus === 'success' && clientId) {
+      const amount = Number(amountStr) || 0;
+      const client = clientes.find(c => c.id === clientId);
+      if (client) {
+        // Build unique hash based on preference ID or fallback to current timestamp
+        const hash = preferenceId ? `MP-${preferenceId}` : `MP-${Date.now()}`;
+        
+        // Execute the payment registration in context
+        const pagoResult = registrarPago({
+          cliente_id: clientId,
+          cliente_nombre_completo: `${client.nombre} ${client.apellido}`,
+          monto: amount,
+          medio_pago: 'MERCADO_PAGO',
+          mes_correspondiente: new Date().toISOString().slice(0, 7), // mes actual
+          hash_transaccion: hash,
+          registrado_por: client.email // socio pagó online
+        }, client.email);
+
+        if (pagoResult.success) {
+          setPaymentSuccessData({
+            clientName: `${client.nombre} ${client.apellido}`,
+            amount: amount
+          });
+        }
+      }
+
+      // Clean query parameters from URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [clientes, registrarPago]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -128,12 +174,20 @@ function InnerApp() {
 
   if (rolActivo === 'SOCIO') {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 font-sans antialiased" id="app-wrapper-socio">
-        <RoleSwitcher />
-        <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
-          <SocioPanel />
+      <>
+        <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 font-sans antialiased" id="app-wrapper-socio">
+          <RoleSwitcher />
+          <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
+            <SocioPanel />
+          </div>
         </div>
-      </div>
+        {paymentSuccessData && (
+          <PaymentSuccessModal 
+            data={paymentSuccessData} 
+            onClose={() => setPaymentSuccessData(null)} 
+          />
+        )}
+      </>
     );
   }
 
@@ -259,7 +313,7 @@ function InnerApp() {
         <RoleSwitcher />
 
         {/* GEOMETRIC THEMED SUB-HEADER (Matching the clean header element) */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs" id="sub-header-container">
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-row items-center justify-between gap-3 shadow-xs" id="sub-header-container">
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
               Entorno Seguro
@@ -267,6 +321,99 @@ function InnerApp() {
             <span className="text-base font-bold text-slate-800 flex items-center gap-2 tracking-tight" id="current-tab-label-header">
               {currentTab.desc}
             </span>
+          </div>
+
+          {/* BELL NOTIFICATIONS TRIGGER */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                if (!showNotificationsDropdown) {
+                  // Optional: mark as read automatically, or let the user click "Marcar leídas"
+                }
+              }}
+              className="relative p-2 text-slate-500 hover:text-slate-850 hover:bg-slate-100 rounded-full transition-all duration-150 cursor-pointer outline-hidden border border-slate-200/50"
+              id="admin-notifications-bell-trigger"
+              aria-label="Notificaciones"
+            >
+              <Bell className="w-4.5 h-4.5" />
+              {notificaciones.filter(n => !n.leido).length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-600 rounded-full border border-white animate-pulse"></span>
+              )}
+            </button>
+
+            {showNotificationsDropdown && (
+              <>
+                {/* Backdrop click closer */}
+                <div className="fixed inset-0 z-40" onClick={() => setShowNotificationsDropdown(false)}></div>
+                
+                {/* Dropdown Container */}
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 font-sans animate-scale-in max-h-[420px] overflow-y-auto" id="admin-notifications-dropdown">
+                  <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2">
+                    <h4 className="text-xs font-bold text-slate-800">Alertas de Cobro ({notificaciones.filter(n => !n.leido).length} nuevas)</h4>
+                    {notificaciones.length > 0 && (
+                      <button
+                        onClick={() => {
+                          marcarNotificacionesLeidas();
+                        }}
+                        className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold hover:underline cursor-pointer"
+                      >
+                        Marcar todas leídas
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {notificaciones.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400 text-xs">
+                        No hay notificaciones de cobro registradas.
+                      </div>
+                    ) : (
+                      notificaciones.map(notif => {
+                        const dateFormatted = new Date(notif.fecha).toLocaleTimeString('es-AR', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) + ' - ' + new Date(notif.fecha).toLocaleDateString('es-AR', {
+                          day: 'numeric',
+                          month: 'short'
+                        });
+
+                        return (
+                          <div 
+                            key={notif.id} 
+                            className={`flex justify-between items-start p-2.5 rounded-xl border text-[11px] leading-relaxed transition-all ${
+                              notif.leido 
+                                ? 'bg-slate-50 border-slate-150 text-slate-550' 
+                                : 'bg-emerald-50/50 border-emerald-100 text-slate-800 font-medium shadow-2xs'
+                            }`}
+                          >
+                            <div className="space-y-1 pr-2 flex-1 text-left">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-1.5 h-1.5 rounded-full ${notif.leido ? 'bg-slate-300' : 'bg-emerald-500'}`}></span>
+                                <span className="font-bold text-slate-700">{notif.titulo}</span>
+                              </div>
+                              <p className="text-[10px] text-slate-550 leading-relaxed font-sans">{notif.mensaje}</p>
+                              <span className="text-[8px] text-slate-400 block font-mono font-medium">{dateFormatted}</span>
+                            </div>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                eliminarNotificacion(notif.id);
+                              }}
+                              className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded hover:bg-slate-100 cursor-pointer shrink-0"
+                              title="Eliminar notificación"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </header>
 
@@ -276,6 +423,75 @@ function InnerApp() {
         </main>
       </div>
 
+      {paymentSuccessData && (
+        <PaymentSuccessModal 
+          data={paymentSuccessData} 
+          onClose={() => setPaymentSuccessData(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
+interface PaymentSuccessModalProps {
+  data: { clientName: string; amount: number };
+  onClose: () => void;
+}
+
+function PaymentSuccessModal({ data, onClose }: PaymentSuccessModalProps) {
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-100 shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-scale-in">
+        {/* Decorative background gradients */}
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-100 rounded-full blur-3xl opacity-50"></div>
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
+
+        {/* Big check icon with pulsating circle */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 bg-emerald-100 rounded-full scale-150 animate-ping opacity-30"></div>
+          <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white border-4 border-white shadow-md relative z-10">
+            <Check className="w-8 h-8 stroke-[3]" />
+          </div>
+        </div>
+
+        <h3 className="text-2xl font-black text-slate-800 tracking-tight">¡Pago Aprobado!</h3>
+        <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+          Tu transacción se ha procesado con éxito a través de Mercado Pago.
+        </p>
+
+        {/* Receipt display card */}
+        <div className="w-full bg-slate-50 border border-slate-150 rounded-2xl p-5 my-6 space-y-3">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400 font-mono uppercase">Socio</span>
+            <span className="font-bold text-slate-800">{data.clientName}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400 font-mono uppercase">Medio de Pago</span>
+            <span className="font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 text-[10px]">
+              MERCADO PAGO
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400 font-mono uppercase">Monto Abonado</span>
+            <span className="font-black text-emerald-700 text-sm font-mono">
+              ${data.amount.toLocaleString('es-AR')} ARS
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-xs pt-2.5 border-t border-slate-200">
+            <span className="text-slate-400 font-mono uppercase">Estado Cuenta</span>
+            <span className="font-bold text-emerald-750 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[9px] border border-emerald-150 uppercase tracking-wide">
+              ✓ Al Día
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full bg-slate-900 hover:bg-slate-850 text-white font-bold py-3 px-6 rounded-2xl text-xs transition-all shadow-md active:scale-98 cursor-pointer relative z-10"
+        >
+          Entendido, gracias
+        </button>
+      </div>
     </div>
   );
 }

@@ -17,7 +17,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ 
   setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal 
 }) => {
-  const { clientes, planes, turnos, pagos, rolActivo } = useGym();
+  const { clientes, planes, turnos, pagos, rolActivo, notificaciones } = useGym();
   
   // Mes corriente de análisis
   const mesActual = '2026-05';
@@ -267,39 +267,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           <div className="relative h-64 w-full flex items-end justify-between font-mono text-[10px] text-zinc-500">
             {/* SVG Line path background representation */}
-            <svg className="absolute inset-x-0 bottom-4 top-4 h-48 w-full" preserveAspectRatio="none">
+            <svg className="absolute inset-x-0 bottom-4 top-4 h-48 w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
               {/* Lines Grid for spacing reference */}
-              <line x1="0%" y1="0%" x2="100%" y2="0%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
-              <line x1="0%" y1="25%" x2="100%" y2="25%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
-              <line x1="0%" y1="50%" x2="100%" y2="50%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
-              <line x1="0%" y1="75%" x2="100%" y2="75%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
-              <line x1="0%" y1="100%" x2="100%" y2="100%" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0" y1="0" x2="100" y2="0" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0" y1="25" x2="100" y2="25" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0" y1="50" x2="100" y2="50" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0" y1="75" x2="100" y2="75" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0" y1="100" x2="100" y2="100" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
 
               {/* Draw area and line polygon */}
               <polyline
                 fill="none"
                 stroke="black"
-                strokeWidth="3.5"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={ingresosHistoricos.map((val, idx) => {
                   const x = (idx / 5) * 100;
                   const ratio = (val / maxIngreso);
-                  // Invert Y because SVG coordinates starts 0 at top
                   const y = 90 - (ratio * 70); 
-                  return `${x}%,${y}%`;
+                  return `${x},${y}`;
                 }).join(' ')}
               />
+            </svg>
 
-              {/* Dots on nodes */}
+            {/* Dots overlay SVG without viewBox to keep circles round */}
+            <svg className="absolute inset-x-0 bottom-4 top-4 h-48 w-full pointer-events-none">
               {ingresosHistoricos.map((val, idx) => {
                 const x = `${(idx / 5) * 100}%`;
                 const ratio = val / maxIngreso;
                 const y = `${90 - (ratio * 70)}%`;
                 return (
-                  <g key={idx}>
-                    <circle cx={x} cy={y} r="6" fill="black" stroke="white" strokeWidth="2" className="cursor-pointer" />
-                  </g>
+                  <circle key={idx} cx={x} cy={y} r="6" fill="black" stroke="white" strokeWidth="2" className="cursor-pointer pointer-events-auto" />
                 );
               })}
             </svg>
@@ -488,6 +487,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div key={c.id} className="flex justify-between items-center text-xs p-2 bg-zinc-50 border border-zinc-200 rounded-lg">
                     <span className="font-semibold text-zinc-900 font-sans">{c.nombre} {c.apellido}</span>
                     <span className="font-mono text-red-600 font-bold">${c.deuda_acumulada.toLocaleString('es-AR')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ALERTA 4: COBROS RECIENTES EN VIVO */}
+          <div className="space-y-2 pt-4 border-t border-zinc-100">
+            <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest font-sans">Cobros Recientes en Vivo</h4>
+            {notificaciones.filter(n => n.tipo === 'PAGO_REALIZADO').length === 0 ? (
+              <p className="text-zinc-400 font-sans text-xs">No hay cobros registrados recientemente.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {notificaciones.filter(n => n.tipo === 'PAGO_REALIZADO').slice(0, 3).map(n => (
+                  <div key={n.id} className="flex flex-col gap-1 text-[11px] p-2.5 bg-emerald-50/40 border border-emerald-100 rounded-xl relative">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-800 tracking-tight">{n.titulo}</span>
+                      <span className="text-[8px] font-mono text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">CONFIRMADO</span>
+                    </div>
+                    <p className="text-[10px] text-slate-655 font-medium leading-relaxed font-sans">{n.mensaje}</p>
+                    <span className="text-[8px] text-zinc-400 block font-mono">
+                      {new Date(n.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} - {new Date(n.fecha).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                    </span>
                   </div>
                 ))}
               </div>

@@ -9,7 +9,7 @@ import {
 
 export const MorososControl: React.FC = () => {
   const { 
-    clientes, planes, pagos, ejecutarCronMorosidad, registrarPago 
+    clientes, planes, pagos, ejecutarCronMorosidad, registrarPago, updateCliente
   } = useGym();
 
   const [simularFecha, setSimularFecha] = useState('2026-05-10'); // May 10th, 2026 as standard post-gracia date
@@ -84,15 +84,15 @@ export const MorososControl: React.FC = () => {
 
     setTimeout(() => {
       setCronConsole(prev => [...prev, `>> Success: Returned ${clientesActivos.length} active memberships.`]);
-    }, 450);
+    }, 300);
 
     setTimeout(() => {
       setCronConsole(prev => [
         ...prev,
-        `>> Evaluating grace period limits (Rule: Day 5 at 23:59).`,
+        `>> Evaluating grace period limits (Rules: Day 1, 5, 6, 11).`,
         `>> Checking registered monthly coverages for mes-current: [${simularFecha.slice(0, 7)}]`
       ]);
-    }, 900);
+    }, 600);
 
     setTimeout(() => {
       const result = ejecutarCronMorosidad(simularFecha);
@@ -100,11 +100,10 @@ export const MorososControl: React.FC = () => {
       setCronRunning(false);
       setCronConsole(prev => [
         ...prev,
-        `>> Running transactional updates on client profiles...`,
-        `>> [LOG] Audit: CRON_CONTROL_MOROSIDAD_EJECUTADO registered successfully with ID: lg-${Date.now()}`,
-        `>> Deno response status: 200 (Success). Processed: ${result.procesados} | New Defaults: ${result.nuevosMorosos}`
+        ...result.logLineas,
+        `>> Deno response status: 200 (Success).`
       ]);
-    }, 1800);
+    }, 1200);
   };
 
   // --- REGISTRAR PAGO RAPIDO DESDE TABLA DE MOROSIDAD ---
@@ -249,9 +248,11 @@ export const MorososControl: React.FC = () => {
           {cronStatsResult && (
             <div className="mt-4 pt-3 border-t border-zinc-800 flex justify-between items-center text-xs animate-fade-in font-sans">
               <span className="text-amber-400 font-bold uppercase tracking-wider text-[9px]">Análisis Terminado con éxito</span>
-              <div className="flex gap-4 font-mono font-semibold">
+              <div className="flex flex-wrap gap-4 font-mono font-semibold">
                 <span>Procesados: <strong className="text-white">{cronStatsResult.procesados}</strong></span>
                 <span>Pasaron a Mora: <strong className="text-red-400 font-bold">{cronStatsResult.nuevosMorosos}</strong></span>
+                <span>Turnos Suspendidos (Semana 1): <strong className="text-amber-400 font-bold">{cronStatsResult.suspendidosSemanaCount}</strong></span>
+                <span>Bajas de Turno: <strong className="text-red-400 font-bold">{cronStatsResult.dadosBajaCount}</strong></span>
               </div>
             </div>
           )}
@@ -315,7 +316,19 @@ export const MorososControl: React.FC = () => {
                   return (
                     <tr key={c.id} className="hover:bg-zinc-50/50">
                       <td className="p-4">
-                        <div className="font-bold text-zinc-950">{c.apellido}, {c.nombre}</div>
+                        <div className="font-bold text-zinc-950 flex items-center gap-1.5 flex-wrap">
+                          <span>{c.apellido}, {c.nombre}</span>
+                          {c.exencion_cobro && c.exencion_cobro !== 'NINGUNA' && (
+                            <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold uppercase shrink-0 ${
+                              c.exencion_cobro === 'SUSPENDIDO' ? 'bg-amber-100 text-amber-700 border border-amber-205' :
+                              c.exencion_cobro === 'POSTERGADO' ? 'bg-cyan-100 text-cyan-700 border border-cyan-205' :
+                              'bg-emerald-100 text-emerald-705 border border-emerald-205'
+                            }`}>
+                              {c.exencion_cobro === 'SUSPENDIDO' ? 'Cobro Suspendido' :
+                               c.exencion_cobro === 'POSTERGADO' ? 'Postergado' : 'Perdonado'}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{c.email}</div>
                       </td>
                       <td className="p-4">
@@ -376,7 +389,27 @@ export const MorososControl: React.FC = () => {
               <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-150 leading-relaxed">
                 <span className="text-zinc-400 text-[10px] uppercase font-bold block mb-0.5">Socio</span>
                 <span className="font-bold text-zinc-900 text-sm block">{selectedClienteToClear.nombre} {selectedClienteToClear.apellido}</span>
-                <span className="text-zinc-500 font-semibold block text-[10px] mt-2">Deuda histórica registrada: <span className="font-mono text-red-600 font-bold">${selectedClienteToClear.deuda_acumulada.toLocaleString('es-AR')}</span></span>
+                <span className="text-zinc-555 font-semibold block text-[10px] mt-2">Deuda histórica registrada: <span className="font-mono text-red-650 font-bold">${selectedClienteToClear.deuda_acumulada.toLocaleString('es-AR')}</span></span>
+              </div>
+
+              {/* GESTION DE EXCEPCION RAPIDA */}
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold block text-[10px] uppercase font-sans">Exención / Excepción de Cobro</label>
+                <select
+                  value={selectedClienteToClear.exencion_cobro || 'NINGUNA'}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    updateCliente(selectedClienteToClear.id, { exencion_cobro: val });
+                    // Mutate locally to update table state instantly
+                    selectedClienteToClear.exencion_cobro = val;
+                  }}
+                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                >
+                  <option value="NINGUNA">Ninguna (Control estándar)</option>
+                  <option value="SUSPENDIDO">Suspensión de cobro momentáneo</option>
+                  <option value="POSTERGADO">Postergación autorizada</option>
+                  <option value="PERDONADO">Perdonado / Exento este mes</option>
+                </select>
               </div>
 
               {/* MONTO */}

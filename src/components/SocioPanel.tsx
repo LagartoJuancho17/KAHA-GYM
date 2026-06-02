@@ -4,7 +4,8 @@ import { useGym } from '../GymContext';
 import { 
   Trash2, User, Sparkles, AlertTriangle, CreditCard, ExternalLink, 
   ChevronDown, LogOut, QrCode, Barcode, CalendarDays, Award, Phone, 
-  Check, Info, Menu, X, Receipt, Home, Shield, Mail, Calendar, MapPin, Plus, RefreshCw, Megaphone
+  Check, Info, Menu, X, Receipt, Home, Shield, Mail, Calendar, MapPin, Plus, RefreshCw, Megaphone,
+  CalendarClock, Clock, Loader2
 } from 'lucide-react';
 
 // Decoupled weekday calculation to schedule replacement dates
@@ -33,7 +34,8 @@ export const SocioPanel: React.FC = () => {
   const { 
     clientes, turnos, pagos, selectedSocioId, planes, googleUser, signOutGoogle,
     novedades, setRolActivo, rolActivo,
-    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija
+    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija,
+    recuperos, programarRecuperoPendiente, registrarPago
   } = useGym();
 
   // Navigation tabs: HOME | PERFIL | RESERVAS | PAGOS | NOVEDADES
@@ -54,6 +56,54 @@ export const SocioPanel: React.FC = () => {
   // States for booking dates selection
   const [bookingTurnId, setBookingTurnId] = useState<string | null>(null);
   const [reprogramTurnId, setReprogramTurnId] = useState<string | null>(null);
+
+  // --- RECOVERY PORTAL STATES ---
+  const [canjeRecuperoId, setCanjeRecuperoId] = useState<string | null>(null);
+  const [canjeTurnoId, setCanjeTurnoId] = useState<string>('');
+  const [canjeFecha, setCanjeFecha] = useState<string>('');
+  const [canjeSuccess, setCanjeSuccess] = useState<string | null>(null);
+  const [canjeError, setCanjeError] = useState<string | null>(null);
+
+  // --- MERCADO PAGO STATES ---
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [showPaymentChoiceModal, setShowPaymentChoiceModal] = useState(false);
+  const [simulatedSuccessData, setSimulatedSuccessData] = useState<{ clientName: string; amount: number } | null>(null);
+
+  const handlePagarMercadoPago = async () => {
+    if (!socio) return;
+    setIsPaying(true);
+    setPaymentError(null);
+    try {
+      const response = await fetch('/api/create-preference', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: socio.deuda_acumulada,
+          title: `Cuota KAHA GYM - ${socio.nombre} ${socio.apellido}`,
+          clientId: socio.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al iniciar el pago con Mercado Pago.');
+      }
+
+      const preference = await response.json();
+      if (preference.init_point) {
+        window.location.href = preference.init_point;
+      } else {
+        throw new Error('No se recibió la URL de redirección de Mercado Pago.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setPaymentError(err.message || 'Error de conexión con la pasarela de pagos.');
+      setIsPaying(false);
+    }
+  };
 
 
 
@@ -93,7 +143,44 @@ export const SocioPanel: React.FC = () => {
       .sort((a, b) => new Date(b.fecha_pago).getTime() - new Date(a.fecha_pago).getTime());
   }, [pagos, socio]);
 
+  // Pending recovery tickets
+  const pendingRecuperos = useMemo(() => {
+    if (!socio) return [];
+    return (recuperos || []).filter(
+      r => r.cliente_id === socio.id && 
+           r.turno_recupero_id === 'PENDIENTE_DEFINICION' && 
+           r.estado === 'PENDIENTE'
+    );
+  }, [recuperos, socio]);
 
+  const handleConfirmCanje = (recuperoId: string) => {
+    if (!canjeTurnoId || !canjeFecha) {
+      setCanjeError('Debes seleccionar un turno y una fecha.');
+      return;
+    }
+    const result = programarRecuperoPendiente(recuperoId, canjeTurnoId, canjeFecha);
+    if (result.success) {
+      setCanjeSuccess(result.message);
+      setCanjeError(null);
+      setTimeout(() => {
+        setCanjeRecuperoId(null);
+        setCanjeTurnoId('');
+        setCanjeFecha('');
+        setCanjeSuccess(null);
+      }, 2000);
+    } else {
+      setCanjeError(result.message);
+      setCanjeSuccess(null);
+    }
+  };
+
+  const handleCancelCanje = () => {
+    setCanjeRecuperoId(null);
+    setCanjeTurnoId('');
+    setCanjeFecha('');
+    setCanjeError(null);
+    setCanjeSuccess(null);
+  };
 
   // Daily slots for current tab
   const turnosDelDia = useMemo(() => {
@@ -972,6 +1059,28 @@ export const SocioPanel: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {socio.deuda_acumulada > 0 && (
+                <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-col gap-2">
+                  <button
+                    onClick={() => setShowPaymentChoiceModal(true)}
+                    disabled={isPaying}
+                    className="w-full bg-[#009EE3] hover:bg-[#008bc7] text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isPaying ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4" />
+                    )}
+                    <span>{isPaying ? 'Iniciando Mercado Pago...' : 'Pagar con Mercado Pago'}</span>
+                  </button>
+                  {paymentError && (
+                    <p className="text-[10px] text-rose-600 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">
+                      {paymentError}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
           </section>
@@ -1135,8 +1244,12 @@ export const SocioPanel: React.FC = () => {
                       <div className="p-5 space-y-3.5">
                         <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
                           <span className="text-slate-500 font-semibold">Estado de Cuenta:</span>
-                          <span className="font-mono font-bold bg-emerald-50 border border-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded text-[10px]">
-                            ACTIVO / AL DÍA
+                          <span className={`font-mono font-bold px-2.5 py-0.5 rounded text-[10px] ${
+                            socio.estado === 'ACTIVO' 
+                              ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' 
+                              : 'bg-rose-50 border border-rose-100 text-rose-700'
+                          }`}>
+                            {socio.estado === 'ACTIVO' ? 'ACTIVO / AL DÍA' : 'CON DEUDA / INHABILITADO'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
@@ -1153,7 +1266,7 @@ export const SocioPanel: React.FC = () => {
                         </div>
                         <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
                           <span className="text-slate-500 font-semibold">Deuda Acumulada:</span>
-                          <span className="font-bold text-slate-800 font-mono text-[11px]">
+                          <span className={`font-bold font-mono text-[11px] ${socio.deuda_acumulada > 0 ? 'text-rose-700 font-extrabold' : 'text-slate-850'}`}>
                             ${socio.deuda_acumulada.toLocaleString('es-AR')} ARS
                           </span>
                         </div>
@@ -1171,13 +1284,22 @@ export const SocioPanel: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="bg-emerald-50/40 p-4 border-t border-slate-200">
-                        <p className="text-[10px] text-emerald-850 leading-relaxed font-semibold flex items-start gap-1.5">
-                          <Info className="w-3.5 h-3.5 text-emerald-650 shrink-0 mt-0.5 animate-pulse" />
-                          <span>
-                            Para solicitar cambios permanentes en el tipo de tu membresía o cancelaciones, por favor contactate con administración vía WhatsApp.
-                          </span>
-                        </p>
+                      <div className={`p-4 border-t border-slate-200 ${socio.deuda_acumulada > 0 ? 'bg-rose-50/40' : 'bg-emerald-50/40'}`}>
+                        {socio.deuda_acumulada > 0 ? (
+                          <p className="text-[10px] text-rose-850 leading-relaxed font-semibold flex items-start gap-1.5">
+                            <Info className="w-3.5 h-3.5 text-rose-650 shrink-0 mt-0.5 animate-pulse" />
+                            <span>
+                              Registrás una deuda de ${socio.deuda_acumulada.toLocaleString('es-AR')} ARS. Podés abonar de forma directa y 100% segura mediante Mercado Pago con el botón ubicado en tu plan vigente.
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-emerald-850 leading-relaxed font-semibold flex items-start gap-1.5">
+                            <Info className="w-3.5 h-3.5 text-emerald-650 shrink-0 mt-0.5 animate-pulse" />
+                            <span>
+                              Para solicitar cambios permanentes en el tipo de tu membresía o cancelaciones, por favor contactate con administración vía WhatsApp.
+                            </span>
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1261,6 +1383,182 @@ export const SocioPanel: React.FC = () => {
               <p className="text-[11px] text-sky-850 font-medium leading-relaxed">
                 ¡Tienes todos tus cupos mensuales asignados de forma fija! Si deseas asistir en otro horario, puedes <strong>reprogramar</strong> tus sesiones haciendo click en "Reprogramar clase" en tus días fijos o desde el listado de sesiones en la pantalla de Inicio.
               </p>
+            </div>
+          )}
+
+          {/* SECCIÓN: RECUPEROS PENDIENTES */}
+          {pendingRecuperos.length > 0 && (
+            <div className="mb-8 p-5 bg-amber-50/50 border border-amber-250 rounded-2xl">
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarClock className="w-5.5 h-5.5 text-amber-600 animate-pulse" />
+                <h3 className="text-xs font-black uppercase text-amber-800 tracking-wider font-mono">
+                  Mis Recuperos Pendientes de Reprogramación
+                </h3>
+              </div>
+              <p className="text-[11px] text-amber-700 font-sans mb-4 leading-relaxed">
+                Tienes inasistencias registradas (por aviso de falta o vacaciones) que aún no has reprogramado. Cada ticket de recupero es válido por 1 mes (30 días) a partir de la inasistencia. ¡Canjéalos antes de que expiren!
+              </p>
+
+              <div className="space-y-3">
+                {pendingRecuperos.map(rec => {
+                  const originalTurn = turnos.find(t => t.id === rec.turno_original_id);
+                  const isExpired = new Date(rec.fecha_limite + 'T23:59:59') < new Date();
+                  const dateFormatted = new Date(rec.fecha_inasistencia + 'T00:00:00').toLocaleDateString('es-AR', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  });
+                  const limitDateFormatted = new Date(rec.fecha_limite + 'T00:00:00').toLocaleDateString('es-AR', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  });
+
+                  return (
+                    <div key={rec.id} className="bg-white border border-amber-205 rounded-xl p-4 shadow-3xs flex flex-col gap-3">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">
+                            Clase del {dateFormatted}
+                          </p>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                            Original: {originalTurn ? `${originalTurn.dia} a las ${originalTurn.hora} hs` : 'Turno no encontrado'}
+                          </p>
+                          <p className="text-[10px] text-amber-750 font-bold mt-1.5 flex items-center gap-1.5 font-mono">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                            VENCE EL: {limitDateFormatted}
+                          </p>
+                        </div>
+
+                        {!isExpired && (
+                          <button
+                            onClick={() => {
+                              if (canjeRecuperoId === rec.id) {
+                                handleCancelCanje();
+                              } else {
+                                setCanjeRecuperoId(rec.id);
+                                setCanjeTurnoId('');
+                                setCanjeFecha('');
+                              }
+                            }}
+                            className={`px-3.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer font-sans shrink-0 flex items-center gap-1.5 ${
+                              canjeRecuperoId === rec.id
+                                ? 'bg-slate-100 border border-slate-205 text-slate-650 hover:bg-slate-200'
+                                : 'bg-amber-600 hover:bg-amber-700 text-white border border-amber-650 shadow-3xs'
+                            }`}
+                          >
+                            <CalendarClock className="w-3.5 h-3.5" />
+                            {canjeRecuperoId === rec.id ? 'Cancelar' : 'Canjear Recupero'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* FORM DE CANJE EXPANDIBLE */}
+                      {canjeRecuperoId === rec.id && (
+                        <div className="bg-slate-50 p-4.5 rounded-xl border border-slate-200 space-y-4 animate-fade-in mt-2">
+                          <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-wider font-mono">
+                            Programar Clase de Recupero
+                          </h4>
+
+                          {canjeError && (
+                            <div className="p-2.5 bg-rose-50 border border-rose-150 rounded-lg text-[10px] text-rose-600 font-medium">
+                              {canjeError}
+                            </div>
+                          )}
+
+                          {canjeSuccess && (
+                            <div className="p-2.5 bg-emerald-50 border border-emerald-150 rounded-lg text-[10px] text-emerald-700 font-bold">
+                              {canjeSuccess}
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
+                                1. Selecciona Turno
+                              </label>
+                              <select
+                                value={canjeTurnoId}
+                                onChange={(e) => {
+                                  setCanjeTurnoId(e.target.value);
+                                  setCanjeFecha('');
+                                }}
+                                className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 outline-hidden focus:border-emerald-500 font-mono transition-all"
+                              >
+                                <option value="">-- Seleccionar Turno --</option>
+                                {turnos.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.dia} - {t.hora} hs {t.profesor ? `(Prof: ${t.profesor})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
+                                2. Selecciona Fecha
+                              </label>
+                              {canjeTurnoId ? (
+                                <select
+                                  value={canjeFecha}
+                                  onChange={(e) => setCanjeFecha(e.target.value)}
+                                  className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 outline-hidden focus:border-emerald-500 font-mono transition-all"
+                                >
+                                  <option value="">-- Seleccionar Fecha --</option>
+                                  {getAvailableDatesForTurn(turnos.find(t => t.id === canjeTurnoId)!.dia)
+                                    .filter(d => {
+                                      const dObj = new Date(d + 'T00:00:00');
+                                      const limitObj = new Date(rec.fecha_limite + 'T23:59:59');
+                                      return dObj <= limitObj && dObj >= new Date(new Date().setHours(0,0,0,0));
+                                    })
+                                    .map(d => {
+                                      const formattedDate = new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                        weekday: 'short'
+                                      });
+                                      return (
+                                        <option key={d} value={d}>
+                                          {formattedDate}
+                                        </option>
+                                      );
+                                    })}
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  disabled
+                                  placeholder="Selecciona primero un turno"
+                                  className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-100/50 text-slate-400 font-mono cursor-not-allowed"
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-2 border-t border-slate-150">
+                            <button
+                              type="button"
+                              onClick={handleCancelCanje}
+                              className="px-3.5 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmCanje(rec.id)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                            >
+                              <Check className="w-4 h-4" />
+                              Confirmar Agendamiento
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -1673,6 +1971,141 @@ export const SocioPanel: React.FC = () => {
           </svg>
         </a>
       </div>
+
+      {/* CHOICE MODAL FOR PAYMENT METHOD */}
+      {showPaymentChoiceModal && socio && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in font-sans" id="payment-choice-modal">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-100 shadow-2xl relative overflow-hidden flex flex-col animate-scale-in">
+            {/* Decorative background gradients */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-sky-100 rounded-full blur-3xl opacity-55"></div>
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-150 rounded-full blur-3xl opacity-40"></div>
+
+            <div className="flex justify-between items-center mb-6 relative z-10">
+              <h3 className="text-xl font-bold text-slate-800 tracking-tight">Confirmar Método de Pago</h3>
+              <button 
+                onClick={() => setShowPaymentChoiceModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 relative z-10">
+              <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4.5">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Monto a abonar</span>
+                <span className="text-2xl font-black text-slate-800 font-mono">${socio.deuda_acumulada.toLocaleString('es-AR')} ARS</span>
+              </div>
+
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                Selecciona cómo deseas procesar este pago. Puedes usar la pasarela oficial de Mercado Pago o simular el cobro de forma instantánea localmente sin configurar cuentas externas.
+              </p>
+
+              <div className="pt-2 flex flex-col gap-3">
+                {/* Option 1: Official Checkout */}
+                <button
+                  onClick={async () => {
+                    setShowPaymentChoiceModal(false);
+                    await handlePagarMercadoPago();
+                  }}
+                  disabled={isPaying}
+                  className="w-full bg-[#009EE3] hover:bg-[#008bc7] text-white font-bold py-3.5 px-6 rounded-2xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-md disabled:opacity-60"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Proceder con Mercado Pago (Oficial)</span>
+                </button>
+
+                {/* Option 2: Local Simulation */}
+                <button
+                  onClick={() => {
+                    if (!socio) return;
+                    setShowPaymentChoiceModal(false);
+                    
+                    // Simulate registration
+                    const simulatedHash = `SIM-MP-${Date.now()}`;
+                    const res = registrarPago({
+                      cliente_id: socio.id,
+                      cliente_nombre_completo: `${socio.nombre} ${socio.apellido}`,
+                      monto: socio.deuda_acumulada,
+                      medio_pago: 'MERCADO_PAGO',
+                      mes_correspondiente: new Date().toISOString().slice(0, 7), // mes actual
+                      hash_transaccion: simulatedHash,
+                      registrado_por: socio.email
+                    }, socio.email);
+
+                    if (res.success) {
+                      setSimulatedSuccessData({
+                        clientName: `${socio.nombre} ${socio.apellido}`,
+                        amount: socio.deuda_acumulada
+                      });
+                    }
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-2xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-md"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Simular Pago Rápido (Local)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SIMULATED PAYMENT SUCCESS RECEIPT MODAL */}
+      {simulatedSuccessData && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-100 shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-scale-in">
+            {/* Decorative background gradients */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-100 rounded-full blur-3xl opacity-50"></div>
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
+
+            {/* Big check icon with pulsating circle */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-emerald-100 rounded-full scale-150 animate-ping opacity-30"></div>
+              <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white border-4 border-white shadow-md relative z-10">
+                <Check className="w-8 h-8 stroke-[3]" />
+              </div>
+            </div>
+
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">¡Pago Aprobado (Simulado)!</h3>
+            <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+              Tu transacción simulada se ha procesado con éxito y se ha reportado al panel administrativo.
+            </p>
+
+            {/* Receipt display card */}
+            <div className="w-full bg-slate-50 border border-slate-150 rounded-2xl p-5 my-6 space-y-3 text-left">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-mono uppercase">Socio</span>
+                <span className="font-bold text-slate-800">{simulatedSuccessData.clientName}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-mono uppercase">Medio de Pago</span>
+                <span className="font-semibold text-sky-650 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 text-[10px]">
+                  SIMULACIÓN MP
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-mono uppercase">Monto Abonado</span>
+                <span className="font-black text-emerald-700 text-sm font-mono">
+                  ${simulatedSuccessData.amount.toLocaleString('es-AR')} ARS
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs pt-2.5 border-t border-slate-200">
+                <span className="text-slate-400 font-mono uppercase">Estado Cuenta</span>
+                <span className="font-bold text-emerald-750 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[9px] border border-emerald-150 uppercase tracking-wide">
+                  ✓ Al Día
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSimulatedSuccessData(null)}
+              className="w-full bg-slate-900 hover:bg-slate-850 text-white font-bold py-3 px-6 rounded-2xl text-xs transition-all shadow-md active:scale-98 cursor-pointer relative z-10"
+            >
+              Entendido, gracias
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

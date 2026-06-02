@@ -4,6 +4,7 @@
 import { Cliente, Plan, Turno, Pago, AuditLog, HistorialPrecioPlan, RecuperoTurno, Novedad } from './types';
 
 export const INITIAL_PLANES: Plan[] = [
+  { id: 'p-none', nombre: 'Aún no sabe', dias_por_semana: 5, precio: 0.00, creado_at: '2026-01-10T10:00:00Z' },
   { id: 'p-2d', nombre: 'Plan 2 Días Semana', dias_por_semana: 2, precio: 14000.00, creado_at: '2026-01-10T10:00:00Z' },
   { id: 'p-3d', nombre: 'Plan 3 Días Semana', dias_por_semana: 3, precio: 18000.00, creado_at: '2026-01-10T10:00:00Z' },
   { id: 'p-4d', nombre: 'Plan 4 Días Semana', dias_por_semana: 4, precio: 21000.00, creado_at: '2026-01-10T10:00:00Z' },
@@ -189,6 +190,21 @@ export const INITIAL_CLIENTES: Cliente[] = [
     ultimo_mes_pagado: '2026-05',
     turnos_fijos: ['MARTES-15:00', 'JUEVES-15:00', 'VIERNES-15:00'],
     creado_at: '2026-04-12T14:00:00Z'
+  },
+  {
+    id: 'c-invitado',
+    nombre: 'Invitado',
+    apellido: 'de Prueba',
+    email: 'invitado@test.com',
+    telefono: '11-0000-0000',
+    tipo: 'FLEXIBLE',
+    estado: 'ACTIVO',
+    plan_id: 'p-none',
+    activo: true,
+    deuda_acumulada: 0,
+    ultimo_mes_pagado: '2026-05',
+    turnos_fijos: [],
+    creado_at: '2026-05-01T10:00:00Z'
   }
 ];
 
@@ -264,7 +280,8 @@ export const INITIAL_RECUPEROS: RecuperoTurno[] = [
     fecha_inasistencia: '2026-05-18',
     turno_recupero_id: 'MARTES-08:30',
     fecha_recupero: '2026-05-19',
-    estado: 'COMPLETADO'
+    estado: 'COMPLETADO',
+    fecha_limite: '2026-06-18'
   }
 ];
 
