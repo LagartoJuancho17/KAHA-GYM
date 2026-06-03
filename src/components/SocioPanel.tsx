@@ -44,7 +44,7 @@ export const SocioPanel: React.FC = () => {
   // Mobile/SaaS slide-out sidebar drawer state (Left to Right navigation)
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const [activeDayTab, setActiveDayTab] = useState<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>('LUNES');
+  const [activeDays, setActiveDays] = useState<Set<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>>(new Set(['LUNES']));
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -184,8 +184,12 @@ export const SocioPanel: React.FC = () => {
 
   // Daily slots for current tab
   const turnosDelDia = useMemo(() => {
-    return turnos.filter(t => t.dia === activeDayTab);
-  }, [turnos, activeDayTab]);
+    const DIAS_ORDER = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const selected = activeDays.size > 0 ? activeDays : new Set(['LUNES']);
+    return turnos
+      .filter(t => selected.has(t.dia as any))
+      .sort((a, b) => DIAS_ORDER.indexOf(a.dia) - DIAS_ORDER.indexOf(b.dia) || a.hora.localeCompare(b.hora));
+  }, [turnos, activeDays]);
 
   // Plan matching
   const planSocio = useMemo(() => {
@@ -1562,21 +1566,29 @@ export const SocioPanel: React.FC = () => {
             </div>
           )}
 
-          {/* DIAS CALENDARIO SELECTOR TAB BAR */}
+          {/* DIAS CALENDARIO SELECTOR TAB BAR — MULTI SELECT */}
           <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-205 gap-1 lg:max-w-xl mx-auto mb-8" id="socio-agenda-tabs">
             {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const).map(dia => {
-              const isActive = activeDayTab === dia;
+              const isActive = activeDays.has(dia);
               return (
                 <button
                   key={dia}
                   onClick={() => {
-                    setActiveDayTab(dia);
+                    setActiveDays(prev => {
+                      const next = new Set(prev);
+                      if (next.has(dia)) {
+                        if (next.size > 1) next.delete(dia); // keep at least one
+                      } else {
+                        next.add(dia);
+                      }
+                      return next;
+                    });
                     setBookingTurnId(null);
                     setReprogramTurnId(null);
                   }}
                   className={`py-3.5 text-center text-xs font-bold rounded-xl transition-all cursor-pointer select-none border ${
                     isActive 
-                      ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 text-white border-transparent font-black scale-102 shadow-sm' 
+                      ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 text-white border-transparent font-black scale-102 shadow-sm ring-2 ring-emerald-500/20' 
                       : 'text-slate-500 hover:text-slate-800 bg-transparent border-transparent hover:bg-white/50'
                   }`}
                 >
@@ -1590,17 +1602,42 @@ export const SocioPanel: React.FC = () => {
               );
             })}
           </div>
+          {activeDays.size > 1 && (
+            <div className="flex items-center justify-center mb-4">
+              <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+                {activeDays.size} días seleccionados — tocá un día para deseleccionarlo
+              </span>
+            </div>
+          )}
 
-          {/* CONTENEDOR DE SLOTS HOY / GRID */}
-          <div className="space-y-4" id="socio-agenda-slots">
+          {/* CONTENEDOR DE SLOTS HOY / GRID — agrupado por día */}
+          <div className="space-y-8" id="socio-agenda-slots">
             {turnosDelDia.length === 0 ? (
               <div className="text-center py-12 bg-slate-50 border border-slate-150 rounded-2xl">
                 <Info className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-slate-500 italic text-xs font-medium">No hay horarios o turnos configurados para el día {activeDayTab}.</p>
+                <p className="text-slate-500 italic text-xs font-medium">No hay horarios configurados para los días seleccionados.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {turnosDelDia.map(turno => {
+              (['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const)
+                .filter(dia => activeDays.has(dia))
+                .map(dia => {
+                  const turnosDelDiaFiltrado = turnosDelDia.filter(t => t.dia === dia);
+                  if (turnosDelDiaFiltrado.length === 0) return null;
+                  return (
+                    <div key={dia}>
+                      {/* Separador de día cuando hay más de 1 seleccionado */}
+                      {activeDays.size > 1 && (
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-px flex-1 bg-slate-200"></div>
+                          <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest font-mono bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+                            {dia === 'MIERCOLES' ? 'Miércoles' : dia.charAt(0) + dia.slice(1).toLowerCase()}
+                          </span>
+                          <div className="h-px flex-1 bg-slate-200"></div>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {turnosDelDiaFiltrado.map(turno => {
+
                   const holdsMyFijo = socio.turnos_fijos.includes(turno.id);
                   const misReservasEnTurno = (socio.reservas_individuales || []).filter(r => r.turno_id === turno.id && isDateInPaidMonth(r.fecha));
                   const holdsMyIndividual = misReservasEnTurno.length > 0;
@@ -1810,11 +1847,16 @@ export const SocioPanel: React.FC = () => {
                     </div>
                   );
                 })}
+                </div>
               </div>
-            )}
+            );
+          })
+          )}
           </div>
         </section>
       )}
+
+
 
       {/* 4. SECCION: PAGOS */}
       {activeTabSection === 'PAGOS' && (
@@ -1885,31 +1927,51 @@ export const SocioPanel: React.FC = () => {
                 const isTurno = nov.categoria === 'TURNOS';
                 const isEvento = nov.categoria === 'EVENTOS';
 
-                let bgBadge = 'bg-sky-50 text-sky-800 border-sky-150';
-                let dotColor = 'bg-sky-500';
+                // Per-category color scheme: card bg, border, badge, title, text
+                let cardBg = 'bg-gradient-to-br from-sky-50 to-sky-100/60 border-sky-200';
+                let badgeCls = 'bg-sky-500/15 text-sky-800 border-sky-300';
+                let titleCls = 'text-sky-950';
+                let bodyCls = 'text-sky-900/80';
+                let footerCls = 'border-sky-200/60 text-sky-600/70';
+                let accentBar = 'bg-sky-500';
                 let labelTxt = 'Información General';
 
                 if (isArancel) {
-                  bgBadge = 'bg-emerald-50 text-emerald-800 border-emerald-150';
-                  dotColor = 'bg-emerald-500';
+                  cardBg = 'bg-gradient-to-br from-emerald-50 to-emerald-100/60 border-emerald-200';
+                  badgeCls = 'bg-emerald-500/15 text-emerald-800 border-emerald-300';
+                  titleCls = 'text-emerald-950';
+                  bodyCls = 'text-emerald-900/80';
+                  footerCls = 'border-emerald-200/60 text-emerald-600/70';
+                  accentBar = 'bg-emerald-500';
                   labelTxt = 'Aranceles y Pagos';
                 } else if (isTurno) {
-                  bgBadge = 'bg-teal-50 text-teal-800 border-teal-150';
-                  dotColor = 'bg-teal-500';
+                  cardBg = 'bg-gradient-to-br from-teal-50 to-teal-100/60 border-teal-200';
+                  badgeCls = 'bg-teal-500/15 text-teal-800 border-teal-300';
+                  titleCls = 'text-teal-950';
+                  bodyCls = 'text-teal-900/80';
+                  footerCls = 'border-teal-200/60 text-teal-600/70';
+                  accentBar = 'bg-teal-500';
                   labelTxt = 'Horarios y Turnos';
                 } else if (isEvento) {
-                  bgBadge = 'bg-amber-50 text-amber-800 border-amber-150';
-                  dotColor = 'bg-amber-500';
+                  cardBg = 'bg-gradient-to-br from-amber-50 to-amber-100/60 border-amber-200';
+                  badgeCls = 'bg-amber-500/15 text-amber-800 border-amber-300';
+                  titleCls = 'text-amber-950';
+                  bodyCls = 'text-amber-900/80';
+                  footerCls = 'border-amber-200/60 text-amber-600/70';
+                  accentBar = 'bg-amber-500';
                   labelTxt = 'Talleres y Eventos';
                 }
 
                 return (
-                  <div 
+                  <div
                     key={nov.id}
-                    className={`bg-white rounded-2xl border p-5 flex flex-col justify-between gap-4 relative overflow-hidden shadow-xs transition-shadow hover:shadow-sm ${
-                      nov.destacado ? 'border-amber-250 ring-2 ring-amber-500/5 bg-gradient-to-tr from-white to-amber-500/[0.01]' : 'border-slate-205'
+                    className={`rounded-2xl border p-5 flex flex-col justify-between gap-4 relative overflow-hidden shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${cardBg} ${
+                      nov.destacado ? 'ring-2 ring-amber-400/40' : ''
                     }`}
                   >
+                    {/* Colored left accent bar */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${accentBar}`}></div>
+
                     {nov.destacado && (
                       <span className="absolute top-0 right-0 bg-amber-500 text-white px-2.5 py-0.5 rounded-bl-xl text-[8px] font-black uppercase tracking-widest font-mono flex items-center gap-1">
                         <Award className="w-3 h-3 text-white" />
@@ -1917,24 +1979,24 @@ export const SocioPanel: React.FC = () => {
                       </span>
                     )}
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 pl-2">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 border rounded-md text-[8.5px] font-black uppercase tracking-wider font-mono ${bgBadge}`}>
+                        <span className={`px-2 py-0.5 border rounded-md text-[8.5px] font-black uppercase tracking-wider font-mono ${badgeCls}`}>
                           {labelTxt}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-mono">{nov.fecha}</span>
+                        <span className={`text-[10px] font-mono ${footerCls.split(' ').slice(-1)[0]}`}>{nov.fecha}</span>
                       </div>
 
-                      <h4 className="font-bold text-slate-900 leading-snug tracking-tight text-sm md:text-base font-sans mt-1">
+                      <h4 className={`font-bold leading-snug tracking-tight text-sm md:text-base font-sans mt-1 ${titleCls}`}>
                         {nov.titulo}
                       </h4>
 
-                      <p className="text-slate-650 text-xs font-sans whitespace-pre-line leading-relaxed">
+                      <p className={`text-xs font-sans whitespace-pre-line leading-relaxed ${bodyCls}`}>
                         {nov.contenido}
                       </p>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 flex items-center gap-1 text-[9.5px] text-slate-400 font-sans mt-auto">
+                    <div className={`pt-3 border-t flex items-center gap-1 text-[9.5px] font-sans mt-auto pl-2 ${footerCls}`}>
                       <User className="w-3.5 h-3.5" />
                       <span>Publicado por la administración</span>
                     </div>
@@ -1946,8 +2008,9 @@ export const SocioPanel: React.FC = () => {
         </section>
       )}
 
-      {/* Floating WhatsApp Button ONLY for Client/User View */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 group" id="floating-whatsapp-container">
+
+      {/* Floating WhatsApp Button — raised above bottom nav */}
+      <div className="fixed bottom-24 right-5 z-50 flex flex-col items-end gap-2 group" id="floating-whatsapp-container">
         {/* Chat Tooltip Bubble */}
         <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 text-slate-800 px-3.5 py-2 rounded-2xl shadow-lg text-[11px] font-bold tracking-tight opacity-0 scale-90 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none select-none font-sans flex items-center gap-2 border-emerald-100">
           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -1955,7 +2018,7 @@ export const SocioPanel: React.FC = () => {
         </div>
         
         <a
-          href={`https://wa.me/541138032652?text=${encodeURIComponent(`Hola KAHA GYM, soy el socio ${socio.nombre} ${socio.apellido}. Me contacto desde mi portal de cliente.`)}`}
+          href={`https://wa.me/541178402722?text=${encodeURIComponent(`Hola KAHA GYM, soy el socio ${socio.nombre} ${socio.apellido}. Me contacto desde mi portal de cliente.`)}`}
           target="_blank"
           rel="noreferrer"
           className="flex items-center justify-center w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-500/35 transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 relative"
@@ -1971,6 +2034,86 @@ export const SocioPanel: React.FC = () => {
           </svg>
         </a>
       </div>
+
+      {/* ═══ BOTTOM NAVIGATION BAR ═══ */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200 shadow-[0_-4px_24px_rgba(0,0,0,0.07)] flex items-center justify-around px-2 pb-safe"
+        id="socio-bottom-navbar"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)', height: '68px' }}
+      >
+        {/* PERFIL */}
+        <button
+          onClick={() => setActiveTabSection('PERFIL')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] ${
+            activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-700'
+          }`}
+          id="bottom-nav-perfil"
+        >
+          <User className="w-5 h-5" />
+          <span className="text-[9px] font-bold uppercase tracking-wider">Perfil</span>
+        </button>
+
+        {/* RESERVAS */}
+        <button
+          onClick={() => setActiveTabSection('RESERVAS')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] ${
+            activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-700'
+          }`}
+          id="bottom-nav-reservas"
+        >
+          <CalendarDays className="w-5 h-5" />
+          <span className="text-[9px] font-bold uppercase tracking-wider">Horarios</span>
+        </button>
+
+        {/* HOME — CENTRAL PROMINENTE */}
+        <button
+          onClick={() => setActiveTabSection('HOME')}
+          className="flex flex-col items-center gap-0.5 -mt-5 cursor-pointer group/home"
+          id="bottom-nav-home"
+          aria-label="Ir al inicio"
+        >
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 transition-all group-hover/home:scale-105 active:scale-95 ${
+            activeTabSection === 'HOME'
+              ? 'bg-gradient-to-tr from-emerald-500 to-teal-600 ring-4 ring-emerald-500/20'
+              : 'bg-gradient-to-tr from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600'
+          }`}>
+            <Home className="w-6 h-6 text-white" />
+          </div>
+          <span className={`text-[9px] font-black uppercase tracking-wider mt-0.5 ${
+            activeTabSection === 'HOME' ? 'text-emerald-600' : 'text-slate-500'
+          }`}>Home</span>
+        </button>
+
+        {/* PAGOS */}
+        <button
+          onClick={() => setActiveTabSection('PAGOS')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] ${
+            activeTabSection === 'PAGOS' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-700'
+          }`}
+          id="bottom-nav-pagos"
+        >
+          <Receipt className="w-5 h-5" />
+          <span className="text-[9px] font-bold uppercase tracking-wider">Pagos</span>
+        </button>
+
+        {/* NOVEDADES */}
+        <button
+          onClick={() => setActiveTabSection('NOVEDADES')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] relative ${
+            activeTabSection === 'NOVEDADES' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-700'
+          }`}
+          id="bottom-nav-novedades"
+        >
+          <Megaphone className="w-5 h-5" />
+          <span className="text-[9px] font-bold uppercase tracking-wider">Cartelera</span>
+          {novedades.some(n => n.destacado) && (
+            <span className="absolute top-1 right-2 w-2 h-2 bg-amber-500 rounded-full animate-ping"></span>
+          )}
+        </button>
+      </nav>
+
+      {/* Spacer so content doesn't hide behind bottom nav */}
+      <div className="h-20" aria-hidden="true" />
 
       {/* CHOICE MODAL FOR PAYMENT METHOD */}
       {showPaymentChoiceModal && socio && (

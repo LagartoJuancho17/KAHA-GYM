@@ -121,3 +121,32 @@ export interface AlertaNotificacion {
   leido: boolean;
 }
 
+export interface Gasto {
+  id: string;
+  concepto: string;
+  monto: number;
+  categoria: 'PROFESORES' | 'SERVICIOS' | 'ALQUILER' | 'INSUMOS' | 'OTROS';
+  fecha: string; // 'YYYY-MM-DD'
+  registrado_por: string;
+  creado_at: string;
+}
+
+export interface Profesor {
+  id: string;
+  nombre: string;
+  email: string;
+  telefono: string;
+  valor_hora: number;
+  activo: boolean;
+}
+
+export interface NovedadProfesor {
+  id: string;
+  profesor_id: string; // Profesor ausente / a reemplazar
+  fecha: string; // 'YYYY-MM-DD'
+  turno_id: string;
+  tipo: 'AUSENCIA' | 'REEMPLAZO';
+  reemplazo_profesor_id?: string; // Profesor que lo cubre, si aplica
+  creado_at: string;
+}
+

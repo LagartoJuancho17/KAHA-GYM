@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { useGym } from '../GymContext';
 import { 
   Users, AlertTriangle, TrendingUp, DollarSign, 
-  Calendar, ArrowUpRight, Plus, Receipt, Grid, Download, ListOrdered
+  Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
+  TrendingDown, X, Minus
 } from 'lucide-react';
-import { Cliente, Pago, Plan } from '../types';
+import { Gasto } from '../types';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -14,11 +15,24 @@ interface DashboardProps {
   setShowAddPagoModal?: (show: boolean) => void;
 }
 
+const CATEGORIAS_GASTO = ['ALQUILER', 'SERVICIOS', 'INSUMOS', 'PROFESORES', 'OTROS'] as const;
+
 export const Dashboard: React.FC<DashboardProps> = ({ 
   setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal 
 }) => {
-  const { clientes, planes, turnos, pagos, rolActivo, notificaciones } = useGym();
+  const { clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, registrarGasto } = useGym();
   
+  // Modal state
+  const [showGastoModal, setShowGastoModal] = useState(false);
+  const [gastoForm, setGastoForm] = useState({
+    concepto: '',
+    monto: '',
+    categoria: 'OTROS' as Gasto['categoria'],
+    fecha: new Date().toISOString().slice(0, 10)
+  });
+  const [gastoErr, setGastoErr] = useState('');
+  const [gastoOk, setGastoOk] = useState('');
+
   // Mes corriente de análisis
   const mesActual = '2026-05';
 
@@ -36,7 +50,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const pagosDeEsteMes = pagos.filter(p => p.mes_correspondiente === mesActual);
   const ingresosReales = pagosDeEsteMes.reduce((acc, current) => acc + current.monto, 0);
 
-  // Ingresos esperados (teóricos) de los clientes activos basándose en su plan
+  // Ingresos esperados (teóricos)
   const ingresosEsperados = clientesActivosFicha.reduce((acc, current) => {
     const plan = planes.find(p => p.id === current.plan_id);
     return acc + (plan ? plan.precio : 0);
@@ -46,21 +60,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ? Math.round((ingresosReales / ingresosEsperados) * 100)
     : 0;
 
-  // Ocupación promedio (Asignaciones / Cupo Instalado Total)
+  // Ocupación promedio
   const totalCupoDisponible = turnos.reduce((acc, t) => acc + t.cupo_maximo, 0);
   const totalAsignados = turnos.reduce((acc, t) => acc + t.asignados_ids.length, 0);
   const ocupacionPromedio = totalCupoDisponible > 0
     ? Math.round((totalAsignados / totalCupoDisponible) * 100)
     : 0;
 
+  // Gastos del mes actual
+  const gastosEsteMes = gastos.filter(g => g.fecha.startsWith(mesActual));
+  const gastosTotal = gastosEsteMes.reduce((acc, g) => acc + g.monto, 0);
+
+  // Balance neto
+  const balanceNeto = ingresosReales - gastosTotal;
+
   // --- DATOS PARA GRÁFICOS ---
-  // 1. Historial de ingresos 6 meses (Simulado según pagos cargados)
   const ultimos6Meses = ['2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05'];
   const ingresosHistoricos = ultimos6Meses.map(mes => {
     const totalMes = pagos
       .filter(p => p.mes_correspondiente === mes)
       .reduce((sum, p) => sum + p.monto, 0);
-    // Para que se vea bonito y completo, asignamos valores lógicos mínimos si no hay pagos históricos cargados
     if (totalMes === 0) {
       if (mes === '2025-12') return 48000;
       if (mes === '2026-01') return 56000;
@@ -71,11 +90,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return totalMes;
   });
 
-  // Max value de ingresos para escalar SVG
   const maxIngreso = Math.max(...ingresosHistoricos, 10000);
 
-  // 2. Ocupación por turno (Agrupado por horario)
-  // Agrupar horarios únicos recopilando asignaciones
+  // Ocupación por horario
   const horariosUnicos = Array.from(new Set(turnos.map(t => t.hora))).sort();
   const ocupacionPorHorario = horariosUnicos.map(hora => {
     const turnosDelHorario = turnos.filter(t => t.hora === hora);
@@ -89,7 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   });
 
-  // 3. Clientes por plan
+  // Clientes por plan
   const planDistribucion = planes.map(plan => {
     const cant = clientesActivosFicha.filter(c => c.plan_id === plan.id).length;
     return {
@@ -99,7 +116,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   });
   const totalPlanSum = planDistribucion.reduce((acc, current) => acc + current.cantidad, 0);
 
-  // --- ALERTAS EN TIEMPO REAL ---
+  // --- ALERTAS ---
   const turnosSaturadosAlert = turnos
     .filter(t => (t.asignados_ids.length / t.cupo_maximo) >= 0.8)
     .slice(0, 4);
@@ -108,10 +125,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .filter(t => t.lista_espera_ids.length > 0)
     .slice(0, 4);
 
-  const hoyDia = new Date().toISOString().slice(0, 10);
   const vencimientoHoyAlert = clientesActivosFicha
     .filter(c => c.estado === 'MOROSO' || c.estado === 'CON_DEUDA')
     .slice(0, 4);
+
+  // --- GASTO MODAL HANDLERS ---
+  const handleGastoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setGastoErr('');
+    const monto = parseFloat(gastoForm.monto);
+    if (!gastoForm.concepto.trim()) { setGastoErr('El concepto es obligatorio.'); return; }
+    if (isNaN(monto) || monto <= 0) { setGastoErr('El monto debe ser mayor a 0.'); return; }
+    if (!gastoForm.fecha) { setGastoErr('La fecha es obligatoria.'); return; }
+
+    const res = registrarGasto({
+      concepto: gastoForm.concepto.trim(),
+      monto,
+      categoria: gastoForm.categoria,
+      fecha: gastoForm.fecha,
+      registrado_por: 'admin@gimnasio.com.ar'
+    });
+
+    if (res.success) {
+      setGastoOk('¡Gasto registrado exitosamente!');
+      setGastoForm({ concepto: '', monto: '', categoria: 'OTROS', fecha: new Date().toISOString().slice(0, 10) });
+      setTimeout(() => {
+        setShowGastoModal(false);
+        setGastoOk('');
+      }, 1200);
+    } else {
+      setGastoErr(res.message);
+    }
+  };
 
   return (
     <div className="space-y-8 p-6 max-w-7xl mx-auto" id="dashboard-tab-panel">
@@ -126,9 +171,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => {
-              if (setShowAddClienteModal) {
-                setShowAddClienteModal(true);
-              }
+              if (setShowAddClienteModal) setShowAddClienteModal(true);
               setActiveTab('CLIENTES');
             }}
             className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
@@ -140,9 +183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           <button
             onClick={() => {
-              if (setShowAddPagoModal) {
-                setShowAddPagoModal(true);
-              }
+              if (setShowAddPagoModal) setShowAddPagoModal(true);
               setActiveTab('PAGOS');
             }}
             className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
@@ -153,14 +194,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
           
           <button
-            onClick={() => {
-              setActiveTab('TURNOS');
-            }}
+            onClick={() => setActiveTab('TURNOS')}
             className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             id="quick-schedule-btn"
           >
             <Grid className="w-4 h-4 text-slate-500" />
             Grilla Horarios
+          </button>
+
+          <button
+            onClick={() => {
+              setGastoErr('');
+              setGastoOk('');
+              setShowGastoModal(true);
+            }}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            id="quick-add-expense-btn"
+          >
+            <Minus className="w-4 h-4" />
+            Añadir Gasto
           </button>
         </div>
       </div>
@@ -227,33 +279,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* INGRESOS ESPERADOS */}
-        <div className="kpi-card-theme" id="card-theoretical-income">
+        {/* GASTOS TOTALES */}
+        <div className="kpi-card-theme" id="card-total-expenses">
           <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ingreso Teórico</span>
-            <span className="bg-slate-50 text-slate-400 p-1.5 rounded-lg text-xs font-semibold border border-slate-200/50">
-              <DollarSign className="w-4 h-4" />
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Gastos Totales</span>
+            <span className="bg-rose-50 text-rose-600 p-1.5 rounded-lg text-xs font-semibold border border-rose-100">
+              <TrendingDown className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-mono font-semibold text-slate-500">
-              ${ingresosEsperados.toLocaleString('es-AR')}
+            <h3 className="text-2xl font-mono font-bold text-rose-600">
+              ${gastosTotal.toLocaleString('es-AR')}
             </h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">Facturas al 100% de abono</p>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">Egresos registrados</p>
           </div>
         </div>
 
-        {/* OCUPACIÓN PROMEDIO */}
-        <div className="kpi-card-theme" id="card-avg-occupancy">
+        {/* BALANCE NETO */}
+        <div className={`kpi-card-theme border-l-4 ${balanceNeto >= 0 ? 'border-l-emerald-500' : 'border-l-red-500'}`} id="card-net-balance">
           <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ocupación</span>
-            <span className="bg-violet-50 text-violet-600 p-1.5 rounded-lg text-xs font-semibold border border-violet-100">
-              <Calendar className="w-4 h-4" />
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Balance Neto</span>
+            <span className={`p-1.5 rounded-lg text-xs font-semibold border ${balanceNeto >= 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+              {balanceNeto >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
             </span>
           </div>
           <div className="mt-4">
-            <h3 className="text-3xl font-sans font-bold text-slate-900">{ocupacionPromedio}%</h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">Carga de turnos e inscritos</p>
+            <h3 className={`text-2xl font-mono font-bold ${balanceNeto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {balanceNeto >= 0 ? '+' : ''}${balanceNeto.toLocaleString('es-AR')}
+            </h3>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans">Ingresos menos egresos</p>
           </div>
         </div>
       </div>
@@ -266,16 +320,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Evolución de Ingresos de los Últimos 6 Meses (ARS)</h3>
           
           <div className="relative h-64 w-full flex items-end justify-between font-mono text-[10px] text-zinc-500">
-            {/* SVG Line path background representation */}
+            {/* SVG Line path background */}
             <svg className="absolute inset-x-0 bottom-4 top-4 h-48 w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-              {/* Lines Grid for spacing reference */}
               <line x1="0" y1="0" x2="100" y2="0" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
               <line x1="0" y1="25" x2="100" y2="25" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
               <line x1="0" y1="50" x2="100" y2="50" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
               <line x1="0" y1="75" x2="100" y2="75" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
               <line x1="0" y1="100" x2="100" y2="100" stroke="#e4e4e7" strokeDasharray="3,3" strokeWidth="1" />
-
-              {/* Draw area and line polygon */}
               <polyline
                 fill="none"
                 stroke="black"
@@ -284,14 +335,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 strokeLinejoin="round"
                 points={ingresosHistoricos.map((val, idx) => {
                   const x = (idx / 5) * 100;
-                  const ratio = (val / maxIngreso);
+                  const ratio = val / maxIngreso;
                   const y = 90 - (ratio * 70); 
                   return `${x},${y}`;
                 }).join(' ')}
               />
             </svg>
 
-            {/* Dots overlay SVG without viewBox to keep circles round */}
+            {/* Dots overlay */}
             <svg className="absolute inset-x-0 bottom-4 top-4 h-48 w-full pointer-events-none">
               {ingresosHistoricos.map((val, idx) => {
                 const x = `${(idx / 5) * 100}%`;
@@ -316,19 +367,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* GRÁFICO 2: CLIENTES POR PLAN (TORTA / DONA) */}
+        {/* GRÁFICO 2: CLIENTES POR PLAN (DONA) */}
         <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm flex flex-col justify-between">
           <div>
             <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Distribución por Plan contratado</h3>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-6 justify-center">
-            {/* SVG Simple Donut Chart */}
             <div className="relative w-36 h-36 flex items-center justify-center">
               <svg className="w-full h-full transform -rotate-90">
                 <circle cx="72" cy="72" r="50" fill="transparent" stroke="#f4f4f5" strokeWidth="18" />
-                
-                {/* Dynamically segments. We have 4 plans, pre-calculate arcs for a standard representation */}
                 {totalPlanSum > 0 ? (() => {
                   let accumulatedOffset = 0;
                   const colores = ['#09090b', '#3f3f46', '#22c55e', '#f59e0b'];
@@ -367,7 +415,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            {/* Leyendas con colores */}
             <div className="space-y-2 text-xs flex-1">
               {planDistribucion.map((p, idx) => {
                 const colores = ['bg-zinc-950', 'bg-zinc-600', 'bg-emerald-500', 'bg-amber-500'];
@@ -387,17 +434,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* OCUPACIÓN POR HORARIO DE TURNOS (BARRAS) & ALERTAS */}
+      {/* OCUPACIÓN POR HORARIO & ALERTAS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* GRÁFICO 3: OCUPACIÓN PROMEDIO POR TURNO/HORA (BARRAS) */}
+        {/* GRÁFICO 3: OCUPACIÓN POR TURNO/HORA */}
         <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm col-span-1 lg:col-span-2">
           <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Saturación Promedio de Ocupación según Horarios</h3>
           
           <div className="space-y-3">
             {ocupacionPorHorario.map(h => {
-              // Color based on occupancy to comply with requirement
-              // verde < 70%, amarillo 70-90%, rojo >= 90%
               let barColor = 'bg-emerald-500';
               let textColor = 'text-emerald-700 bg-emerald-50';
               if (h.porcent >= 70 && h.porcent < 90) {
@@ -456,7 +501,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          {/* ALERTA 2: LISTAS DE ESPERA CON VACANTE */}
+          {/* ALERTA 2: LISTAS DE ESPERA */}
           <div className="space-y-2">
             <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest font-sans">Listas de Espera Atoradas</h4>
             {listsEnEsperaAlert.length === 0 ? (
@@ -476,7 +521,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          {/* ALERTA 3: CLIENTES CON DEUDAS VENCIMIENTO HOY */}
+          {/* ALERTA 3: MOROSOS */}
           <div className="space-y-2">
             <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest font-sans">Morosos Importantes</h4>
             {vencimientoHoyAlert.length === 0 ? (
@@ -493,7 +538,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          {/* ALERTA 4: COBROS RECIENTES EN VIVO */}
+          {/* COBROS RECIENTES */}
           <div className="space-y-2 pt-4 border-t border-zinc-100">
             <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest font-sans">Cobros Recientes en Vivo</h4>
             {notificaciones.filter(n => n.tipo === 'PAGO_REALIZADO').length === 0 ? (
@@ -517,6 +562,177 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* GASTOS DEL MES - Mini resumen */}
+      {gastosEsteMes.length > 0 && (
+        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500">Últimos Gastos Registrados — {mesActual}</h3>
+            <button
+              onClick={() => setActiveTab('PAGOS')}
+              className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors underline underline-offset-2"
+            >
+              Ver todos en Pagos →
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {gastosEsteMes.slice(0, 6).map(g => {
+              const catColors: Record<string, string> = {
+                ALQUILER: 'bg-violet-50 text-violet-700 border-violet-100',
+                SERVICIOS: 'bg-sky-50 text-sky-700 border-sky-100',
+                INSUMOS: 'bg-amber-50 text-amber-700 border-amber-100',
+                PROFESORES: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                OTROS: 'bg-zinc-50 text-zinc-600 border-zinc-200'
+              };
+              return (
+                <div key={g.id} className="flex justify-between items-center p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900 truncate">{g.concepto}</p>
+                    <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border ${catColors[g.categoria] || catColors.OTROS}`}>
+                      {g.categoria}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-rose-600 ml-3 shrink-0">${g.monto.toLocaleString('es-AR')}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL AÑADIR GASTO */}
+      {showGastoModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm font-sans" id="gasto-modal">
+          <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-md overflow-hidden animate-scale-up">
+            
+            {/* Header */}
+            <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold tracking-tight flex items-center gap-2">
+                  <Minus className="w-4 h-4 text-rose-400" />
+                  Registrar Gasto / Egreso
+                </h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Ingresá el detalle del gasto para actualizar el balance neto del mes</p>
+              </div>
+              <button
+                onClick={() => setShowGastoModal(false)}
+                className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors cursor-pointer"
+                id="btn-close-gasto-modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleGastoSubmit} className="p-6 space-y-4 text-xs">
+              {gastoErr && (
+                <div className="bg-red-50 text-red-700 p-2.5 rounded-lg font-medium border border-red-200 text-xs">
+                  {gastoErr}
+                </div>
+              )}
+              {gastoOk && (
+                <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-semibold border border-emerald-200 text-xs">
+                  {gastoOk}
+                </div>
+              )}
+
+              {/* CONCEPTO */}
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">Concepto del gasto *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Alquiler salón, Servicio de internet, etc."
+                  value={gastoForm.concepto}
+                  onChange={e => setGastoForm(prev => ({ ...prev, concepto: e.target.value }))}
+                  className="w-full border border-zinc-200 rounded-lg p-2.5 text-xs outline-hidden focus:border-zinc-500 font-sans"
+                  id="gasto-concepto-input"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* MONTO */}
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">Monto ARS *</label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2.5 text-zinc-400 font-mono text-xs">$</span>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="0"
+                      value={gastoForm.monto}
+                      onChange={e => setGastoForm(prev => ({ ...prev, monto: e.target.value }))}
+                      className="w-full border border-zinc-200 rounded-lg p-2.5 pl-6 text-xs font-mono font-bold outline-hidden focus:border-zinc-500"
+                      id="gasto-monto-input"
+                    />
+                  </div>
+                </div>
+
+                {/* FECHA */}
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">Fecha *</label>
+                  <input
+                    type="date"
+                    required
+                    value={gastoForm.fecha}
+                    onChange={e => setGastoForm(prev => ({ ...prev, fecha: e.target.value }))}
+                    className="w-full border border-zinc-200 rounded-lg p-2.5 text-xs outline-hidden focus:border-zinc-500 font-mono"
+                    id="gasto-fecha-input"
+                  />
+                </div>
+              </div>
+
+              {/* CATEGORÍA */}
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">Categoría</label>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIAS_GASTO.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setGastoForm(prev => ({ ...prev, categoria: cat }))}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                        gastoForm.categoria === cat
+                          ? 'bg-zinc-900 text-white border-zinc-900'
+                          : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-zinc-400'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* PREVIEW */}
+              {gastoForm.monto && parseFloat(gastoForm.monto) > 0 && (
+                <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg flex justify-between items-center">
+                  <span className="text-zinc-600 font-semibold">Total a registrar:</span>
+                  <span className="font-mono font-bold text-rose-600 text-sm">
+                    ${parseFloat(gastoForm.monto).toLocaleString('es-AR')} ARS
+                  </span>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-zinc-100 flex justify-end gap-2 font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setShowGastoModal(false)}
+                  className="px-4 py-2 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-all text-zinc-700 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-all shadow-sm cursor-pointer"
+                  id="btn-submit-gasto"
+                >
+                  Registrar Gasto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

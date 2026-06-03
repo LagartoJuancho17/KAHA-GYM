@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, 
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
-  ReservaIndividual, ClaseSuspendida, AlertaNotificacion
+  ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, Profesor, NovedadProfesor
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -20,6 +20,9 @@ interface GymContextType {
   auditLogs: AuditLog[];
   novedades: Novedad[];
   notificaciones: AlertaNotificacion[];
+  gastos: Gasto[];
+  profesores: Profesor[];
+  novedadesProfesores: NovedadProfesor[];
   rolActivo: RolUsuario;
   setRolActivo: (rol: RolUsuario) => void;
   selectedSocioId: string | null;
@@ -27,6 +30,15 @@ interface GymContextType {
   addNotificacion: (tipo: 'PAGO_REALIZADO' | 'SISTEMA' | 'DEUDA_VENCIDA', titulo: string, mensaje: string) => void;
   marcarNotificacionesLeidas: () => void;
   eliminarNotificacion: (id: string) => void;
+
+  // Gastos, Profesores and Novedades
+  registrarGasto: (gasto: Omit<Gasto, 'id' | 'creado_at'>) => { success: boolean; message: string };
+  eliminarGasto: (id: string) => void;
+  registrarProfesor: (profesor: Omit<Profesor, 'id' | 'activo'>) => { success: boolean; message: string };
+  updateProfesor: (id: string, updates: Partial<Profesor>) => { success: boolean; message: string };
+  eliminarProfesor: (id: string) => void;
+  registrarNovedadProfesor: (novedad: Omit<NovedadProfesor, 'id' | 'creado_at'>) => { success: boolean; message: string };
+  eliminarNovedadProfesor: (id: string) => void;
   
   // Google Authentication simulation states
   googleUser: { email: string; name: string; picture?: string; role: RolUsuario } | null;
@@ -85,6 +97,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [novedades, setNovedades] = useState<Novedad[]>([]);
   const [notificaciones, setNotificaciones] = useState<AlertaNotificacion[]>([]);
+  const [gastos, setGastos] = useState<Gasto[]>([]);
+  const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [novedadesProfesores, setNovedadesProfesores] = useState<NovedadProfesor[]>([]);
   const [googleUser, setGoogleUser] = useState<{ email: string; name: string; picture?: string; role: RolUsuario } | null>(() => {
     const local = localStorage.getItem('gym_google_user');
     return local ? JSON.parse(local) : null;
@@ -137,6 +152,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const localLogs = localStorage.getItem('gym_audit_logs');
     const localNovedades = localStorage.getItem('gym_novedades');
     const localNotificaciones = localStorage.getItem('gym_notificaciones');
+    const localGastos = localStorage.getItem('gym_gastos');
+    const localProfesores = localStorage.getItem('gym_profesores');
+    const localNovedadesProfesores = localStorage.getItem('gym_novedades_profesores');
     const localRol = localStorage.getItem('gym_rol_activo');
 
     if (localClientes) setClientes(JSON.parse(localClientes));
@@ -211,6 +229,37 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     else {
       setNotificaciones([]);
       localStorage.setItem('gym_notificaciones', JSON.stringify([]));
+    }
+
+    if (localGastos) setGastos(JSON.parse(localGastos));
+    else {
+      const initGastos = [
+        { id: 'gas-1', concepto: 'Alquiler Salón Principal', monto: 85000, categoria: 'ALQUILER', fecha: '2026-05-01', registrado_por: 'admin@gimnasio.com.ar', creado_at: '2026-05-01T10:00:00Z' },
+        { id: 'gas-2', concepto: 'Servicio de Luz Edesur', monto: 18400, categoria: 'SERVICIOS', fecha: '2026-05-10', registrado_por: 'admin@gimnasio.com.ar', creado_at: '2026-05-10T12:00:00Z' },
+        { id: 'gas-3', concepto: 'Insumos Limpieza', monto: 7500, categoria: 'INSUMOS', fecha: '2026-05-15', registrado_por: 'admin@gimnasio.com.ar', creado_at: '2026-05-15T15:00:00Z' }
+      ];
+      setGastos(initGastos as Gasto[]);
+      localStorage.setItem('gym_gastos', JSON.stringify(initGastos));
+    }
+
+    if (localProfesores) setProfesores(JSON.parse(localProfesores));
+    else {
+      const initProfesores = [
+        { id: 'prof-1', nombre: 'Juan Ferrari', email: 'jmferrariprofe@gmail.com', telefono: '11-3803-2652', valor_hora: 2500, activo: true },
+        { id: 'prof-2', nombre: 'Carlos Gómez', email: 'carlos@gimnasio.com.ar', telefono: '11-4455-6677', valor_hora: 2000, activo: true },
+        { id: 'prof-3', nombre: 'María Rodríguez', email: 'maria@gimnasio.com.ar', telefono: '11-8899-0011', valor_hora: 2200, activo: true }
+      ];
+      setProfesores(initProfesores as Profesor[]);
+      localStorage.setItem('gym_profesores', JSON.stringify(initProfesores));
+    }
+
+    if (localNovedadesProfesores) setNovedadesProfesores(JSON.parse(localNovedadesProfesores));
+    else {
+      const initNovedadesP = [
+        { id: 'nov-p-1', profesor_id: 'prof-2', fecha: '2026-05-11', turno_id: 'LUNES-08:30', tipo: 'AUSENCIA', creado_at: '2026-05-11T09:00:00Z' }
+      ];
+      setNovedadesProfesores(initNovedadesP as NovedadProfesor[]);
+      localStorage.setItem('gym_novedades_profesores', JSON.stringify(initNovedadesP));
     }
 
     const localGoogleUser = localStorage.getItem('gym_google_user');
@@ -1568,6 +1617,88 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const registrarGasto = (gastoData: Omit<Gasto, 'id' | 'creado_at'>) => {
+    const nuevoGasto: Gasto = {
+      ...gastoData,
+      id: `gas-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      creado_at: new Date().toISOString()
+    };
+    setGastos(prev => {
+      const updated = [nuevoGasto, ...prev];
+      localStorage.setItem('gym_gastos', JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('GASTO_REGISTRADO', { concepto: gastoData.concepto, monto: gastoData.monto });
+    return { success: true, message: 'Gasto registrado exitosamente.' };
+  };
+
+  const eliminarGasto = (id: string) => {
+    setGastos(prev => {
+      const updated = prev.filter(g => g.id !== id);
+      localStorage.setItem('gym_gastos', JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('GASTO_ELIMINADO', { id });
+  };
+
+  const registrarProfesor = (profesorData: Omit<Profesor, 'id' | 'activo'>) => {
+    const nuevoProfesor: Profesor = {
+      ...profesorData,
+      id: `prof-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      activo: true
+    };
+    setProfesores(prev => {
+      const updated = [...prev, nuevoProfesor];
+      localStorage.setItem('gym_profesores', JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('PROFESOR_REGISTRADO', { nombre: profesorData.nombre, valor_hora: profesorData.valor_hora });
+    return { success: true, message: 'Profesor registrado exitosamente.' };
+  };
+
+  const updateProfesor = (id: string, updates: Partial<Profesor>) => {
+    setProfesores(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, ...updates } : p);
+      localStorage.setItem('gym_profesores', JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('PROFESOR_MODIFICADO', { id, cambiados: Object.keys(updates) });
+    return { success: true, message: 'Profesor modificado exitosamente.' };
+  };
+
+  const eliminarProfesor = (id: string) => {
+    setProfesores(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, activo: false } : p);
+      localStorage.setItem('gym_profesores', JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('PROFESOR_ELIMINADO', { id });
+  };
+
+  const registrarNovedadProfesor = (novedadData: Omit<NovedadProfesor, 'id' | 'creado_at'>) => {
+    const nuevaNovedad: NovedadProfesor = {
+      ...novedadData,
+      id: `nov-p-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      creado_at: new Date().toISOString()
+    };
+    setNovedadesProfesores(prev => {
+      const updated = [nuevaNovedad, ...prev];
+      localStorage.setItem('gym_novedades_profesores', JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('NOVEDAD_PROFESOR_REGISTRADA', { tipo: novedadData.tipo, fecha: novedadData.fecha });
+    return { success: true, message: 'Novedad de profesor registrada exitosamente.' };
+  };
+
+  const eliminarNovedadProfesor = (id: string) => {
+    setNovedadesProfesores(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      localStorage.setItem('gym_novedades_profesores', JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('NOVEDAD_PROFESOR_ELIMINADA', { id });
+  };
+
   const addNovedad = (novData: Omit<Novedad, 'id' | 'fecha'>) => {
     const formatTime = () => {
       const d = new Date();
@@ -1616,6 +1747,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('gym_recuperos');
     localStorage.removeItem('gym_novedades');
     localStorage.removeItem('gym_notificaciones');
+    localStorage.removeItem('gym_gastos');
+    localStorage.removeItem('gym_profesores');
+    localStorage.removeItem('gym_novedades_profesores');
     localStorage.removeItem('gym_audit_logs');
     localStorage.removeItem('gym_google_user');
     localStorage.removeItem('gym_rol_activo');
@@ -1625,7 +1759,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <GymContext.Provider value={{
       clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, novedades,
-      notificaciones, rolActivo,
+      notificaciones, gastos, profesores, novedadesProfesores, rolActivo,
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,
       googleUser, signInWithGoogle, signOutGoogle,
@@ -1636,6 +1770,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija,
       registrarPago, importarPagosCSV,
       addNotificacion, marcarNotificacionesLeidas, eliminarNotificacion,
+      registrarGasto, eliminarGasto, registrarProfesor, updateProfesor, eliminarProfesor, registrarNovedadProfesor, eliminarNovedadProfesor,
       addNovedad, updateNovedad, deleteNovedad,
       ejecutarCronMorosidad,
       borrarHistorial

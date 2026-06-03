@@ -9,7 +9,7 @@ import {
 
 export const TurnosGrid: React.FC = () => {
   const { 
-    turnos, clientes, planes, recuperos, agregarRecupero, 
+    turnos, clientes, planes, recuperos, agregarRecupero, profesores,
     actualizarEstadoRecupero, asignarClienteFijo, removerAsignacionFija, 
     checkInFlexible, modificarPrecioOCupoTurno, rolActivo, asignarTurnoVariable,
     crearReservaIndividual, cancelarReservaIndividual, asignarProfesorTurno,
@@ -537,13 +537,26 @@ export const TurnosGrid: React.FC = () => {
                   <form onSubmit={handleSaveProfesor} className="bg-zinc-50 p-3.5 rounded-lg border border-zinc-200 space-y-2">
                     <label className="font-bold text-[10px] text-zinc-550 uppercase tracking-widest block font-sans">Profesor Fijo / Clase</label>
                     <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Ej: Prof. Juan"
-                        value={localProfesor}
-                        onChange={(e) => setLocalProfesor(e.target.value)}
-                        className="border border-zinc-300 rounded-lg p-2 flex-1 bg-white outline-hidden text-xs"
-                      />
+                      {profesores.filter(p => p.activo).length > 0 ? (
+                        <select
+                          value={localProfesor}
+                          onChange={(e) => setLocalProfesor(e.target.value)}
+                          className="border border-zinc-300 rounded-lg p-2 flex-1 bg-white outline-hidden text-xs font-medium"
+                        >
+                          <option value="">— Sin asignar —</option>
+                          {profesores.filter(p => p.activo).map(p => (
+                            <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="Ej: Prof. Juan"
+                          value={localProfesor}
+                          onChange={(e) => setLocalProfesor(e.target.value)}
+                          className="border border-zinc-300 rounded-lg p-2 flex-1 bg-white outline-hidden text-xs"
+                        />
+                      )}
                       <button
                         type="submit"
                         className="bg-black hover:bg-zinc-800 text-white rounded-lg text-xs font-semibold px-3 py-2 cursor-pointer transition-colors"
