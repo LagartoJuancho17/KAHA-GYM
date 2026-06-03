@@ -33,6 +33,7 @@ export default function App() {
 function InnerApp() {
   const [activeTab, setActiveTab] = useState<TabID>('DASHBOARD');
   const [showAddPagoModal, setShowAddPagoModal] = useState(false);
+  const [openTurnosModalId, setOpenTurnosModalId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const { 
@@ -217,9 +218,19 @@ function InnerApp() {
   const renderActiveTabContent = () => {
     switch (activeTab) {
       case 'DASHBOARD':
-        return <Dashboard setActiveTab={(tab) => setActiveTab(tab as TabID)} />;
+        return (
+          <Dashboard 
+            setActiveTab={(tab) => setActiveTab(tab as TabID)} 
+            setOpenTurnosModalForId={setOpenTurnosModalId}
+          />
+        );
       case 'CLIENTES':
-        return <ClientesCRUD />;
+        return (
+          <ClientesCRUD 
+            openTurnosModalForId={openTurnosModalId}
+            setOpenTurnosModalForId={setOpenTurnosModalId}
+          />
+        );
       case 'PLANES':
         return <PlanesPricing />;
       case 'TURNOS':
@@ -240,7 +251,12 @@ function InnerApp() {
       case 'AUDITORIA':
         return <AuditLogView />;
       default:
-        return <Dashboard setActiveTab={(tab) => setActiveTab(tab as TabID)} />;
+        return (
+          <Dashboard 
+            setActiveTab={(tab) => setActiveTab(tab as TabID)} 
+            setOpenTurnosModalForId={setOpenTurnosModalId}
+          />
+        );
     }
   };
 

@@ -13,12 +13,13 @@ interface DashboardProps {
   setEditingClienteId?: (id: string | null) => void;
   setShowAddClienteModal?: (show: boolean) => void;
   setShowAddPagoModal?: (show: boolean) => void;
+  setOpenTurnosModalForId?: (id: string | null) => void;
 }
 
 const CATEGORIAS_GASTO = ['ALQUILER', 'SERVICIOS', 'INSUMOS', 'PROFESORES', 'OTROS'] as const;
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
-  setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal 
+  setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal, setOpenTurnosModalForId 
 }) => {
   const { 
     clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, 
@@ -260,6 +261,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <button
                     onClick={() => {
                       autorizarCliente(c.id);
+                      if (setOpenTurnosModalForId) {
+                        setOpenTurnosModalForId(c.id);
+                      }
+                      setActiveTab('CLIENTES');
                     }}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-transparent shadow-2xs"
                   >

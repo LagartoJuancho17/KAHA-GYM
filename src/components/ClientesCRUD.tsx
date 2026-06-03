@@ -13,13 +13,17 @@ interface ClientesCRUDProps {
   setEditingClienteId?: (id: string | null) => void;
   showAddClienteModal?: boolean;
   setShowAddClienteModal?: (show: boolean) => void;
+  openTurnosModalForId?: string | null;
+  setOpenTurnosModalForId?: (id: string | null) => void;
 }
 
 export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   editingClienteId: propEditingClienteId,
   setEditingClienteId: propSetEditingClienteId,
   showAddClienteModal: propShowAddClienteModal,
-  setShowAddClienteModal: propSetShowAddClienteModal
+  setShowAddClienteModal: propSetShowAddClienteModal,
+  openTurnosModalForId,
+  setOpenTurnosModalForId
 }) => {
   const { 
     clientes, planes, pagos, turnos, addCliente, updateCliente, autorizarCliente,
@@ -92,6 +96,21 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   });
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [importReport, setImportReport] = useState<{ procesados: number; insertados: number; errores: string[] } | null>(null);
+
+  React.useEffect(() => {
+    if (openTurnosModalForId) {
+      const found = clientes.find(c => c.id === openTurnosModalForId);
+      if (found) {
+        setClientForTurnosModal(found);
+        setSelectedTurnoToAssign('');
+        setTurnosModalError('');
+        setTurnosModalSuccess('');
+      }
+      if (setOpenTurnosModalForId) {
+        setOpenTurnosModalForId(null);
+      }
+    }
+  }, [openTurnosModalForId, clientes, setOpenTurnosModalForId]);
 
   // Reset Form
   const resetForm = () => {
@@ -429,11 +448,14 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                     </span>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
                   <button
                     onClick={() => {
                       autorizarCliente(c.id);
+                      setClientForTurnosModal(c);
+                      setSelectedTurnoToAssign('');
+                      setTurnosModalError('');
+                      setTurnosModalSuccess('');
                     }}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-transparent shadow-2xs"
                   >
@@ -626,6 +648,10 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                                   onClick={() => {
                                     setOpenRowMenuId(null);
                                     autorizarCliente(c.id);
+                                    setClientForTurnosModal(c);
+                                    setSelectedTurnoToAssign('');
+                                    setTurnosModalError('');
+                                    setTurnosModalSuccess('');
                                   }}
                                   className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2 transition-colors cursor-pointer border-b border-zinc-100"
                                 >
