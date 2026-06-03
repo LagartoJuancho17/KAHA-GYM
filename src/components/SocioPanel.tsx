@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useGym } from '../GymContext';
 import { 
   Trash2, User, Sparkles, AlertTriangle, CreditCard, ExternalLink, 
-  ChevronDown, LogOut, QrCode, Barcode, CalendarDays, Award, Phone, 
+  ChevronLeft, ChevronRight, ChevronDown, LogOut, QrCode, Barcode, CalendarDays, Award, Phone, 
   Check, Info, Menu, X, Receipt, Home, Shield, Mail, Calendar, MapPin, Plus, RefreshCw, Megaphone,
   CalendarClock, Clock, Loader2
 } from 'lucide-react';
@@ -35,8 +35,41 @@ export const SocioPanel: React.FC = () => {
     clientes, turnos, pagos, selectedSocioId, planes, googleUser, signOutGoogle,
     novedades, setRolActivo, rolActivo,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija,
-    recuperos, programarRecuperoPendiente, registrarPago
+    recuperos, programarRecuperoPendiente, registrarPago,
+    waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva
   } = useGym();
+
+  const [weekOffset, setWeekOffset] = useState<number>(0);
+
+  const getWeekRange = (offset: number) => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + distanceToMonday + (offset * 7));
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    return { monday, sunday };
+  };
+
+  const isDateInSelectedWeek = (dateStr: string) => {
+    const { monday, sunday } = getWeekRange(weekOffset);
+    const date = new Date(dateStr + 'T12:00:00');
+    return date >= monday && date <= sunday;
+  };
+
+  const getWeekRangeLabel = (offset: number) => {
+    const { monday, sunday } = getWeekRange(offset);
+    const options: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+    const startStr = monday.toLocaleDateString('es-AR', options);
+    const endStr = sunday.toLocaleDateString('es-AR', options);
+    return `${startStr} al ${endStr}`;
+  };
 
   // Navigation tabs: HOME | PERFIL | RESERVAS | PAGOS | NOVEDADES
   const [activeTabSection, setActiveTabSection] = useState<'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES'>('HOME');
@@ -152,6 +185,11 @@ export const SocioPanel: React.FC = () => {
            r.estado === 'PENDIENTE'
     );
   }, [recuperos, socio]);
+
+  const misWaitlists = useMemo(() => {
+    if (!socio) return [];
+    return (waitlistReservas || []).filter(w => w.cliente_id === socio.id);
+  }, [waitlistReservas, socio]);
 
   const handleConfirmCanje = (recuperoId: string) => {
     if (!canjeTurnoId || !canjeFecha) {
@@ -1390,6 +1428,59 @@ export const SocioPanel: React.FC = () => {
             </div>
           )}
 
+          {/* SECCIÓN: MIS LISTAS DE ESPERA ACTIVAS */}
+          {misWaitlists.length > 0 && (
+            <div className="mb-8 p-5 bg-teal-50/50 border border-teal-200 rounded-2xl">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-5.5 h-5.5 text-teal-600 animate-pulse" />
+                <h3 className="text-xs font-black uppercase text-teal-800 tracking-wider font-mono">
+                  Mis Reservas en Lista de Espera
+                </h3>
+              </div>
+              <p className="text-[11px] text-teal-700 font-sans mb-4 leading-relaxed">
+                Estás anotado en la lista de espera para los siguientes turnos. Si se libera un cupo por cancelación o suspensión de clase, serás promovido automáticamente y recibirás una notificación.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {misWaitlists.map(w => {
+                  const turn = turnos.find(t => t.id === w.turno_id);
+                  const dateFormatted = new Date(w.fecha + 'T00:00:00').toLocaleDateString('es-AR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'short'
+                  });
+                  return (
+                    <div key={w.id} className="bg-white border border-teal-100 rounded-xl p-3.5 shadow-3xs flex justify-between items-center gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-slate-805 capitalize">
+                          {dateFormatted}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                          Turno: {turn ? `${turn.hora} hs (${turn.dia})` : 'Turno no encontrado'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const res = removerListaEsperaReserva(socio.id, w.turno_id, w.fecha);
+                          if (res.success) {
+                            setSuccessMessage(res.message);
+                            setTimeout(() => setSuccessMessage(null), 3500);
+                          } else {
+                            setErrorMessage(res.message);
+                            setTimeout(() => setErrorMessage(null), 3500);
+                          }
+                        }}
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 font-bold px-2.5 py-1.5 rounded-lg text-[9px] transition-all cursor-pointer border border-rose-100"
+                      >
+                        Salir
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* SECCIÓN: RECUPEROS PENDIENTES */}
           {pendingRecuperos.length > 0 && (
             <div className="mb-8 p-5 bg-amber-50/50 border border-amber-250 rounded-2xl">
@@ -1566,6 +1657,36 @@ export const SocioPanel: React.FC = () => {
             </div>
           )}
 
+          {/* NAVEGACIÓN SEMANAL (CALENDARIO VARIABLE) */}
+          <div className="flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-2xl mb-6 max-w-xl mx-auto" id="socio-week-navigation">
+            <button
+              onClick={() => {
+                setWeekOffset(prev => prev - 1);
+                setBookingTurnId(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-205 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Semana Anterior
+            </button>
+            <div className="text-center">
+              <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest block font-mono">Semana Seleccionada</span>
+              <span className="text-xs font-bold text-slate-800">
+                {getWeekRangeLabel(weekOffset)}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setWeekOffset(prev => prev + 1);
+                setBookingTurnId(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-205 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+            >
+              Semana Siguiente
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* DIAS CALENDARIO SELECTOR TAB BAR — MULTI SELECT */}
           <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-205 gap-1 lg:max-w-xl mx-auto mb-8" id="socio-agenda-tabs">
             {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const).map(dia => {
@@ -1701,9 +1822,12 @@ export const SocioPanel: React.FC = () => {
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2 animate-fade-in">
                           <p className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-wider">Fechas Disponibles:</p>
                           <div className="grid grid-cols-1 gap-2">
-                            {getAvailableDatesForTurn(turno.dia).map(dateStr => {
+                            {getAvailableDatesForTurn(turno.dia).filter(isDateInSelectedWeek).map(dateStr => {
                               const occupiedCount = getOccupiedCountOnDate(turno.id, dateStr);
                               const isFullOnDate = occupiedCount >= turno.cupo_maximo;
+                              const inWaitlist = (waitlistReservas || []).some(
+                                w => w.cliente_id === socio.id && w.turno_id === turno.id && w.fecha === dateStr
+                              );
                               
                               const hasBooking = (socio.reservas_individuales || []).some(r => r.fecha === dateStr) || 
                                                  socio.turnos_fijos.some(tfId => {
@@ -1734,7 +1858,42 @@ export const SocioPanel: React.FC = () => {
                                   {hasBooking ? (
                                     <span className="text-[9px] font-bold text-slate-450 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Ya tienes clase</span>
                                   ) : isFullOnDate ? (
-                                    <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded">Lleno</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded shrink-0">Lleno</span>
+                                      {inWaitlist ? (
+                                        <button
+                                          onClick={() => {
+                                            const res = removerListaEsperaReserva(socio.id, turno.id, dateStr);
+                                            if (res.success) {
+                                              setSuccessMessage(res.message);
+                                              setTimeout(() => setSuccessMessage(null), 3500);
+                                            } else {
+                                              setErrorMessage(res.message);
+                                              setTimeout(() => setErrorMessage(null), 3500);
+                                            }
+                                          }}
+                                          className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-slate-300 shadow-3xs"
+                                        >
+                                          Salir de Espera
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => {
+                                            const res = agregarListaEsperaReserva(socio.id, turno.id, dateStr);
+                                            if (res.success) {
+                                              setSuccessMessage(res.message);
+                                              setTimeout(() => setSuccessMessage(null), 3500);
+                                            } else {
+                                              setErrorMessage(res.message);
+                                              setTimeout(() => setErrorMessage(null), 3500);
+                                            }
+                                          }}
+                                          className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs border border-amber-605"
+                                        >
+                                          Anotarse en Espera
+                                        </button>
+                                      )}
+                                    </div>
                                   ) : (
                                     <button
                                       onClick={() => {
@@ -1748,7 +1907,7 @@ export const SocioPanel: React.FC = () => {
                                           setTimeout(() => setErrorMessage(null), 3500);
                                         }
                                       }}
-                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs border border-emerald-700"
                                     >
                                       Confirmar
                                     </button>

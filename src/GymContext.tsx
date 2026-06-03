@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, 
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
-  ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, Profesor, NovedadProfesor
+  ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, Profesor, NovedadProfesor, WaitlistReserva
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -45,6 +45,11 @@ interface GymContextType {
   signInWithGoogle: (email: string, name: string, picture?: string) => void;
   signOutGoogle: () => void;
   
+  // Waitlist Reservas
+  waitlistReservas: WaitlistReserva[];
+  agregarListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
+  removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
+
   // Clientes Methods
   addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => { success: boolean; message: string; duplicate?: boolean };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
@@ -101,6 +106,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [novedadesProfesores, setNovedadesProfesores] = useState<NovedadProfesor[]>([]);
+  const [waitlistReservas, setWaitlistReservas] = useState<WaitlistReserva[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_waitlist_reservas');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [googleUser, setGoogleUser] = useState<{ email: string; name: string; picture?: string; role: RolUsuario } | null>(() => {
     const local = localStorage.getItem('gym_google_user');
     return local ? JSON.parse(local) : null;
@@ -281,6 +294,68 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (localRol) {
       setRolActivo(localRol as RolUsuario);
     }
+  }, []);
+
+  // Listen for storage events from other tabs to keep state synchronized in real-time
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.newValue) return;
+      try {
+        const val = JSON.parse(e.newValue);
+        switch (e.key) {
+          case 'gym_clientes':
+            setClientes(val);
+            break;
+          case 'gym_planes':
+            setPlanes(val);
+            break;
+          case 'gym_historial_precios':
+            setHistorialPrecios(val);
+            break;
+          case 'gym_turnos':
+            setTurnos(val);
+            break;
+          case 'gym_pagos':
+            setPagos(val);
+            break;
+          case 'gym_recuperos':
+            setRecuperos(val);
+            break;
+          case 'gym_audit_logs':
+            setAuditLogs(val);
+            break;
+          case 'gym_novedades':
+            setNovedades(val);
+            break;
+          case 'gym_notificaciones':
+            setNotificaciones(val);
+            break;
+          case 'gym_gastos':
+            setGastos(val);
+            break;
+          case 'gym_profesores':
+            setProfesores(val);
+            break;
+          case 'gym_novedades_profesores':
+            setNovedadesProfesores(val);
+            break;
+          case 'gym_google_user':
+            setGoogleUser(val);
+            break;
+          case 'gym_rol_activo':
+            setRolActivo(val);
+            break;
+          case 'gym_waitlist_reservas':
+            setWaitlistReservas(val);
+            break;
+        }
+      } catch (err) {
+        console.error("Error parsing storage sync key:", e.key, err);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Sync helpers
@@ -977,6 +1052,121 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Reserva agendada exitosamente.' };
   };
 
+  const agregarListaEsperaReserva = (clienteId: string, turnoId: string, fecha: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const alreadyWaiting = waitlistReservas.some(w => w.cliente_id === clienteId && w.turno_id === turnoId && w.fecha === fecha);
+    if (alreadyWaiting) {
+      return { success: false, message: 'Ya te encuentras en la lista de espera para este turno y fecha.' };
+    }
+
+    const nuevoEnEspera: WaitlistReserva = {
+      id: `wl-${Date.now()}`,
+      cliente_id: clienteId,
+      turno_id: turnoId,
+      fecha,
+      creado_at: new Date().toISOString()
+    };
+
+    const updatedWl = [...waitlistReservas, nuevoEnEspera];
+    setWaitlistReservas(updatedWl);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updatedWl));
+
+    addAuditLog('LISTA_ESPERA_RESERVA_AGREGADO', { 
+      cliente: `${cliente.nombre} ${cliente.apellido}`, 
+      turno_id: turnoId, 
+      fecha 
+    });
+
+    return { success: true, message: 'Te has anotado en la lista de espera exitosamente.' };
+  };
+
+  const removerListaEsperaReserva = (clienteId: string, turnoId: string, fecha: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const filtered = waitlistReservas.filter(w => !(w.cliente_id === clienteId && w.turno_id === turnoId && w.fecha === fecha));
+    setWaitlistReservas(filtered);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(filtered));
+
+    addAuditLog('LISTA_ESPERA_RESERVA_REMOVIDO', { 
+      cliente: `${cliente.nombre} ${cliente.apellido}`, 
+      turno_id: turnoId, 
+      fecha 
+    });
+
+    return { success: true, message: 'Te has retirado de la lista de espera.' };
+  };
+
+  const procesarPromocionListaEspera = (turnoId: string, fecha: string, currentClientes: Cliente[]): Cliente[] => {
+    const waitingList = waitlistReservas
+      .filter(w => w.turno_id === turnoId && w.fecha === fecha)
+      .sort((a, b) => new Date(a.creado_at).getTime() - new Date(b.creado_at).getTime());
+
+    if (waitingList.length === 0) return currentClientes;
+
+    const nextWaitlistEntry = waitingList[0];
+    const candidateClient = currentClientes.find(c => c.id === nextWaitlistEntry.cliente_id && c.activo);
+    if (!candidateClient) {
+      // Clean up invalid waitlist entry and try again
+      const newWl = waitlistReservas.filter(w => w.id !== nextWaitlistEntry.id);
+      setWaitlistReservas(newWl);
+      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
+      return procesarPromocionListaEspera(turnoId, fecha, currentClientes);
+    }
+
+    // Auto-promote candidate
+    const nuevaReservaAuto: ReservaIndividual = {
+      id: `res-auto-${Date.now()}`,
+      turno_id: turnoId,
+      fecha,
+      creado_at: new Date().toISOString()
+    };
+
+    const updatedList = currentClientes.map(c => {
+      if (c.id === candidateClient.id) {
+        return {
+          ...c,
+          reservas_individuales: [...(c.reservas_individuales || []), nuevaReservaAuto]
+        };
+      }
+      return c;
+    });
+
+    // Remove from waitlist
+    const newWl = waitlistReservas.filter(w => w.id !== nextWaitlistEntry.id);
+    setWaitlistReservas(newWl);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
+
+    // Send internal notification to nextClient
+    const turno = turnos.find(t => t.id === turnoId);
+    const horaClase = turno ? turno.hora : '00:00';
+    const newNotif: AlertaNotificacion = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      tipo: 'SISTEMA',
+      titulo: '¡Cupo Asignado por Lista de Espera!',
+      mensaje: `Se liberó un cupo y fuiste promovido al turno de las ${horaClase} hs el día ${fecha}.`,
+      fecha: new Date().toISOString(),
+      leido: false
+    };
+
+    try {
+      const storedNotifs = localStorage.getItem('gym_notificaciones');
+      const parsedNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
+      localStorage.setItem('gym_notificaciones', JSON.stringify([newNotif, ...parsedNotifs]));
+      setNotificaciones([newNotif, ...parsedNotifs]);
+    } catch(e) {}
+
+    addAuditLog('LISTA_ESPERA_PROMOCION_AUTO', {
+      cliente: `${candidateClient.nombre} ${candidateClient.apellido}`,
+      turno_id: turnoId,
+      fecha
+    });
+
+    return updatedList;
+  };
+
   const cancelarReservaIndividual = (clienteId: string, reservaId: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
@@ -1015,7 +1205,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
 
-    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    const finalClientes = procesarPromocionListaEspera(reserva.turno_id, reserva.fecha, updatedClientes);
+    saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
     addAuditLog('RESERVA_INDIVIDUAL_CANCELADA', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
       turno_id: reserva.turno_id, 
@@ -1071,7 +1262,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
 
-    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    const finalClientes = procesarPromocionListaEspera(turnoId, fecha, updatedClientes);
+    saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
     addAuditLog('CLASE_FIJA_SUSPENDIDA', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
       turno_id: turnoId, 
@@ -1772,6 +1964,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('gym_audit_logs');
     localStorage.removeItem('gym_google_user');
     localStorage.removeItem('gym_rol_activo');
+    localStorage.removeItem('gym_waitlist_reservas');
     window.location.reload();
   };
 
@@ -1782,6 +1975,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,
       googleUser, signInWithGoogle, signOutGoogle,
+      waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,

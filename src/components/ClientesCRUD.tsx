@@ -8,6 +8,22 @@ import {
   MoreVertical, Calendar, ChevronDown, CheckCircle
 } from 'lucide-react';
 
+const getWhatsAppLink = (phone: string) => {
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (!cleanPhone) return '';
+  let formattedPhone = cleanPhone;
+  if (!formattedPhone.startsWith('54')) {
+    if (formattedPhone.startsWith('9')) {
+      formattedPhone = '54' + formattedPhone;
+    } else if (formattedPhone.startsWith('15')) {
+      formattedPhone = '549' + formattedPhone.substring(2);
+    } else {
+      formattedPhone = '549' + formattedPhone;
+    }
+  }
+  return `https://wa.me/${formattedPhone}`;
+};
+
 interface ClientesCRUDProps {
   editingClienteId?: string | null;
   setEditingClienteId?: (id: string | null) => void;
@@ -598,7 +614,23 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                       </td>
                       <td className="p-4 cursor-pointer" onClick={() => setSelectedCliente(c)}>
                         <div className="text-zinc-650 font-medium">{c.email}</div>
-                        <div className="text-zinc-450 text-[10px]">{c.telefono || 'Sin celular'}</div>
+                        <div className="text-zinc-450 text-[10px] flex items-center gap-1.5 mt-0.5">
+                          <span>{c.telefono || 'Sin celular'}</span>
+                          {c.telefono && (
+                            <a
+                              href={getWhatsAppLink(c.telefono)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-emerald-600 hover:text-emerald-700 transition-colors inline-flex items-center"
+                              title="Enviar mensaje de WhatsApp"
+                            >
+                              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.458L0 24zm5.835-4.117c1.661.988 3.513 1.507 5.409 1.508 5.761 0 10.448-4.679 10.45-10.439.002-2.79-1.082-5.412-3.053-7.382C16.71 1.597 14.092.513 11.993.513c-5.759 0-10.443 4.69-10.447 10.45-.001 1.88.49 3.73 1.42 5.362L1.856 22.28l6.183-1.621c-1.552-1.012-1.769-1.096-2.147-1.397zM17.17 14.398c-.284-.144-1.685-.83-1.947-.925-.263-.096-.454-.144-.645.144-.191.288-.741.925-.907 1.117-.167.19-.334.215-.618.072-.284-.144-1.202-.442-2.29-1.41-1.077-.96-1.804-2.148-2.015-2.51-.21-.362-.023-.558.158-.737.163-.162.363-.424.544-.637.182-.213.243-.362.364-.604.122-.241.06-.454-.03-.645-.09-.192-.646-1.56-.885-2.138-.233-.56-.47-.482-.645-.491-.167-.008-.358-.01-.55-.01s-.502.072-.765.362c-.263.288-1.004.978-1.004 2.384 0 1.406 1.028 2.763 1.171 2.955.143.192 2.023 3.084 4.9 4.323.684.295 1.218.47 1.635.6.688.219 1.314.188 1.81.114.551-.082 1.685-.688 1.925-1.353.24-.665.24-1.233.167-1.353-.072-.119-.263-.191-.547-.334z"/>
+                              </svg>
+                            </a>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4">
                         <button
@@ -812,9 +844,24 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                   <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Correo Electrónico</span>
                   <span className="font-semibold text-zinc-900 block">{selectedCliente.email}</span>
                 </div>
-                <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-                  <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Celular</span>
-                  <span className="font-semibold text-zinc-900 block">{selectedCliente.telefono || 'Sin registrar'}</span>
+                <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 flex justify-between items-center">
+                  <div>
+                    <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Celular</span>
+                    <span className="font-semibold text-zinc-900 block">{selectedCliente.telefono || 'Sin registrar'}</span>
+                  </div>
+                  {selectedCliente.telefono && (
+                    <a
+                      href={getWhatsAppLink(selectedCliente.telefono)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 transition-colors inline-flex items-center justify-center border border-emerald-200"
+                      title="Enviar mensaje de WhatsApp"
+                    >
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.458L0 24zm5.835-4.117c1.661.988 3.513 1.507 5.409 1.508 5.761 0 10.448-4.679 10.45-10.439.002-2.79-1.082-5.412-3.053-7.382C16.71 1.597 14.092.513 11.993.513c-5.759 0-10.443 4.69-10.447 10.45-.001 1.88.49 3.73 1.42 5.362L1.856 22.28l6.183-1.621c-1.552-1.012-1.769-1.096-2.147-1.397zM17.17 14.398c-.284-.144-1.685-.83-1.947-.925-.263-.096-.454-.144-.645.144-.191.288-.741.925-.907 1.117-.167.19-.334.215-.618.072-.284-.144-1.202-.442-2.29-1.41-1.077-.96-1.804-2.148-2.015-2.51-.21-.362-.023-.558.158-.737.163-.162.363-.424.544-.637.182-.213.243-.362.364-.604.122-.241.06-.454-.03-.645-.09-.192-.646-1.56-.885-2.138-.233-.56-.47-.482-.645-.491-.167-.008-.358-.01-.55-.01s-.502.072-.765.362c-.263.288-1.004.978-1.004 2.384 0 1.406 1.028 2.763 1.171 2.955.143.192 2.023 3.084 4.9 4.323.684.295 1.218.47 1.635.6.688.219 1.314.188 1.81.114.551-.082 1.685-.688 1.925-1.353.24-.665.24-1.233.167-1.353-.072-.119-.263-.191-.547-.334z"/>
+                      </svg>
+                    </a>
+                  )}
                 </div>
                 <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
                   <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Tipo de Membresía</span>

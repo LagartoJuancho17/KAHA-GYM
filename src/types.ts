@@ -151,3 +151,11 @@ export interface NovedadProfesor {
   creado_at: string;
 }
 
+export interface WaitlistReserva {
+  id: string;
+  cliente_id: string;
+  turno_id: string;
+  fecha: string;
+  creado_at: string;
+}
+

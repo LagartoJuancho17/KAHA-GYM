@@ -38,7 +38,8 @@ function InnerApp() {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const { 
     rolActivo, googleUser, signOutGoogle, registrarPago, clientes,
-    notificaciones, marcarNotificacionesLeidas, eliminarNotificacion
+    notificaciones, marcarNotificacionesLeidas, eliminarNotificacion,
+    autorizarCliente
   } = useGym();
 
   const [timeString, setTimeString] = useState('');
@@ -195,6 +196,25 @@ function InnerApp() {
             <p className="text-[10px] text-slate-400 mt-2">
               ¿Eres profesor o admin? Cierra sesión e ingresa con tu correo autorizado.
             </p>
+            
+            {/* Botón de ayuda para desarrollo local/localStorage */}
+            {socioAsociado && (
+              <div className="pt-4 border-t border-slate-100 mt-4">
+                <button
+                  onClick={() => {
+                    autorizarCliente(socioAsociado.id);
+                    window.location.reload();
+                  }}
+                  className="w-full py-2 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-250 border-dashed font-bold text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Simular Aprobación de Admin
+                </button>
+                <p className="text-[9px] text-slate-450 mt-1 text-center">
+                  (Como la base es local/localStorage, los navegadores de incógnito o diferentes no comparten base de datos. Haz click aquí para autorizar esta sesión local)
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
