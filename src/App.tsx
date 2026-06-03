@@ -128,6 +128,78 @@ function InnerApp() {
     return <GoogleSignIn />;
   }
 
+  // Check if Google-logged-in user is a SOCIO and is pending authorization
+  const socioAsociado = clientes.find(c => c.activo && c.email.toLowerCase().trim() === googleUser.email.toLowerCase().trim());
+  const esPendiente = googleUser.role === 'SOCIO' && socioAsociado && socioAsociado.autorizado === false;
+
+  if (esPendiente) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-xs select-none relative" id="pending-authorization-wrapper">
+        <div className="bg-white border border-slate-200 shadow-xl rounded-2xl p-8 max-w-md w-full text-center relative overflow-hidden">
+          {/* Decorative Background Gradient Element */}
+          <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600" />
+          
+          {/* Header Section */}
+          <div className="mb-6 flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-4 shadow-sm animate-pulse">
+              <ShieldAlert className="w-8 h-8 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Acceso en Revisión</h2>
+            <p className="text-slate-500 text-xs mt-1">Tu cuenta requiere autorización de un administrador</p>
+          </div>
+
+          {/* User Details Card */}
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-6 flex items-center gap-3 text-left">
+            {googleUser.picture ? (
+              <img 
+                src={googleUser.picture} 
+                alt={googleUser.name} 
+                className="w-12 h-12 rounded-full border border-slate-200 object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center text-white font-extrabold uppercase text-sm">
+                {googleUser.name[0]}
+              </div>
+            )}
+            <div className="overflow-hidden">
+              <p className="font-bold text-slate-800 text-xs truncate">{googleUser.name}</p>
+              <p className="text-[10px] text-slate-500 truncate">{googleUser.email}</p>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 mt-1.5 text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                Pendiente de Autorización
+              </span>
+            </div>
+          </div>
+
+          {/* Info message */}
+          <div className="text-slate-600 text-xs leading-relaxed space-y-3 mb-8">
+            <p>
+              ¡Hola, <strong>{googleUser.name.split(' ')[0]}</strong>! Tus datos de inicio de sesión de Google se han guardado correctamente en nuestra base de datos.
+            </p>
+            <p className="bg-amber-50/50 border border-amber-100/50 p-3 rounded-lg text-[11px] text-amber-800 text-center">
+              Por motivos de seguridad, un <strong>Administrador</strong> del gimnasio debe verificar y autorizar tu ficha antes de que puedas reservar clases, ver horarios y realizar pagos.
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <button 
+              onClick={signOutGoogle}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer border border-transparent"
+            >
+              <X className="w-4 h-4" />
+              Cerrar Sesión Google
+            </button>
+            <p className="text-[10px] text-slate-400 mt-2">
+              ¿Eres profesor o admin? Cierra sesión e ingresa con tu correo autorizado.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const TAB_ITEMS = [
     { id: 'DASHBOARD' as TabID, label: 'Dashboard', icon: LayoutDashboard, desc: 'Panel de Control General' },
     { id: 'CLIENTES' as TabID, label: 'Socios', icon: Users, desc: 'Gestión Integral de Socios' },
@@ -237,6 +309,9 @@ function InnerApp() {
             {TAB_ITEMS.map(item => {
               const Icon = item.icon;
               const isSelected = activeTab === item.id;
+              const pendingCount = item.id === 'CLIENTES' 
+                ? clientes.filter(c => c.activo && c.autorizado === false).length 
+                : 0;
               
               return (
                 <button
@@ -255,7 +330,12 @@ function InnerApp() {
                   id={`tab-btn-sidebar-${item.id.toLowerCase()}`}
                 >
                   <Icon className={`w-4 h-4 transition-colors ${isSelected ? 'text-emerald-600' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {pendingCount > 0 && (
+                    <span className="bg-amber-500 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-full animate-pulse tracking-wide shadow-sm">
+                      {pendingCount}
+                    </span>
+                  )}
                 </button>
               );
             })}

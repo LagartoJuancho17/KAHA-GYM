@@ -87,7 +87,7 @@ export const RoleSwitcher: React.FC = () => {
               className="bg-slate-50 border border-slate-200 text-slate-800 text-[10px] rounded px-1.5 py-0.5 outline-none font-medium cursor-pointer"
             >
               <option value="" disabled>Seleccione socio...</option>
-              {clientes.filter(c => c.activo).map(c => (
+              {clientes.filter(c => c.activo && c.autorizado !== false).map(c => (
                 <option key={c.id} value={c.id}>
                   {c.apellido}, {c.nombre}
                 </option>

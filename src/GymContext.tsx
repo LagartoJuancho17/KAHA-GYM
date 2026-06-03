@@ -48,6 +48,7 @@ interface GymContextType {
   // Clientes Methods
   addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => { success: boolean; message: string; duplicate?: boolean };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
+  autorizarCliente: (id: string) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
   altaCliente: (id: string) => void;
   eliminarCliente: (id: string) => void;
@@ -387,7 +388,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ultimo_mes_pagado: new Date().toISOString().slice(0, 7), // Al día del mes de registro
       turnos_fijos: [],
       activo: true,
-      creado_at: new Date().toISOString()
+      creado_at: new Date().toISOString(),
+      autorizado: true
     };
 
     const updated = [newClient, ...clientes];
@@ -479,6 +481,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('CLIENTE_ALTA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
   };
 
+  const autorizarCliente = (id: string) => {
+    const matched = clientes.find(c => c.id === id);
+    if (!matched) return { success: false, message: 'Cliente no encontrado.' };
+    const updatedClientes = clientes.map(c => {
+      if (c.id === id) {
+        return { ...c, autorizado: true };
+      }
+      return c;
+    });
+
+    saveState(updatedClientes);
+    addAuditLog('CLIENTE_AUTORIZADO', { id, nombre: `${matched.nombre} ${matched.apellido}`, email: matched.email });
+    return { success: true, message: 'Cliente autorizado exitosamente.' };
+  };
+
   const eliminarCliente = (id: string) => {
     const updatedClientes = clientes.filter(c => c.id !== id);
 
@@ -546,7 +563,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deuda_acumulada: 0,
         ultimo_mes_pagado: new Date().toISOString().slice(0, 7),
         turnos_fijos: [],
-        creado_at: new Date().toISOString()
+        creado_at: new Date().toISOString(),
+        autorizado: true
       };
 
       nuevosClientes.push(clientAdded);
@@ -1551,7 +1569,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ultimo_mes_pagado: new Date().toISOString().slice(0, 7),
           turnos_fijos: [],
           exencion_cobro: 'NINGUNA',
-          creado_at: new Date().toISOString()
+          creado_at: new Date().toISOString(),
+          autorizado: false
         };
         
         const updated = [nuevoCliente, ...clientes];
@@ -1763,7 +1782,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,
       googleUser, signInWithGoogle, signOutGoogle,
-      addCliente, updateCliente, bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV,
+      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,

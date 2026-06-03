@@ -38,6 +38,7 @@ export interface Cliente {
   reservas_individuales?: ReservaIndividual[];
   clases_suspendidas?: ClaseSuspendida[];
   creado_at: string;
+  autorizado?: boolean;
 }
 
 export interface Plan {
