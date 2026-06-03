@@ -4,7 +4,7 @@ import { useGym } from '../GymContext';
 import { 
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
-  TrendingDown, X, Minus
+  TrendingDown, X, Minus, Check, AlertCircle
 } from 'lucide-react';
 import { Gasto } from '../types';
 
@@ -20,7 +20,12 @@ const CATEGORIAS_GASTO = ['ALQUILER', 'SERVICIOS', 'INSUMOS', 'PROFESORES', 'OTR
 export const Dashboard: React.FC<DashboardProps> = ({ 
   setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal 
 }) => {
-  const { clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, registrarGasto } = useGym();
+  const { 
+    clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, 
+    registrarGasto, autorizarCliente, eliminarCliente 
+  } = useGym();
+
+  const clientesPendientes = clientes.filter(c => c.activo && c.autorizado === false);
   
   // Modal state
   const [showGastoModal, setShowGastoModal] = useState(false);
@@ -216,6 +221,68 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* SOLICITUDES PENDIENTES DE AUTORIZACIÓN */}
+      {clientesPendientes.length > 0 && (
+        <div className="bg-amber-50/60 backdrop-blur-xs border border-amber-200 p-5 rounded-2xl space-y-4 shadow-xs animate-fade-in" id="pending-authorizations-section-dashboard">
+          <div className="flex items-center justify-between border-b border-amber-200/50 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-250/50">
+                <AlertCircle className="w-4 h-4 text-amber-600 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-amber-900 font-sans">Solicitudes de Acceso Pendientes</h3>
+                <p className="text-[10px] text-amber-700/80 font-sans mt-0.5">Nuevos socios registrados con Google esperando confirmación de acceso</p>
+              </div>
+            </div>
+            <span className="bg-amber-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full shadow-xs">
+              {clientesPendientes.length} {clientesPendientes.length === 1 ? 'pendiente' : 'pendientes'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {clientesPendientes.map(c => (
+              <div key={c.id} className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col justify-between shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 font-bold uppercase text-[11px] shrink-0">
+                    {c.nombre[0]}{c.apellido[0]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-zinc-900 text-xs truncate leading-none mb-1">{c.apellido}, {c.nombre}</p>
+                    <p className="text-[10px] text-zinc-500 truncate leading-none mb-2" title={c.email}>{c.email}</p>
+                    <span className="text-[9px] text-zinc-400 font-sans bg-zinc-50 px-2 py-0.5 rounded-md border border-zinc-150">
+                      Registrado: {new Date(c.creado_at).toLocaleDateString('es-AR')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
+                  <button
+                    onClick={() => {
+                      autorizarCliente(c.id);
+                    }}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-transparent shadow-2xs"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Autorizar Acceso
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`¿Estás seguro de rechazar y eliminar a ${c.nombre} ${c.apellido}?`)) {
+                        eliminarCliente(c.id);
+                      }
+                    }}
+                    className="bg-red-50 hover:bg-red-100 text-red-650 p-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                    title="Rechazar solicitud"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* TARJETAS INDICADORAS DE RENDIMIENTO */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-5">
