@@ -13,13 +13,14 @@ export const TurnosGrid: React.FC = () => {
     actualizarEstadoRecupero, asignarClienteFijo, removerAsignacionFija, 
     checkInFlexible, modificarPrecioOCupoTurno, rolActivo, asignarTurnoVariable,
     crearReservaIndividual, cancelarReservaIndividual, asignarProfesorTurno,
-    registrarVacaciones, suspenderClaseFija
+    registrarVacaciones, suspenderClaseFija, addCliente
   } = useGym();
 
   const [subTab, setSubTab] = useState<'GRILLA' | 'RECUPEROS' | 'TIEMPO_REAL'>('GRILLA');
   const [assignRealtimeClientMap, setAssignRealtimeClientMap] = useState<Record<string, string>>({});
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
   const [realtimeSuccess, setRealtimeSuccess] = useState<string | null>(null);
+  const [guestName, setGuestName] = useState('');
 
   // --- CELL SELECTION STATE ---
   const [selectedTurnoId, setSelectedTurnoId] = useState<string | null>(null);
@@ -291,15 +292,47 @@ export const TurnosGrid: React.FC = () => {
 
   const handleAddRealtimeVariable = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRealtimeSlot || !realtimeCandidateClient) return;
+    if (!selectedRealtimeSlot) return;
+    if (!realtimeCandidateClient && !guestName.trim()) return;
 
     setRealtimeError(null);
     setRealtimeSuccess(null);
 
-    const res = crearReservaIndividual(realtimeCandidateClient, selectedRealtimeSlot.id, selectedRealtimeSlot.date);
+    let targetClientId = realtimeCandidateClient;
+
+    if (guestName.trim()) {
+      const parts = guestName.trim().split(' ');
+      const name = parts[0] || 'Invitado';
+      const lastname = parts.slice(1).join(' ') || '(Invitado)';
+      
+      const newGuestResult = addCliente({
+        nombre: name,
+        apellido: lastname,
+        email: `invitado-${Date.now()}@kaha.com`,
+        telefono: '11-0000-0000',
+        tipo: 'FLEXIBLE',
+        plan_id: 'p-none',
+        exencion_cobro: 'NINGUNA'
+      });
+
+      if (newGuestResult.success && (newGuestResult as any).id) {
+        targetClientId = (newGuestResult as any).id;
+      } else {
+        setRealtimeError(newGuestResult.message || 'Error al registrar el socio invitado.');
+        return;
+      }
+    }
+
+    if (!targetClientId) {
+      setRealtimeError('Debes elegir un alumno o escribir el nombre de un invitado.');
+      return;
+    }
+
+    const res = crearReservaIndividual(targetClientId, selectedRealtimeSlot.id, selectedRealtimeSlot.date);
     if (res.success) {
       setRealtimeSuccess(res.message);
       setRealtimeCandidateClient('');
+      setGuestName('');
       setTimeout(() => setRealtimeSuccess(null), 3000);
     } else {
       setRealtimeError(res.message);
@@ -837,9 +870,8 @@ export const TurnosGrid: React.FC = () => {
                               }`}
                               title={`Hacer clic para gestionar tiempo real: ${idTurno} (${fechaStr})`}
                             >
-                              <div className="flex flex-col items-center justify-center gap-1">
-                                <span className="font-bold text-xs font-mono">{rtData.total} / {rtData.cupo}</span>
-                                <div className="text-[9px] font-sans opacity-75 font-semibold">Vacantes: {Math.max(0, rtData.cupo - rtData.total)}</div>
+                              <div className="flex flex-col items-center justify-center gap-0.5">
+                                <span className="font-bold text-xs font-mono">{rtData.total} ocupados</span>
                                 
                                 <div className="flex flex-wrap gap-0.5 justify-center mt-1">
                                   {rtData.fijosActivos.length > 0 && (
@@ -910,7 +942,7 @@ export const TurnosGrid: React.FC = () => {
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-center">
                       <div>
                         <div className="text-[10px] text-zinc-450 uppercase tracking-widest font-bold">Estado de Ocupación</div>
-                        <div className="text-sm font-extrabold text-slate-800 font-mono mt-0.5">{rtData.total} / {rtData.cupo} Cupos</div>
+                        <div className="text-sm font-extrabold text-slate-800 font-mono mt-0.5">{rtData.total} Cupos Ocupados</div>
                       </div>
                       <div className="text-right">
                         <div className="text-[10px] text-zinc-450 uppercase tracking-widest font-bold">Profesor Fijo</div>
@@ -1021,35 +1053,61 @@ export const TurnosGrid: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Agendar Variable Form */}
-                    <form onSubmit={handleAddRealtimeVariable} className="border-t border-zinc-150 pt-4 space-y-2">
-                      <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Agendar Alumno Variable (Solo por Hoy)</label>
-                      <div className="flex gap-2">
+                    {/* Agendar Variable o Invitado Form */}
+                    <form onSubmit={handleAddRealtimeVariable} className="border-t border-zinc-150 pt-4 space-y-3">
+                      <label className="font-bold text-[10px] text-zinc-550 uppercase tracking-widest block font-sans">Agendar Alumno Variable o Invitado</label>
+                      
+                      <div className="space-y-1">
+                        <span className="text-[9px] text-zinc-400 font-sans block">Socio Registrado:</span>
                         <select
                           value={realtimeCandidateClient}
-                          onChange={(e) => setRealtimeCandidateClient(e.target.value)}
-                          className="flex-1 border border-zinc-250 rounded-lg p-2 text-xs bg-white outline-hidden"
+                          onChange={(e) => {
+                            setRealtimeCandidateClient(e.target.value);
+                            if (e.target.value) setGuestName('');
+                          }}
+                          className="w-full border border-zinc-250 rounded-lg p-2 text-xs bg-white outline-hidden"
                         >
-                          <option value="">-- Elige un socio --</option>
+                          <option value="">-- Selecciona socio --</option>
                           {candidateClients.map(c => (
                             <option key={c.id} value={c.id}>
                               {c.apellido}, {c.nombre}
                             </option>
                           ))}
                         </select>
-                        <button
-                          type="submit"
-                          disabled={!realtimeCandidateClient || isFull}
-                          className={`font-bold text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                            !realtimeCandidateClient || isFull
-                              ? 'bg-zinc-100 text-zinc-450 border border-zinc-200 cursor-not-allowed'
-                              : 'bg-slate-900 border border-slate-900 text-white hover:bg-slate-800'
-                          }`}
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Reservar
-                        </button>
                       </div>
+
+                      <div className="flex items-center gap-2 text-zinc-300 text-[8px] font-bold uppercase tracking-wider justify-center my-1 select-none">
+                        <div className="h-px bg-zinc-200 flex-1"></div>
+                        <span>O BIEN</span>
+                        <div className="h-px bg-zinc-200 flex-1"></div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[9px] text-zinc-400 font-sans block">Registrar Socio Invitado (Nombre y Apellido):</span>
+                        <input
+                          type="text"
+                          placeholder="Ej: Juan Pérez"
+                          value={guestName}
+                          onChange={(e) => {
+                            setGuestName(e.target.value);
+                            if (e.target.value) setRealtimeCandidateClient('');
+                          }}
+                          className="w-full border border-zinc-250 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={(!realtimeCandidateClient && !guestName.trim()) || isFull}
+                        className={`w-full font-bold text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          (!realtimeCandidateClient && !guestName.trim()) || isFull
+                            ? 'bg-zinc-100 text-zinc-450 border border-zinc-200 cursor-not-allowed'
+                            : 'bg-slate-900 border border-slate-900 text-white hover:bg-slate-800 shadow-sm'
+                        }`}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Reservar {guestName.trim() ? 'como Invitado' : ''}
+                      </button>
                     </form>
 
                   </div>

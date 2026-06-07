@@ -470,7 +470,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [newClient, ...clientes];
     saveState(updated);
     addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo });
-    return { success: true, message: 'Cliente registrado exitosamente.' };
+    return { success: true, message: 'Cliente registrado exitosamente.', id: newClient.id };
   };
 
   const updateCliente = (id: string, updates: Partial<Cliente>) => {

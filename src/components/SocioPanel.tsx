@@ -1790,7 +1790,7 @@ export const SocioPanel: React.FC = () => {
                           <div>
                             <p className="text-base font-black text-slate-800 tracking-tight">{turno.hora} hs</p>
                             <p className="text-[10px] text-slate-450 mt-1 font-medium">
-                              Cupo máximo del salón: {turno.cupo_maximo} alumnos
+                              Socios asignados permanentemente: {turno.asignados_ids.length}
                             </p>
                             {holdsMyIndividual && (
                               <div className="mt-1.5 flex flex-wrap gap-1">
@@ -1852,7 +1852,7 @@ export const SocioPanel: React.FC = () => {
                                 <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-150 text-xs">
                                   <div>
                                     <span className="font-bold text-slate-700">{dateFormatted}</span>
-                                    <span className="text-[9px] text-slate-455 font-mono ml-2">({occupiedCount}/{turno.cupo_maximo} ocupados)</span>
+                                    <span className="text-[9px] text-slate-455 font-mono ml-2">({occupiedCount} ocupados)</span>
                                   </div>
 
                                   {hasBooking ? (
