@@ -557,7 +557,7 @@ function InnerApp() {
         </header>
 
         {/* Main View Area */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
           <ErrorBoundary key={activeTab} section={currentTab.label}>
             {renderActiveTabContent()}
           </ErrorBoundary>

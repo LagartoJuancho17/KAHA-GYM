@@ -189,9 +189,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* SECCIÓN BIENVENIDA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-sans font-bold tracking-tight text-slate-950">Panel de Control General</h2>
-          <p className="text-slate-500 font-sans text-sm">
-            Indicadores operativos para <span className="font-semibold text-slate-700 capitalize">{mesNombre}</span>
+          <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-zinc-900 leading-[1.05]">Panel de Control</h2>
+          <p className="text-zinc-500 font-sans text-sm mt-1.5">
+            Indicadores operativos · <span className="font-semibold text-zinc-800 capitalize">{mesNombre}</span>
           </p>
         </div>
         
@@ -313,135 +313,126 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* TARJETAS INDICADORAS DE RENDIMIENTO */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-5">
-        {/* CLIENTES ACTIVOS - clickable → CLIENTES */}
+      {/* BENTO DE INDICADORES (jerarquía por tamaño de tile) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[150px] gap-4">
+
+        {/* HERO — Balance del mes (tile 2x2, oscuro) */}
+        <button
+          onClick={() => setActiveTab('PAGOS')}
+          className="group col-span-2 row-span-2 bg-zinc-900 text-white rounded-3xl p-7 text-left flex flex-col justify-between relative overflow-hidden cursor-pointer transition-transform hover:-translate-y-0.5"
+          id="card-net-balance"
+        >
+          <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-lime-300/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Balance del mes</span>
+            <span className="w-8 h-8 rounded-full bg-lime-300 flex items-center justify-center shrink-0">
+              <DollarSign className="w-4 h-4 text-zinc-900" />
+            </span>
+          </div>
+
+          <div className="relative z-10">
+            <div className={`font-display text-5xl xl:text-6xl font-bold leading-none tracking-tight ${balanceNeto >= 0 ? 'text-lime-300' : 'text-rose-400'}`}>
+              {balanceNeto >= 0 ? '' : '−'}${Math.abs(balanceNeto).toLocaleString('es-AR')}
+            </div>
+            <p className="text-zinc-400 text-xs mt-2 capitalize">{mesNombre} · Ingresos − Egresos</p>
+          </div>
+
+          <div className="space-y-2.5 relative z-10">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-zinc-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-lime-300" />Ingresos</span>
+              <span className="font-mono font-semibold text-white">${ingresosReales.toLocaleString('es-AR')}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-zinc-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Gastos</span>
+              <span className="font-mono font-semibold text-white">${gastosTotal.toLocaleString('es-AR')}</span>
+            </div>
+            <div className="pt-3 border-t border-white/10">
+              <div className="flex justify-between text-[10px] text-zinc-400 mb-1.5">
+                <span className="uppercase tracking-wider">Cobranza</span>
+                <span className="font-mono">{porcentajeCobranza}%</span>
+              </div>
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-lime-300 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, porcentajeCobranza)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </button>
+
+        {/* Socios Activos */}
         <button
           onClick={() => setActiveTab('CLIENTES')}
-          className="kpi-card-theme text-left hover:border-sky-200 hover:shadow-sky-50 group"
+          className="group bg-white border border-zinc-200/70 rounded-3xl p-5 text-left flex flex-col justify-between cursor-pointer transition-all hover:border-zinc-900 hover:-translate-y-0.5"
           id="card-active-clients"
         >
-          <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Socios Activos</span>
-            <span className="bg-sky-50 text-sky-700 p-1.5 rounded-lg text-xs font-semibold border border-sky-100 group-hover:bg-sky-100 transition-colors">
-              <Users className="w-4 h-4" />
-            </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Socios Activos</span>
+            <Users className="w-4 h-4 text-zinc-300 group-hover:text-zinc-900 transition-colors" />
           </div>
-          <div className="mt-4">
-            <h3 className="text-3xl font-sans font-bold text-slate-900">{totalActivosCount}</h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
-              Socios vigentes <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-            </p>
+          <div className="flex items-end justify-between">
+            <span className="font-display text-4xl font-bold text-zinc-900 leading-none">{totalActivosCount}</span>
+            <ArrowUpRight className="w-4 h-4 text-zinc-300 mb-1 group-hover:text-zinc-900 transition-colors" />
           </div>
         </button>
 
-        {/* % MOROSIDAD - clickable → MOROSIDAD */}
+        {/* Morosidad */}
         <button
           onClick={() => setActiveTab('MOROSIDAD')}
-          className="kpi-card-theme text-left group hover:border-amber-200"
+          className="group bg-white border border-zinc-200/70 rounded-3xl p-5 text-left flex flex-col justify-between cursor-pointer transition-all hover:border-zinc-900 hover:-translate-y-0.5"
           id="card-delinquency-rate"
         >
-          <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Morosidad</span>
-            <span className={`p-1.5 rounded-lg text-xs font-semibold border ${porcentajeMorosidad > 15 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-              <AlertTriangle className="w-4 h-4" />
-            </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Morosidad</span>
+            <AlertTriangle className={`w-4 h-4 transition-colors ${porcentajeMorosidad > 15 ? 'text-rose-500' : 'text-zinc-300 group-hover:text-zinc-900'}`} />
           </div>
-          <div className="mt-4">
-            <h3 className="text-3xl font-sans font-bold text-slate-900">{porcentajeMorosidad}%</h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
-              <span className="font-semibold text-red-600">{morososCount}</span> en mora
-              <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity ml-auto" />
-            </p>
+          <div className="flex items-end justify-between">
+            <span className="font-display text-4xl font-bold text-zinc-900 leading-none">{porcentajeMorosidad}<span className="text-2xl text-zinc-400">%</span></span>
+            <span className="text-[10px] text-zinc-400 mb-1"><span className="font-semibold text-rose-500">{morososCount}</span> en mora</span>
           </div>
         </button>
 
-        {/* COBRANZA EFECTIVA */}
-        <div className="kpi-card-theme" id="card-collection-rate">
-          <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">% Cobranzas</span>
-            <span className="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg text-xs font-semibold border border-emerald-100">
-              <TrendingUp className="w-4 h-4" />
-            </span>
+        {/* Ocupación */}
+        <div
+          className="bg-white border border-zinc-200/70 rounded-3xl p-5 flex flex-col justify-between"
+          id="card-occupancy"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Ocupación</span>
+            <TrendingUp className="w-4 h-4 text-zinc-300" />
           </div>
-          <div className="mt-4">
-            <h3 className="text-3xl font-sans font-bold text-slate-900">{porcentajeCobranza}%</h3>
-            <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${porcentajeCobranza >= 80 ? 'bg-emerald-500' : porcentajeCobranza >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                style={{ width: `${Math.min(100, porcentajeCobranza)}%` }}
-              />
+          <div>
+            <span className="font-display text-4xl font-bold text-zinc-900 leading-none">{ocupacionPromedio}<span className="text-2xl text-zinc-400">%</span></span>
+            <div className="mt-2 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-full bg-zinc-900 rounded-full transition-all" style={{ width: `${Math.min(100, ocupacionPromedio)}%` }} />
             </div>
           </div>
         </div>
 
-        {/* INGRESOS COBRADOS - clickable → PAGOS */}
+        {/* Pendientes de autorización */}
         <button
-          onClick={() => setActiveTab('PAGOS')}
-          className="kpi-card-theme text-left group hover:border-emerald-200"
-          id="card-actual-income"
+          onClick={() => setActiveTab('CLIENTES')}
+          className="group bg-white border border-zinc-200/70 rounded-3xl p-5 text-left flex flex-col justify-between cursor-pointer transition-all hover:border-zinc-900 hover:-translate-y-0.5"
+          id="card-pending"
         >
-          <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ingresos</span>
-            <span className="bg-slate-50 text-slate-700 p-1.5 rounded-lg text-xs font-semibold border border-slate-200 group-hover:bg-emerald-50 group-hover:text-emerald-700 group-hover:border-emerald-100 transition-colors">
-              <DollarSign className="w-4 h-4" />
-            </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Pendientes</span>
+            <span className={`w-2 h-2 rounded-full ${clientesPendientes.length > 0 ? 'bg-lime-400 animate-pulse' : 'bg-zinc-200'}`} />
           </div>
-          <div className="mt-4">
-            <h3 className="text-2xl font-mono font-bold text-slate-900">
-              ${ingresosReales.toLocaleString('es-AR')}
-            </h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
-              ARS este mes <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity ml-auto" />
-            </p>
+          <div className="flex items-end justify-between">
+            <span className="font-display text-4xl font-bold text-zinc-900 leading-none">{clientesPendientes.length}</span>
+            <span className="text-[10px] text-zinc-400 mb-1">por autorizar</span>
           </div>
         </button>
-
-        {/* GASTOS TOTALES - clickable → PAGOS */}
-        <button
-          onClick={() => setActiveTab('PAGOS')}
-          className="kpi-card-theme text-left group hover:border-rose-200"
-          id="card-total-expenses"
-        >
-          <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Gastos</span>
-            <span className="bg-rose-50 text-rose-600 p-1.5 rounded-lg text-xs font-semibold border border-rose-100">
-              <TrendingDown className="w-4 h-4" />
-            </span>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-2xl font-mono font-bold text-rose-600">
-              ${gastosTotal.toLocaleString('es-AR')}
-            </h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
-              Egresos registrados <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity ml-auto" />
-            </p>
-          </div>
-        </button>
-
-        {/* BALANCE NETO */}
-        <div className={`kpi-card-theme border-l-4 ${balanceNeto >= 0 ? 'border-l-emerald-500' : 'border-l-red-500'}`} id="card-net-balance">
-          <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Balance Neto</span>
-            <span className={`p-1.5 rounded-lg text-xs font-semibold border ${balanceNeto >= 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-              {balanceNeto >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-            </span>
-          </div>
-          <div className="mt-4">
-            <h3 className={`text-2xl font-mono font-bold ${balanceNeto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {balanceNeto >= 0 ? '+' : ''}${balanceNeto.toLocaleString('es-AR')}
-            </h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">Ingresos menos egresos</p>
-          </div>
-        </div>
       </div>
 
       {/* GRÁFICOS VISUALES */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* GRÁFICO 1: EVOLUCIÓN HISTÓRICA INGRESOS (LINEA) */}
-        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm col-span-1 lg:col-span-2">
-          <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Evolución de Ingresos de los Últimos 6 Meses (ARS)</h3>
+        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl col-span-1 lg:col-span-2">
+          <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400 mb-4">Evolución de Ingresos de los Últimos 6 Meses (ARS)</h3>
           
           <div className="relative h-64 w-full flex items-end justify-between font-mono text-[10px] text-zinc-500">
             {/* SVG Line path background */}
@@ -496,9 +487,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* GRÁFICO 2: CLIENTES POR PLAN (DONA) */}
-        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm flex flex-col justify-between">
+        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl flex flex-col justify-between">
           <div>
-            <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Distribución por Plan contratado</h3>
+            <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400 mb-4">Distribución por Plan contratado</h3>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-6 justify-center">
@@ -566,8 +557,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* GRÁFICO 3: OCUPACIÓN POR TURNO/HORA */}
-        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm col-span-1 lg:col-span-2">
-          <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500 mb-4">Saturación Promedio de Ocupación según Horarios</h3>
+        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl col-span-1 lg:col-span-2">
+          <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400 mb-4">Saturación Promedio de Ocupación según Horarios</h3>
           
           <div className="space-y-3">
             {ocupacionPorHorario.map(h => {
@@ -603,8 +594,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* PANEL DE ALERTAS EN TIEMPO REAL */}
-        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm space-y-6">
-          <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500">Alertas Operativas Críticas</h3>
+        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl space-y-6">
+          <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400">Alertas Operativas Críticas</h3>
 
           {/* ALERTA 1: TURNOS AL 80%+ */}
           <div className="space-y-2">
@@ -693,9 +684,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* GASTOS DEL MES - Mini resumen */}
       {gastosEsteMes.length > 0 && (
-        <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-sm">
+        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-sans font-bold uppercase tracking-wider text-zinc-500">Últimos Gastos Registrados — {mesActual}</h3>
+            <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400">Últimos Gastos Registrados — {mesActual}</h3>
             <button
               onClick={() => setActiveTab('PAGOS')}
               className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors underline underline-offset-2"
