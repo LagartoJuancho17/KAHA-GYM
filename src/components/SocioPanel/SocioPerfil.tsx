@@ -59,14 +59,14 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-black text-slate-850 tracking-tight uppercase">
+                  <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">
                     {socio.nombre} {socio.apellido}
                   </h2>
-                  <span className="text-[9px] bg-emerald-50 border border-emerald-150 text-emerald-700 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider">
+                  <span className="text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider">
                     Socio Activo
                   </span>
                 </div>
-                <p className="text-xs text-slate-505 flex items-center gap-1.5 mt-1 font-medium">
+                <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-medium">
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
                   <span>{socio.email}</span>
                 </p>
@@ -75,7 +75,7 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
 
             <div className="flex flex-col gap-1.5 self-start sm:self-auto sm:text-right">
               <span className="text-slate-400 text-[10px] uppercase font-mono tracking-widest font-extrabold block">Vía de Acceso</span>
-              <div className="text-emerald-750 bg-emerald-50/75 border border-emerald-100 px-3 py-1.5 rounded-xl font-bold text-[11px] inline-flex items-center gap-1.5 shadow-3xs">
+              <div className="text-emerald-700 bg-emerald-50/75 border border-emerald-100 px-3 py-1.5 rounded-xl font-bold text-[11px] inline-flex items-center gap-1.5 shadow-3xs">
                 <User className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Google OAuth 2.0 Direct</span>
               </div>
@@ -118,13 +118,13 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                       ) : (
                         <button
                           onClick={() => setIsEditingPhone(true)}
-                          className="bg-emerald-55 hover:bg-emerald-100 text-emerald-700 border border-emerald-150 font-bold px-4.5 py-3 rounded-xl text-xs transition-colors cursor-pointer shrink-0 bg-white"
+                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-100 font-bold px-4.5 py-3 rounded-xl text-xs transition-colors cursor-pointer shrink-0 bg-white"
                         >
                           Editar
                         </button>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-450 italic leading-snug">
+                    <p className="text-[10px] text-slate-400 italic leading-snug">
                       Indispensable para el envío automático de confirmaciones y alertas de disponibilidad por WhatsApp.
                     </p>
                   </div>
@@ -138,7 +138,7 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                     <MapPin className="w-5 h-5 text-emerald-600" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-850">KAHA Gimnasio - Sede Principal</h4>
+                    <h4 className="text-xs font-bold text-slate-800">KAHA Gimnasio - Sede Principal</h4>
                     <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                       Av. Cabildo 1420, Belgrano, Ciudad Autónoma de Buenos Aires, Argentina.
                     </p>
@@ -156,7 +156,7 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
 
                 <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
                   <div className="p-5 space-y-3.5">
-                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
+                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">Estado de Cuenta:</span>
                       <span className={`font-mono font-bold px-2.5 py-0.5 rounded text-[10px] ${
                         socio.estado === 'ACTIVO' 
@@ -166,27 +166,27 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                         {socio.estado === 'ACTIVO' ? 'ACTIVO / AL DÍA' : 'CON DEUDA / INHABILITADO'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
+                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">Plan Asignado:</span>
                       <span className="font-bold text-slate-800 text-[11px]">
                         {planSocio ? planSocio.nombre : 'Plan KAHA Semanal'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
+                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">Valor del Plan:</span>
                       <span className="font-mono font-bold text-slate-800 text-[11px]">
                         {planSocio ? `$${planSocio.precio.toLocaleString('es-AR')} ARS` : 'N/A'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
+                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">Deuda Acumulada:</span>
-                      <span className={`font-bold font-mono text-[11px] ${socio.deuda_acumulada > 0 ? 'text-rose-700 font-extrabold' : 'text-slate-850'}`}>
+                      <span className={`font-bold font-mono text-[11px] ${socio.deuda_acumulada > 0 ? 'text-rose-700 font-extrabold' : 'text-slate-800'}`}>
                         ${socio.deuda_acumulada.toLocaleString('es-AR')} ARS
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-150">
+                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">ID Unico Cuenta:</span>
-                      <span className="font-mono text-slate-550 text-[10px] select-all tracking-tight bg-slate-100 px-2 py-0.5 rounded border border-slate-200 truncate">
+                      <span className="font-mono text-slate-500 text-[10px] select-all tracking-tight bg-slate-100 px-2 py-0.5 rounded border border-slate-200 truncate">
                         {socio.id}
                       </span>
                     </div>
@@ -200,15 +200,15 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
 
                   <div className={`p-4 border-t border-slate-200 ${socio.deuda_acumulada > 0 ? 'bg-rose-50/40' : 'bg-emerald-50/40'}`}>
                     {socio.deuda_acumulada > 0 ? (
-                      <p className="text-[10px] text-rose-850 leading-relaxed font-semibold flex items-start gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-rose-650 shrink-0 mt-0.5 animate-pulse" />
+                      <p className="text-[10px] text-rose-800 leading-relaxed font-semibold flex items-start gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
                         <span>
                           Registrás una deuda de ${socio.deuda_acumulada.toLocaleString('es-AR')} ARS. Podés abonar de forma directa y 100% segura mediante Mercado Pago con el botón ubicado en tu plan vigente.
                         </span>
                       </p>
                     ) : (
-                      <p className="text-[10px] text-emerald-850 leading-relaxed font-semibold flex items-start gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-emerald-650 shrink-0 mt-0.5 animate-pulse" />
+                      <p className="text-[10px] text-emerald-800 leading-relaxed font-semibold flex items-start gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5 animate-pulse" />
                         <span>
                           Para solicitar cambios permanentes en el tipo de tu membresía o cancelaciones, por favor contactate con administración vía WhatsApp.
                         </span>
@@ -233,7 +233,7 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                     <span>{isPaying ? 'Iniciando Mercado Pago...' : 'Pagar con Mercado Pago'}</span>
                   </button>
                   {paymentError && (
-                    <p className="text-[10px] text-rose-655 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">
+                    <p className="text-[10px] text-rose-700 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">
                       {paymentError}
                     </p>
                   )}

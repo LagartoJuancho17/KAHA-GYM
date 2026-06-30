@@ -210,7 +210,7 @@ export const TurnosGrid: React.FC = () => {
             onClick={() => setSubTab('GRILLA')}
             className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
               subTab === 'GRILLA'
-                ? 'bg-white text-zinc-955 shadow-sm font-semibold'
+                ? 'bg-white text-zinc-950 shadow-sm font-semibold'
                 : 'text-zinc-500 hover:text-zinc-950'
             }`}
             id="subtab-grilla-trigger"
@@ -232,7 +232,7 @@ export const TurnosGrid: React.FC = () => {
             onClick={() => setSubTab('RECUPEROS')}
             className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
               subTab === 'RECUPEROS'
-                ? 'bg-white text-zinc-955 shadow-sm font-semibold'
+                ? 'bg-white text-zinc-950 shadow-sm font-semibold'
                 : 'text-zinc-500 hover:text-zinc-950'
             }`}
             id="subtab-recuperos-trigger"
@@ -289,7 +289,7 @@ export const TurnosGrid: React.FC = () => {
 
                         if (hora === '15:00' && dia !== 'MARTES' && dia !== 'JUEVES' && dia !== 'VIERNES') {
                           return (
-                            <td key={dia} className="p-2 border-r border-zinc-205 bg-zinc-50/20 text-zinc-400 italic font-medium text-[10px] text-center">
+                            <td key={dia} className="p-2 border-r border-zinc-200 bg-zinc-50/20 text-zinc-400 italic font-medium text-[10px] text-center">
                               —
                             </td>
                           );
@@ -329,7 +329,7 @@ export const TurnosGrid: React.FC = () => {
                                 </div>
                               )}
                               {slotTurno.profesor && (
-                                <div className="mt-1 text-[8.5px] font-sans font-bold text-zinc-550 truncate max-w-full" title={`Profesor: ${slotTurno.profesor}`}>
+                                <div className="mt-1 text-[8.5px] font-sans font-bold text-zinc-500 truncate max-w-full" title={`Profesor: ${slotTurno.profesor}`}>
                                   👤 {slotTurno.profesor}
                                 </div>
                               )}
@@ -367,7 +367,7 @@ export const TurnosGrid: React.FC = () => {
               </div>
 
               {/* LEYENDAS */}
-              <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-355 font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/80">
+              <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/80">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span> Libre (&lt;70%)
                 </span>
@@ -382,14 +382,14 @@ export const TurnosGrid: React.FC = () => {
           </div>
 
           {realtimeError && (
-            <div className="bg-rose-50 border border-rose-250 text-rose-800 px-4 py-3 rounded-xl font-semibold text-xs flex items-center gap-2">
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl font-semibold text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-rose-600" />
               <span>{realtimeError}</span>
             </div>
           )}
 
           {realtimeSuccess && (
-            <div className="bg-emerald-50 border border-emerald-250 text-emerald-855 px-4 py-3 rounded-xl font-semibold text-xs flex items-center gap-2">
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-xl font-semibold text-xs flex items-center gap-2">
               <span className="w-4 h-4 text-emerald-600">✓</span>
               <span>{realtimeSuccess}</span>
             </div>
@@ -467,18 +467,18 @@ export const TurnosGrid: React.FC = () => {
                               
                               <div className="flex flex-wrap gap-0.5 justify-center mt-1">
                                 {rtData.fijosActivos.length > 0 && (
-                                  <span className="text-[7.5px] px-1 bg-sky-105 text-sky-800 rounded-sm font-bold" title={`${rtData.fijosActivos.length} fijos activos`}>F:{rtData.fijosActivos.length}</span>
+                                  <span className="text-[7.5px] px-1 bg-sky-100 text-sky-800 rounded-sm font-bold" title={`${rtData.fijosActivos.length} fijos activos`}>F:{rtData.fijosActivos.length}</span>
                                 )}
                                 {rtData.variables.length > 0 && (
-                                  <span className="text-[7.5px] px-1 bg-violet-105 text-violet-800 rounded-sm font-bold" title={`${rtData.variables.length} variables`}>V:{rtData.variables.length}</span>
+                                  <span className="text-[7.5px] px-1 bg-violet-100 text-violet-800 rounded-sm font-bold" title={`${rtData.variables.length} variables`}>V:{rtData.variables.length}</span>
                                 )}
                                 {rtData.recuperos.length > 0 && (
-                                  <span className="text-[7.5px] px-1 bg-amber-105 text-amber-805 rounded-sm font-bold" title={`${rtData.recuperos.length} recuperos`}>R:{rtData.recuperos.length}</span>
+                                  <span className="text-[7.5px] px-1 bg-amber-100 text-amber-800 rounded-sm font-bold" title={`${rtData.recuperos.length} recuperos`}>R:{rtData.recuperos.length}</span>
                                 )}
                               </div>
 
                               {rtData.profesor && (
-                                <div className="mt-1 text-[8.5px] font-sans font-bold text-zinc-550 truncate max-w-full" title={`Profesor: ${rtData.profesor}`}>
+                                <div className="mt-1 text-[8.5px] font-sans font-bold text-zinc-500 truncate max-w-full" title={`Profesor: ${rtData.profesor}`}>
                                   👤 {rtData.profesor}
                                 </div>
                               )}
@@ -513,7 +513,7 @@ export const TurnosGrid: React.FC = () => {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-fade-in text-xs font-sans">
             {/* TABLA HISTORIAL DE RECUPEROS */}
             <div className="bg-white border border-zinc-200 p-5 rounded-xl xl:col-span-2 space-y-4 shadow-xs">
-              <h3 className="font-sans font-bold text-sm text-zinc-905 uppercase tracking-wide border-b border-zinc-150 pb-2">Planilla de Ausencias y Recuperos Programados</h3>
+              <h3 className="font-sans font-bold text-sm text-zinc-900 uppercase tracking-wide border-b border-zinc-100 pb-2">Planilla de Ausencias y Recuperos Programados</h3>
 
               <div className="overflow-x-auto border border-zinc-200 rounded-lg">
                 <table className="w-full text-left font-sans text-xs">
@@ -548,7 +548,7 @@ export const TurnosGrid: React.FC = () => {
                           <tr key={rec.id} className="hover:bg-zinc-50">
                             <td className="p-3 font-semibold text-zinc-950">{rec.cliente_nombre}</td>
                             <td className="p-3 font-mono">{rec.fecha_inasistencia}</td>
-                            <td className="p-3 font-semibold text-zinc-650">{rec.turno_original_id}</td>
+                            <td className="p-3 font-semibold text-zinc-600">{rec.turno_original_id}</td>
                             <td className="p-3 font-mono">{rec.fecha_recupero || 'Pendiente'}</td>
                             <td className="p-3 font-semibold text-zinc-900">{rec.turno_recupero_id === 'PENDIENTE_DEFINICION' ? 'Pendiente' : rec.turno_recupero_id}</td>
                             <td className="p-3 font-mono text-zinc-600">{rec.fecha_limite}</td>
@@ -587,7 +587,7 @@ export const TurnosGrid: React.FC = () => {
             {/* PANEL DERECHO CON FORMULARIOS */}
             <div className="space-y-6">
               {/* FORMULARIO AGENDAR NUEVO RECUPERO */}
-              <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-805 shadow-xl space-y-4">
+              <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-800 shadow-xl space-y-4">
                 <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
                   <Sparkles className="w-5 h-5 text-amber-500" />
                   <h3 className="font-sans font-bold text-sm tracking-tight">Agendar Recuperación de Clase</h3>
@@ -825,7 +825,7 @@ export const TurnosGrid: React.FC = () => {
               </div>
 
               {/* FORMULARIO REGISTRAR VACACIONES */}
-              <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-805 shadow-xl space-y-4">
+              <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-800 shadow-xl space-y-4">
                 <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
                   <Calendar className="w-5 h-5 text-sky-400" />
                   <h3 className="font-sans font-bold text-sm tracking-tight">Registrar Vacaciones o Viaje</h3>

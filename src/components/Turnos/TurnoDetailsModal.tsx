@@ -106,14 +106,14 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
         <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
           <div>
             <h3 className="text-sm font-bold tracking-tight flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-emerald-450" />
+              <Clock className="w-4 h-4 text-emerald-400" />
               {selectedTurno.dia} — {selectedTurno.hora} hs
             </h3>
             <p className="text-[10px] text-zinc-400 mt-0.5">Gestión de Turno Semanal Fijo</p>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-450 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors cursor-pointer border-none"
+            className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors cursor-pointer border-none"
           >
             <X className="w-4 h-4" />
           </button>
@@ -122,20 +122,20 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
         {/* Body */}
         <div className="p-5 space-y-6">
           {cellActionError && (
-            <div className="bg-red-50 text-red-750 p-2.5 rounded-lg font-medium border border-red-200 text-[11px]">
+            <div className="bg-red-50 text-red-700 p-2.5 rounded-lg font-medium border border-red-200 text-[11px]">
               {cellActionError}
             </div>
           )}
 
           {cellActionSuccess && (
-            <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-medium border border-emerald-255 text-[11px]">
+            <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-medium border border-emerald-300 text-[11px]">
               {cellActionSuccess}
             </div>
           )}
 
           {/* 1. PROFESOR FIJO */}
           <form onSubmit={handleSaveProfesor} className="bg-zinc-50 p-3.5 rounded-lg border border-zinc-200 space-y-2">
-            <label className="font-bold text-[10px] text-zinc-550 uppercase tracking-widest block font-sans">Profesor Fijo / Clase</label>
+            <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Profesor Fijo / Clase</label>
             <div className="flex gap-2">
               {profesores.filter(p => p.activo).length > 0 ? (
                 <select
@@ -168,7 +168,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
 
           {/* 2. ALUMNOS FIJOS ASIGNADOS */}
           <div className="space-y-3">
-            <h4 className="font-bold text-[10px] text-zinc-450 uppercase tracking-widest font-sans border-b border-zinc-100 pb-1.5">Miembros Fijos Asignados ({selectedTurno.asignados_ids.length})</h4>
+            <h4 className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest font-sans border-b border-zinc-100 pb-1.5">Miembros Fijos Asignados ({selectedTurno.asignados_ids.length})</h4>
             
             {selectedTurno.asignados_ids.length === 0 ? (
               <p className="text-zinc-400 italic text-[11px] py-1">Este turno no registra alumnos fijos asignados aún.</p>
@@ -182,7 +182,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                       <span className="font-semibold text-zinc-900">{cl.apellido}, {cl.nombre}</span>
                       <button
                         onClick={() => removerAsignacionFija(cId, turnoId)}
-                        className="text-red-505 hover:text-red-700 bg-red-50 p-1.5 rounded-md border border-red-100 cursor-pointer border-none"
+                        className="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded-md border border-red-100 cursor-pointer border-none"
                         title="Remover asignación permanente"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -198,7 +198,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
               <div className="space-y-2 pt-1">
                 <div className="flex items-center gap-1.5">
                   <ListOrdered className="w-3.5 h-3.5 text-zinc-400" />
-                  <h5 className="font-bold text-[10px] text-zinc-450 uppercase tracking-widest font-sans">Lista de Espera ({selectedTurno.lista_espera_ids.length})</h5>
+                  <h5 className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest font-sans">Lista de Espera ({selectedTurno.lista_espera_ids.length})</h5>
                 </div>
                 <div className="space-y-1.5">
                   {selectedTurno.lista_espera_ids.map((cId, idx) => {
@@ -207,10 +207,10 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                     return (
                       <div key={cl.id} className="flex justify-between items-center p-2 bg-amber-50/50 border border-amber-100 rounded-lg">
                         <span className="font-mono text-[10px] bg-amber-100 text-amber-800 px-1 rounded-sm font-bold">P{idx + 1}</span>
-                        <span className="font-semibold text-zinc-850 flex-1 ml-2">{cl.nombre} {cl.apellido}</span>
+                        <span className="font-semibold text-zinc-800 flex-1 ml-2">{cl.nombre} {cl.apellido}</span>
                         <button
                           onClick={() => removerAsignacionFija(cId, turnoId)}
-                          className="text-zinc-450 hover:text-zinc-800 cursor-pointer border-none bg-transparent"
+                          className="text-zinc-400 hover:text-zinc-800 cursor-pointer border-none bg-transparent"
                           title="Retirar de waitlist"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -257,7 +257,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
           {/* 3. CHECK-IN DIARIO ALUMNO FLEXIBLE */}
           <form onSubmit={handleFlexCheckIn} className="border-t border-zinc-100 pt-4 space-y-3">
             <div className="space-y-1">
-              <label className="font-bold text-[10px] text-zinc-450 uppercase tracking-widest block font-sans">Asistencia de Alumno (Check-In Diario)</label>
+              <label className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest block font-sans">Asistencia de Alumno (Check-In Diario)</label>
               <p className="text-[10px] text-zinc-400 leading-normal">Permite registrar una asistencia libre/check-in para el día de hoy si hay vacantes físicas en este turno.</p>
               <div className="flex gap-2">
                 <select
@@ -276,7 +276,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                   type="submit"
                   className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 font-bold text-xs px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 text-zinc-650" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-zinc-600" />
                   Check-In
                 </button>
               </div>
@@ -285,7 +285,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
 
           {/* 4. CUPO MÁXIMO */}
           <form onSubmit={handleSaveCupo} className="border-t border-zinc-100 pt-4 space-y-2.5">
-            <label className="font-bold text-[10px] text-zinc-450 uppercase tracking-widest block font-sans">Capacidad Máxima del Turno</label>
+            <label className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest block font-sans">Capacidad Máxima del Turno</label>
             <p className="text-[10px] text-zinc-400 leading-normal">Establece el cupo límite de alumnos que pueden asistir simultáneamente a este horario.</p>
             <div className="flex gap-2">
               <input
@@ -307,7 +307,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
         </div>
 
         {/* Footer */}
-        <div className="bg-zinc-50 px-5 py-4 border-t border-zinc-150 flex justify-end font-sans">
+        <div className="bg-zinc-50 px-5 py-4 border-t border-zinc-100 flex justify-end font-sans">
           <button
             onClick={onClose}
             className="px-5 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold transition-colors cursor-pointer border-none"

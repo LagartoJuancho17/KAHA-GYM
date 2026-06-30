@@ -60,11 +60,11 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
     <>
       {/* CHOICE MODAL FOR PAYMENT METHOD */}
       {!simulatedSuccessData && (
-        <div className="fixed inset-0 bg-slate-905/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in font-sans" id="payment-choice-modal">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in font-sans" id="payment-choice-modal">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-100 shadow-2xl relative overflow-hidden flex flex-col animate-scale-in">
             {/* Decorative background gradients */}
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-sky-100 rounded-full blur-3xl opacity-55"></div>
-            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-150 rounded-full blur-3xl opacity-40"></div>
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-100 rounded-full blur-3xl opacity-40"></div>
 
             <div className="flex justify-between items-center mb-6 relative z-10">
               <h3 className="text-xl font-bold text-slate-800 tracking-tight">Confirmar Método de Pago</h3>
@@ -77,9 +77,9 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
             </div>
 
             <div className="space-y-4 relative z-10">
-              <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4.5">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4.5">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Monto a abonar</span>
-                <span className="text-2xl font-black text-slate-805 font-mono">${socio.deuda_acumulada.toLocaleString('es-AR')} ARS</span>
+                <span className="text-2xl font-black text-slate-800 font-mono">${socio.deuda_acumulada.toLocaleString('es-AR')} ARS</span>
               </div>
 
               <p className="text-xs text-slate-500 leading-relaxed font-medium">
@@ -136,7 +136,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
       {/* SIMULATED PAYMENT SUCCESS RECEIPT MODAL */}
       {simulatedSuccessData && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-fade-in font-sans">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-105 shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-scale-in">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-100 shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-scale-in">
             {/* Decorative background gradients */}
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-100 rounded-full blur-3xl opacity-50"></div>
             <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
@@ -150,19 +150,19 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
             </div>
 
             <h3 className="text-2xl font-black text-slate-800 tracking-tight">¡Pago Aprobado (Simulado)!</h3>
-            <p className="text-slate-550 text-sm mt-2 leading-relaxed">
+            <p className="text-slate-500 text-sm mt-2 leading-relaxed">
               Tu transacción simulada se ha procesado con éxito y se ha reportado al panel administrativo.
             </p>
 
             {/* Receipt display card */}
-            <div className="w-full bg-slate-50 border border-slate-150 rounded-2xl p-5 my-6 space-y-3 text-left">
+            <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 my-6 space-y-3 text-left">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400 font-mono uppercase font-bold">Socio</span>
                 <span className="font-bold text-slate-800">{simulatedSuccessData.clientName}</span>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400 font-mono uppercase font-bold">Medio de Pago</span>
-                <span className="font-semibold text-sky-650 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 text-[10px]">
+                <span className="font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 text-[10px]">
                   SIMULACIÓN MP
                 </span>
               </div>
@@ -174,7 +174,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
               </div>
               <div className="flex justify-between items-center text-xs pt-2.5 border-t border-slate-200">
                 <span className="text-slate-400 font-mono uppercase font-bold">Estado Cuenta</span>
-                <span className="font-bold text-emerald-750 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[9px] border border-emerald-150 uppercase tracking-wide">
+                <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[9px] border border-emerald-100 uppercase tracking-wide">
                   ✓ Al Día
                 </span>
               </div>
@@ -185,7 +185,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
                 setSimulatedSuccessData(null);
                 onClose();
               }}
-              className="w-full bg-slate-900 hover:bg-slate-850 text-white font-bold py-3 px-6 rounded-2xl text-xs transition-all shadow-md active:scale-98 cursor-pointer relative z-10 border-none"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-2xl text-xs transition-all shadow-md active:scale-98 cursor-pointer relative z-10 border-none"
             >
               Entendido, gracias
             </button>

@@ -84,7 +84,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                 let estadoLabel = 'Al Día';
                 
                 if (c.autorizado === false) {
-                  badgeClass = 'bg-amber-150 text-amber-855 border-amber-250 animate-pulse';
+                  badgeClass = 'bg-amber-100 text-amber-900 border-amber-200 animate-pulse';
                   estadoLabel = 'Pendiente';
                 } else if (!c.activo || c.estado === 'INACTIVO') {
                   badgeClass = 'bg-zinc-100 text-zinc-600 border-zinc-200';
@@ -98,14 +98,14 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                 }
 
                 return (
-                  <tr key={c.id} className="hover:bg-zinc-50 transition-colors font-sans border-b border-zinc-150" id={`row-cliente-${c.id}`}>
+                  <tr key={c.id} className="hover:bg-zinc-50 transition-colors font-sans border-b border-zinc-100" id={`row-cliente-${c.id}`}>
                     <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-700 font-bold uppercase text-[10px] border border-zinc-205">
+                        <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-700 font-bold uppercase text-[10px] border border-zinc-200">
                           {c.nombre[0]}{c.apellido[0]}
                         </div>
                         <div>
-                          <div className="font-semibold text-zinc-955 text-xs flex items-center gap-2">
+                          <div className="font-semibold text-zinc-950 text-xs flex items-center gap-2">
                             {c.apellido}, {c.nombre}
                             <span className={`px-2 py-0.5 text-[9px] rounded-full font-bold border ${badgeClass}`}>
                               {estadoLabel}
@@ -116,8 +116,8 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                       </div>
                     </td>
                     <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
-                      <div className="text-zinc-650 font-medium">{c.email}</div>
-                      <div className="text-zinc-450 text-[10px] flex items-center gap-1.5 mt-0.5">
+                      <div className="text-zinc-600 font-medium">{c.email}</div>
+                      <div className="text-zinc-400 text-[10px] flex items-center gap-1.5 mt-0.5">
                         <span>{c.telefono || 'Sin celular'}</span>
                         {c.telefono && (
                           <a
@@ -155,7 +155,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                         ${c.deuda_acumulada.toLocaleString('es-AR')}
                       </span>
                     </td>
-                    <td className="p-4 cursor-pointer font-mono text-zinc-650" onClick={() => onSelectCliente(c)}>{c.ultimo_mes_pagado || 'Sin pagos'}</td>
+                    <td className="p-4 cursor-pointer font-mono text-zinc-600" onClick={() => onSelectCliente(c)}>{c.ultimo_mes_pagado || 'Sin pagos'}</td>
                     <td className="p-4 relative">
                       <div className="flex items-center justify-center">
                         <button

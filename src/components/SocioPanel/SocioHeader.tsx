@@ -49,7 +49,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
           {/* Menu button */}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="p-2 text-slate-650 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all cursor-pointer border-none bg-transparent"
+            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all cursor-pointer border-none bg-transparent"
             aria-label="Abrir menú de navegación"
             id="socio-hamburger-menu"
           >
@@ -61,7 +61,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="text-sm font-black text-slate-850 tracking-wider uppercase">KAHA Portal</h1>
+              <h1 className="text-sm font-black text-slate-800 tracking-wider uppercase">KAHA Portal</h1>
               <span className="text-[8px] bg-emerald-50 text-emerald-800 border border-emerald-100 font-mono font-bold px-1.5 py-0.2 rounded-md">PASS ACTIVE</span>
             </div>
             <p className="text-[9px] text-slate-400 font-mono -mt-0.5 uppercase tracking-widest hidden sm:block">Servicio Web de Autogestión</p>
@@ -156,12 +156,12 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
             )}
             <div className="hidden sm:block">
               <p className="text-[11px] font-bold text-slate-800 leading-none tracking-tight">{socio.nombre}</p>
-              <p className="text-[9px] text-emerald-605 font-bold font-mono mt-0.5 uppercase tracking-wider flex items-center gap-1">
+              <p className="text-[9px] text-emerald-600 font-bold font-mono mt-0.5 uppercase tracking-wider flex items-center gap-1">
                 <span className="w-1.2 h-1.2 bg-emerald-500 rounded-full"></span>
                 SOCIO
               </p>
             </div>
-            <ChevronDown className={`w-3.5 h-3.5 text-slate-550 transition-transform ${isDropdownOpen ? 'transform rotate-180 text-emerald-600' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isDropdownOpen ? 'transform rotate-180 text-emerald-600' : ''}`} />
           </button>
 
           {/* DROPDOWN OPTIONS */}
@@ -177,14 +177,14 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-1 text-[9px] text-slate-655 font-mono leading-normal bg-slate-50 p-2.5 rounded-lg border border-slate-150">
+              <div className="space-y-1 text-[9px] text-slate-700 font-mono leading-normal bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                 <div className="flex items-center justify-between">
                   <span>ID:</span>
                   <span className="font-bold text-slate-800">#{socio.id.slice(2, 8).toUpperCase()}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Estado:</span>
-                  <span className="font-bold text-emerald-650 bg-emerald-50 px-1 rounded">Activo</span>
+                  <span className="font-bold text-emerald-600 bg-emerald-50 px-1 rounded">Activo</span>
                 </div>
               </div>
 
@@ -193,7 +193,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
                   setIsDropdownOpen(false);
                   signOutGoogle();
                 }}
-                className="w-full py-2 bg-rose-50 hover:bg-rose-100/50 text-rose-705 hover:text-rose-800 border border-rose-100 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-[10px] border-none"
+                className="w-full py-2 bg-rose-50 hover:bg-rose-100/50 text-rose-700 hover:text-rose-800 border border-rose-100 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-[10px] border-none"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 Cerrar Sesión Google
@@ -220,10 +220,10 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-8.5 h-8.5 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <Shield className="w-4.5 h-4.5 text-emerald-650" />
+                  <Shield className="w-4.5 h-4.5 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-slate-855 uppercase tracking-wider">KAHA Menú</h3>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">KAHA Menú</h3>
                   <span className="text-[8px] text-slate-400 font-mono uppercase tracking-widest block -mt-0.5">Socio Autogestión</span>
                 </div>
               </div>
@@ -238,7 +238,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
               </button>
             </div>
 
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-150 flex items-center gap-2.5">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center gap-2.5">
               {googleUser?.picture ? (
                 <img 
                   src={googleUser.picture} 
@@ -247,7 +247,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-650 flex items-center justify-center font-bold text-xs border border-emerald-100">
+                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs border border-emerald-100">
                   {socio.nombre[0]}
                 </div>
               )}
@@ -367,7 +367,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
                   setDrawerOpen(false);
                   signOutGoogle();
                 }}
-                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100/50 text-rose-700 hover:text-rose-850 border border-rose-100 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer text-[10.5px] border-none"
+                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100/50 text-rose-700 hover:text-rose-800 border border-rose-100 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer text-[10.5px] border-none"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 Cerrar Sesión Google

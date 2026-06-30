@@ -261,7 +261,7 @@ export const ClienteCSVImportModal: React.FC<ClienteCSVImportModalProps> = ({
                   </div>
 
                   <div className="flex justify-between items-center bg-zinc-50 p-4 border border-zinc-200 rounded-xl">
-                    <div className="text-zinc-650 block leading-tight font-sans">
+                    <div className="text-zinc-600 block leading-tight font-sans">
                       Se procesarán un total de <span className="font-bold text-zinc-900">{csvRows.length} miembros</span> listados en el archivo.
                       <p className="text-[10px] text-zinc-400 mt-1">Los emails repetidos serán ignorados o listados en reporte de errores para resguardar la consistencia.</p>
                     </div>

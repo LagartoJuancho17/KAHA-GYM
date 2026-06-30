@@ -121,7 +121,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm font-sans" id="payment-form-modal">
-      <div className="bg-white rounded-xl shadow-2xl border border-zinc-205 w-full max-w-xl overflow-hidden text-xs">
+      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-xl overflow-hidden text-xs">
         <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
           <div>
             <h3 className="text-base font-bold tracking-tight">Cargar Transacción Contable</h3>
@@ -136,7 +136,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
           {formSuccess && <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-semibold border border-emerald-200">{formSuccess}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-zinc-550 font-bold block text-[10px] uppercase">Quién Abona (Pagador)</label>
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Quién Abona (Pagador)</label>
               <select required value={pagoForm.cliente_id} onChange={e => handleClientSelect(e.target.value)} className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium" id="pago-cliente-select">
                 <option value="">-- Seleccionar pagador --</option>
                 {clientes.filter(c => c.activo).map(c => {
@@ -146,7 +146,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-zinc-550 font-bold block text-[10px] uppercase">Agregar Alumno Beneficiario</label>
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Agregar Alumno Beneficiario</label>
               <select value="" onChange={e => handleAddBeneficiary(e.target.value)} className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium" id="add-beneficiary-select">
                 <option value="">-- Buscar y agregar otro socio --</option>
                 {clientes.filter(c => c.activo).map(c => {
@@ -158,7 +158,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
           </div>
           {/* BENEFICIARIOS */}
           <div className="space-y-2">
-            <label className="text-zinc-550 font-bold block text-[10px] uppercase">Detalle de Socios Cubiertos</label>
+            <label className="text-zinc-500 font-bold block text-[10px] uppercase">Detalle de Socios Cubiertos</label>
             {beneficiarios.length === 0 ? (
               <div className="border border-dashed border-zinc-200 rounded-lg p-4 text-center text-zinc-400 italic">No se han seleccionado destinatarios aún.</div>
             ) : (
@@ -173,7 +173,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                           <td className="p-2 font-semibold text-zinc-900">{cl ? `${cl.apellido}, ${cl.nombre}` : 'Desconocido'}</td>
                           <td className="p-2"><input type="month" required value={b.mes_correspondiente} onChange={e => setBeneficiarios(prev => prev.map((x, i) => i === idx ? { ...x, mes_correspondiente: e.target.value } : x))} className="w-full border border-zinc-200 rounded-md p-1 bg-white font-mono text-xs outline-hidden" /></td>
                           <td className="p-2"><div className="relative"><span className="absolute left-1.5 top-1 text-zinc-400 font-mono text-[10px]">$</span><input type="number" required min="1" value={b.monto} onChange={e => setBeneficiarios(prev => prev.map((x, i) => i === idx ? { ...x, monto: e.target.value } : x))} className="w-full border border-zinc-200 rounded-md p-1 pl-4 bg-white font-mono text-xs font-bold outline-hidden" /></div></td>
-                          <td className="p-2 text-center"><button type="button" onClick={() => setBeneficiarios(prev => prev.filter((_, i) => i !== idx))} className="p-1 hover:bg-red-50 text-zinc-400 hover:text-red-650 rounded-md border-none bg-transparent cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                          <td className="p-2 text-center"><button type="button" onClick={() => setBeneficiarios(prev => prev.filter((_, i) => i !== idx))} className="p-1 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-md border-none bg-transparent cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button></td>
                         </tr>
                       );
                     })}
@@ -184,7 +184,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-zinc-550 font-bold block text-[10px] uppercase">Vía de Pago</label>
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Vía de Pago</label>
               <select value={pagoForm.medio_pago} onChange={e => setPagoForm(prev => ({ ...prev, medio_pago: e.target.value as MedioPago }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium">
                 <option value="EFECTIVO">Efectivo</option>
                 <option value="TRANSFERENCIA">Transferencia Bancaria</option>
@@ -194,12 +194,12 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-zinc-550 font-bold block text-[10px] uppercase">Ref / ID Transacción</label>
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Ref / ID Transacción</label>
               <input type="text" placeholder="ej: MP-90382211 (opcional)" value={pagoForm.hash_transaccion} onChange={e => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden font-medium" />
             </div>
           </div>
           <div className="bg-zinc-50 border border-zinc-200 p-3 rounded-lg flex justify-between items-center text-xs">
-            <span className="font-semibold text-zinc-550">Total de la Transacción:</span>
+            <span className="font-semibold text-zinc-500">Total de la Transacción:</span>
             <span className="font-mono font-bold text-emerald-600 text-sm">${beneficiarios.reduce((sum, b) => sum + (parseFloat(b.monto) || 0), 0).toLocaleString('es-AR')} ARS</span>
           </div>
           <div className="pt-4 border-t border-zinc-100 flex justify-end gap-2 text-xs font-semibold">

@@ -72,7 +72,7 @@ export const NovedadesCRUD: React.FC = () => {
 
       {/* SUCCESS NOTIFICATION */}
       {successMsg && (
-        <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-150 rounded-xl text-xs flex items-center gap-2 font-sans">
+        <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-xl text-xs flex items-center gap-2 font-sans">
           <Check className="w-4 h-4 text-emerald-600" />
           {successMsg}
         </div>

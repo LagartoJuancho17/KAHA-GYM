@@ -171,12 +171,12 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
           <div className="border border-zinc-200 p-4 rounded-xl">
             <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-2 font-sans border-b border-zinc-100 pb-2">Turno Variable Reservado (Tiempo Real)</h4>
             {selectedCliente.turno_variable ? (
-              <div className="bg-emerald-50 border border-emerald-150 py-2 px-3 rounded-lg flex justify-between items-center text-emerald-900 font-semibold text-xs">
+              <div className="bg-emerald-50 border border-emerald-100 py-2 px-3 rounded-lg flex justify-between items-center text-emerald-900 font-semibold text-xs">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   <span>Reserva Variable Activa:</span>
                 </span>
-                <span className="font-mono bg-white px-2 py-0.5 border border-emerald-150 rounded text-[11px]">
+                <span className="font-mono bg-white px-2 py-0.5 border border-emerald-100 rounded text-[11px]">
                   {selectedCliente.turno_variable.split('-')[0]} — {selectedCliente.turno_variable.split('-')[1]}hs
                 </span>
               </div>
@@ -213,7 +213,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-4 border-t border-zinc-150 flex gap-3 justify-end bg-zinc-50 -mx-6 -mb-6 p-6">
+          <div className="pt-4 border-t border-zinc-100 flex gap-3 justify-end bg-zinc-50 -mx-6 -mb-6 p-6">
             <button
               onClick={() => {
                 onDeleteClick(selectedCliente);

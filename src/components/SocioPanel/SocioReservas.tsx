@@ -239,7 +239,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
               Balance de Reservas
             </span>
             <h3 className="text-base font-black text-slate-800 tracking-tight mt-1.5 flex items-center gap-2">
-              <CalendarDays className="w-5.5 h-5.5 text-emerald-650" />
+              <CalendarDays className="w-5.5 h-5.5 text-emerald-600" />
               <span>CONTROL DE CUPOS Y TURNOS</span>
             </h3>
           </div>
@@ -254,7 +254,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
         </div>
 
         {/* Metrics Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50/50 p-4.5 rounded-2xl border border-slate-150 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50/50 p-4.5 rounded-2xl border border-slate-100 text-xs">
           <div className="space-y-1">
             <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Cupos Mensuales Plan</p>
             <p className="text-lg font-black text-slate-800">{totalMonthlySlots} <span className="text-xs text-slate-400 font-medium">clases</span></p>
@@ -284,13 +284,13 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
 
         {/* Sessions list */}
         <div className="space-y-3.5">
-          <h4 className="text-xs font-black text-slate-450 uppercase tracking-widest font-mono">Mis Sesiones Programadas ({paidMonth})</h4>
+          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest font-mono">Mis Sesiones Programadas ({paidMonth})</h4>
           
           {sesionesDelMes.length === 0 ? (
-            <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-205 rounded-2xl">
-              <Calendar className="w-9 h-9 text-slate-305 mx-auto mb-2" />
+            <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+              <Calendar className="w-9 h-9 text-slate-300 mx-auto mb-2" />
               <p className="font-bold text-xs text-slate-700">No tienes sesiones programadas para este mes</p>
-              <p className="text-[10px] text-slate-505 mt-1 max-w-sm mx-auto">
+              <p className="text-[10px] text-slate-500 mt-1 max-w-sm mx-auto">
                 Tus días fijos y reservas aparecerán aquí. Presiona "Reservar nuevo cupo" para agendar clases.
               </p>
             </div>
@@ -320,8 +320,8 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                           sesion.isSuspended 
                             ? 'bg-slate-100 text-slate-400 border-slate-200'
                             : sesion.tipo === 'FIJO' 
-                              ? 'bg-sky-100 text-sky-700 border-sky-150' 
-                              : 'bg-emerald-100 text-emerald-700 border-emerald-150'
+                              ? 'bg-sky-100 text-sky-700 border-sky-100' 
+                              : 'bg-emerald-100 text-emerald-700 border-emerald-100'
                         }`}>
                           <Calendar className="w-4.5 h-4.5" />
                         </div>
@@ -339,7 +339,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                       {sesion.isSuspended ? (
                         <span className={`text-[8px] font-bold tracking-wider px-2 py-0.5 rounded font-mono border ${
                           sesion.suspendedInfo?.reintegrado 
-                            ? 'bg-emerald-50 text-emerald-805 border-emerald-200' 
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                             : 'bg-rose-50 text-rose-800 border-rose-200'
                         }`}>
                           {sesion.suspendedInfo?.reintegrado ? 'SUSPENDIDA (REINTEGRADO)' : 'SUSPENDIDA (SIN REINTEGRO)'}
@@ -347,8 +347,8 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                       ) : (
                         <span className={`text-[8px] font-bold tracking-wider px-2 py-0.5 rounded font-mono border ${
                           sesion.tipo === 'FIJO' 
-                            ? 'bg-sky-50 text-sky-850 border-sky-200' 
-                            : 'bg-emerald-50 text-emerald-805 border-emerald-200'
+                            ? 'bg-sky-50 text-sky-800 border-sky-200' 
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                         }`}>
                           {sesion.tipo === 'FIJO' ? 'FIJO' : 'INDIVIDUAL'}
                         </span>
@@ -372,7 +372,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                                 }
                               }
                             }}
-                            className="text-[9px] font-bold text-slate-500 hover:text-rose-605 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                            className="text-[9px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
                           >
                             <X className="w-3.5 h-3.5" />
                             Suspender clase
@@ -391,7 +391,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                                 }
                               }
                             }}
-                            className="text-[9px] font-bold text-slate-500 hover:text-rose-605 bg-slate-50 hover:bg-rose-50 border border-slate-205 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                            className="text-[9px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
                           >
                             <X className="w-3.5 h-3.5" />
                             Cancelar reserva
@@ -431,7 +431,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
               return (
                 <div key={w.id} className="bg-white border border-teal-100 rounded-xl p-3.5 shadow-3xs flex justify-between items-center gap-3">
                   <div>
-                    <p className="text-xs font-bold text-slate-805 capitalize">
+                    <p className="text-xs font-bold text-slate-800 capitalize">
                       {dateFormatted}
                     </p>
                     <p className="text-[10px] text-slate-500 font-mono mt-0.5">
@@ -462,10 +462,10 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
 
       {/* 3. RECUPEROS PENDIENTES */}
       {pendingRecuperos.length > 0 && (
-        <div className="p-5 bg-amber-50/50 border border-amber-250 rounded-2xl">
+        <div className="p-5 bg-amber-50/50 border border-amber-200 rounded-2xl">
           <div className="flex items-center gap-2 mb-3">
             <CalendarClock className="w-5.5 h-5.5 text-amber-600 animate-pulse" />
-            <h3 className="text-xs font-black uppercase text-amber-805 tracking-wider font-mono">
+            <h3 className="text-xs font-black uppercase text-amber-800 tracking-wider font-mono">
               Mis Recuperos Pendientes de Reprogramación
             </h3>
           </div>
@@ -492,7 +492,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2.5 border-b border-slate-100 text-xs">
                     <div>
                       <span className="font-bold text-slate-800">Inasistencia registrada: {dateFormatted}</span>
-                      <span className="text-[10px] text-slate-450 block font-mono mt-0.5">
+                      <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
                         Turno original: {originalTurn ? `${originalTurn.hora.slice(0, 5)} hs (${originalTurn.dia})` : rec.turno_original_id}
                       </span>
                     </div>
@@ -521,7 +521,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-550 uppercase tracking-wide block">Escoge Horario de Grilla:</label>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Escoge Horario de Grilla:</label>
                           <select
                             value={canjeTurnoId}
                             onChange={(e) => {
@@ -540,7 +540,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-slate-550 uppercase tracking-wide block">Escoge Fecha Destino:</label>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Escoge Fecha Destino:</label>
                           {canjeTurnoId ? (
                             <select
                               value={canjeFecha}
@@ -573,13 +573,13 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                               type="text"
                               disabled
                               placeholder="Selecciona primero un turno"
-                              className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-100/50 text-slate-450 font-mono cursor-not-allowed"
+                              className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-100/50 text-slate-400 font-mono cursor-not-allowed"
                             />
                           )}
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-150">
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                         <button
                           type="button"
                           onClick={handleCancelCanje}
@@ -608,12 +608,12 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
       {/* 4. DYNAMIC WHATSAPP BOX */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6.5 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-6" id="socio-whatsapp-support">
         <div className="flex-1 space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-150 text-emerald-700 font-mono text-[8px] uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 font-mono text-[8px] uppercase tracking-wider">
             <Phone className="w-3 h-3 text-emerald-500" />
             Soporte KAHA GYM
           </div>
           <h3 className="text-base font-black text-slate-800 tracking-tight">¿Deseas cambiar un turno fijo asignado?</h3>
-          <p className="text-slate-550 text-xs leading-relaxed max-w-2xl font-medium">
+          <p className="text-slate-500 text-xs leading-relaxed max-w-2xl font-medium">
             Los turnos fijos semanales son permanentes y deben ser aprobados o modificados por un Operador / Profesor. Puedes iniciar un chat directo de WhatsApp con nuestro equipo administrativo haciendo click a la derecha.
           </p>
         </div>

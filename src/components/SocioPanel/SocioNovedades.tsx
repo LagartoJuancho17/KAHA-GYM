@@ -7,9 +7,9 @@ export const SocioNovedades: React.FC = () => {
   const { novedades } = useGym();
 
   return (
-    <section className="bg-white border border-slate-205 rounded-3xl p-6.5 lg:p-8 shadow-sm space-y-6 animate-fade-in" id="socio-novedades-cartelera">
+    <section className="bg-white border border-slate-200 rounded-3xl p-6.5 lg:p-8 shadow-sm space-y-6 animate-fade-in" id="socio-novedades-cartelera">
       <div>
-        <h3 className="text-sm font-black text-slate-850 uppercase tracking-wider font-mono flex items-center gap-2 mb-2 pb-3 border-b border-slate-150">
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider font-mono flex items-center gap-2 mb-2 pb-3 border-b border-slate-100">
           <Megaphone className="w-4.5 h-4.5 text-emerald-600 animate-pulse" />
           CARTELERA OFICIAL DE SOCIOS Y CIRCULARES
         </h3>
@@ -19,7 +19,7 @@ export const SocioNovedades: React.FC = () => {
       </div>
 
       {novedades.length === 0 ? (
-        <div className="text-center py-12 text-slate-405 text-xs italic">
+        <div className="text-center py-12 text-slate-400 text-xs italic">
           No hay publicaciones ni comunicados activos en la cartelera por el momento.
         </div>
       ) : (
@@ -34,7 +34,7 @@ export const SocioNovedades: React.FC = () => {
             let badgeCls = 'bg-sky-500/15 text-sky-800 border-sky-300';
             let titleCls = 'text-sky-950';
             let bodyCls = 'text-sky-900/80';
-            let footerCls = 'border-sky-200/60 text-sky-650/70';
+            let footerCls = 'border-sky-200/60 text-sky-600/70';
             let accentBar = 'bg-sky-500';
             let labelTxt = 'Información General';
 
@@ -43,7 +43,7 @@ export const SocioNovedades: React.FC = () => {
               badgeCls = 'bg-emerald-500/15 text-emerald-800 border-emerald-300';
               titleCls = 'text-emerald-950';
               bodyCls = 'text-emerald-900/80';
-              footerCls = 'border-emerald-200/60 text-emerald-650/70';
+              footerCls = 'border-emerald-200/60 text-emerald-600/70';
               accentBar = 'bg-emerald-500';
               labelTxt = 'Aranceles y Pagos';
             } else if (isTurno) {
@@ -51,15 +51,15 @@ export const SocioNovedades: React.FC = () => {
               badgeCls = 'bg-teal-500/15 text-teal-800 border-teal-300';
               titleCls = 'text-teal-950';
               bodyCls = 'text-teal-900/80';
-              footerCls = 'border-teal-200/60 text-teal-655/70';
+              footerCls = 'border-teal-200/60 text-teal-700/70';
               accentBar = 'bg-teal-500';
               labelTxt = 'Horarios y Turnos';
             } else if (isEvento) {
               cardBg = 'bg-gradient-to-br from-amber-50 to-amber-100/60 border-amber-200';
               badgeCls = 'bg-amber-500/15 text-amber-800 border-amber-300';
-              titleCls = 'text-amber-955';
+              titleCls = 'text-amber-950';
               bodyCls = 'text-amber-900/80';
-              footerCls = 'border-amber-200/60 text-amber-655/70';
+              footerCls = 'border-amber-200/60 text-amber-700/70';
               accentBar = 'bg-amber-500';
               labelTxt = 'Talleres y Eventos';
             }

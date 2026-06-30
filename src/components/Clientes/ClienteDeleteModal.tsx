@@ -29,12 +29,12 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
   if (!isOpen || !cliente) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-955/75 z-[60] flex items-center justify-center p-4 backdrop-blur-sm font-sans" id="confirm-delete-double-modal">
+    <div className="fixed inset-0 bg-slate-950/75 z-[60] flex items-center justify-center p-4 backdrop-blur-sm font-sans" id="confirm-delete-double-modal">
       <div className="bg-white rounded-2xl shadow-2xl border border-red-100 w-full max-w-md overflow-hidden animate-scale-in">
         
         {/* Header */}
         <div className="bg-red-50 border-b border-red-100 p-5 flex items-center gap-3">
-          <div className="p-2.5 bg-red-100 text-red-650 rounded-xl">
+          <div className="p-2.5 bg-red-100 text-red-600 rounded-xl">
             <AlertCircle className="w-5 h-5 text-red-600 animate-bounce" />
           </div>
           <div>
@@ -45,7 +45,7 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
 
         {/* Body Info */}
         <div className="p-5 space-y-4">
-          <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-3 text-xs font-sans">
+          <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3 text-xs font-sans">
             <span className="text-[10px] uppercase font-bold text-zinc-400 font-mono block">Socio Seleccionado</span>
             <span className="font-bold text-zinc-900 text-sm block">
               {cliente.apellido}, {cliente.nombre}
@@ -53,7 +53,7 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
             <span className="text-zinc-500 font-mono text-[10px] block mt-0.5">ID: {cliente.id} | Email: {cliente.email}</span>
           </div>
 
-          <div className="text-xs text-zinc-650 leading-relaxed space-y-2 bg-red-50/40 p-3 rounded-lg border border-red-100/50 font-sans">
+          <div className="text-xs text-zinc-600 leading-relaxed space-y-2 bg-red-50/40 p-3 rounded-lg border border-red-100/50 font-sans">
             <p className="font-bold text-red-950">⚠️ ADVERTENCIA DE SEGURIDAD CRÍTICA:</p>
             <ul className="list-disc pl-4 space-y-1 text-[11px] text-zinc-700 font-sans">
               <li>Se eliminará permanentemente de la base de datos de <strong>KAHA GYM</strong>.</li>
@@ -69,7 +69,7 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
                 type="checkbox"
                 checked={confirmCheck}
                 onChange={(e) => setConfirmCheck(e.target.checked)}
-                className="w-4.5 h-4.5 accent-red-650 rounded border-zinc-300 mt-0.5 cursor-pointer"
+                className="w-4.5 h-4.5 accent-red-600 rounded border-zinc-300 mt-0.5 cursor-pointer"
                 id="checkbox-confirm-delete"
               />
               <span className="text-[11px] font-bold text-zinc-800 leading-tight">
@@ -96,11 +96,11 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
         </div>
 
         {/* Footer Buttons */}
-        <div className="bg-zinc-50 px-5 py-4 border-t border-zinc-150 flex gap-3 font-sans">
+        <div className="bg-zinc-50 px-5 py-4 border-t border-zinc-100 flex gap-3 font-sans">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 font-bold rounded-xl text-xs transition-all cursor-pointer border border-zinc-305 !py-2.5"
+            className="flex-1 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 font-bold rounded-xl text-xs transition-all cursor-pointer border border-zinc-300 !py-2.5"
             id="btn-cancel-hard-delete"
           >
             Cancelar
@@ -114,7 +114,7 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
             }}
             className={`flex-1 font-bold rounded-xl text-xs border transition-all cursor-pointer !py-2.5 ${
               confirmCheck && confirmText === 'ELIMINAR'
-                ? 'bg-red-600 hover:bg-red-700 text-white border-red-750 shadow-xs'
+                ? 'bg-red-600 hover:bg-red-700 text-white border-red-700 shadow-xs'
                 : 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed'
             }`}
             id="btn-confirm-hard-delete-action"

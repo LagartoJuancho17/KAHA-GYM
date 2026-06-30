@@ -224,7 +224,7 @@ export const PlanesPricing: React.FC = () => {
                             {sign}${diff.toLocaleString('es-AR')} ({sign}{percent}%)
                           </span>
                         </td>
-                        <td className="p-3 text-zinc-500">{new Date(h.fecha_change || h.fecha_cambio).toLocaleString('es-AR')}</td>
+                        <td className="p-3 text-zinc-500">{new Date(h.fecha_cambio).toLocaleString('es-AR')}</td>
                         <td className="p-3 font-mono text-zinc-400 text-[10px]">{h.cambiado_por}</td>
                       </tr>
                     );
