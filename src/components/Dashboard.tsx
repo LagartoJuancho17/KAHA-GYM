@@ -250,7 +250,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="bg-amber-50/60 backdrop-blur-xs border border-amber-200 p-5 rounded-2xl space-y-4 shadow-xs animate-fade-in" id="pending-authorizations-section-dashboard">
           <div className="flex items-center justify-between border-b border-amber-200/50 pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-250/50">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-200/50">
                 <AlertCircle className="w-4 h-4 text-amber-600 animate-pulse" />
               </div>
               <div>
@@ -273,7 +273,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-zinc-900 text-xs truncate leading-none mb-1">{c.apellido}, {c.nombre}</p>
                     <p className="text-[10px] text-zinc-500 truncate leading-none mb-2" title={c.email}>{c.email}</p>
-                    <span className="text-[9px] text-zinc-400 font-sans bg-zinc-50 px-2 py-0.5 rounded-md border border-zinc-150">
+                    <span className="text-[9px] text-zinc-400 font-sans bg-zinc-50 px-2 py-0.5 rounded-md border border-zinc-100">
                       Registrado: {new Date(c.creado_at).toLocaleDateString('es-AR')}
                     </span>
                   </div>
@@ -299,7 +299,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         eliminarCliente(c.id);
                       }
                     }}
-                    className="bg-red-50 hover:bg-red-100 text-red-650 p-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                    className="bg-red-50 hover:bg-red-100 text-red-600 p-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
                     title="Rechazar solicitud"
                   >
                     <X className="w-4 h-4" />
@@ -677,7 +677,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <span className="font-bold text-slate-800 tracking-tight">{n.titulo}</span>
                       <span className="text-[8px] font-mono text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">CONFIRMADO</span>
                     </div>
-                    <p className="text-[10px] text-slate-655 font-medium leading-relaxed font-sans">{n.mensaje}</p>
+                    <p className="text-[10px] text-slate-700 font-medium leading-relaxed font-sans">{n.mensaje}</p>
                     <span className="text-[8px] text-zinc-400 block font-mono">
                       {new Date(n.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} - {new Date(n.fecha).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                     </span>

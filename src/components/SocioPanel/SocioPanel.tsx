@@ -72,13 +72,13 @@ export const SocioPanel: React.FC = () => {
 
       {/* ERROR & SUCCESS STATUS BANNER */}
       {successMessage && (
-        <div className="bg-emerald-50 border border-emerald-205 text-emerald-805 p-4 rounded-2xl font-semibold flex items-center gap-2.5 animate-flash-success shadow-xs text-xs">
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl font-semibold flex items-center gap-2.5 animate-flash-success shadow-xs text-xs">
           <span className="w-5 h-5 text-emerald-600 shrink-0 bg-emerald-100 p-1 rounded-full border border-emerald-200 flex items-center justify-center">✓</span>
           <span className="font-sans leading-none">{successMessage}</span>
         </div>
       )}
       {errorMessage && (
-        <div className="bg-rose-50 border border-rose-205 text-rose-800 p-4 rounded-2xl font-semibold flex items-center gap-2.5 shadow-xs text-xs">
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl font-semibold flex items-center gap-2.5 shadow-xs text-xs">
           <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 bg-rose-100 p-1 rounded-full border border-rose-200" />
           <span className="font-sans leading-none">{errorMessage}</span>
         </div>
@@ -124,7 +124,7 @@ export const SocioPanel: React.FC = () => {
                     )}
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-[9px] text-slate-400 font-mono">
-                        <span className="bg-emerald-500/20 px-1.5 py-0.2 rounded border border-emerald-500/30 uppercase font-bold text-emerald-305">
+                        <span className="bg-emerald-500/20 px-1.5 py-0.2 rounded border border-emerald-500/30 uppercase font-bold text-emerald-300">
                           {nov.categoria}
                         </span>
                         <span>{nov.fecha}</span>
@@ -149,7 +149,7 @@ export const SocioPanel: React.FC = () => {
           {/* Bento grid and member info details */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6" id="socio-bento-dashboard">
             {/* Card A: Credential Pass */}
-            <div className="bg-gradient-to-tr from-slate-50 via-white to-emerald-50/20 border border-slate-205 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm transition-all hover:border-emerald-400 group text-xs" id="socio-card-member">
+            <div className="bg-gradient-to-tr from-slate-50 via-white to-emerald-50/20 border border-slate-200 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm transition-all hover:border-emerald-400 group text-xs" id="socio-card-member">
               <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-emerald-500 to-sky-400 rounded-full blur-2xl opacity-10 group-hover:opacity-15 transition-opacity -mr-10 -mt-10 pointer-events-none"></div>
               
               <div className="flex justify-between items-start">
@@ -160,14 +160,14 @@ export const SocioPanel: React.FC = () => {
                   </div>
                   <h2 className="text-sm font-black text-slate-800 mt-2 tracking-tight">CREDENTIAL PASS</h2>
                 </div>
-                <div className="text-slate-400 group-hover:text-emerald-650 transition-colors">
+                <div className="text-slate-400 group-hover:text-emerald-600 transition-colors">
                   <QrCode className="w-7 h-7" />
                 </div>
               </div>
 
               <div className="py-2">
                 <p className="text-[9px] text-slate-400 font-mono select-all tracking-wider">MEMBER NO: {socio.id.toUpperCase()}</p>
-                <p className="text-lg font-black text-slate-850 tracking-wider uppercase mt-0.5">{socio.nombre} {socio.apellido}</p>
+                <p className="text-lg font-black text-slate-800 tracking-wider uppercase mt-0.5">{socio.nombre} {socio.apellido}</p>
               </div>
 
               <div className="border-t border-slate-200 pt-3 flex items-center justify-between">
@@ -184,16 +184,16 @@ export const SocioPanel: React.FC = () => {
             </div>
 
             {/* Card B: Membership Plan */}
-            <div className="bg-white border border-slate-205 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm hover:border-slate-300 transition-all text-xs" id="socio-card-plan">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm hover:border-slate-300 transition-all text-xs" id="socio-card-plan">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-[10px] font-mono text-sky-700 bg-sky-50 border border-sky-105 px-2.5 py-0.5 rounded-full tracking-wider uppercase font-bold">
+                  <span className="text-[10px] font-mono text-sky-700 bg-sky-50 border border-sky-100 px-2.5 py-0.5 rounded-full tracking-wider uppercase font-bold">
                     Plan Vigente
                   </span>
-                  <h3 className="text-lg font-black text-slate-805 tracking-tight mt-2.5">
+                  <h3 className="text-lg font-black text-slate-800 tracking-tight mt-2.5">
                     {planSocio ? planSocio.nombre : 'Abono Individual'}
                   </h3>
-                  <p className="text-slate-550 text-xs mt-1.5 leading-relaxed font-semibold">
+                  <p className="text-slate-500 text-xs mt-1.5 leading-relaxed font-semibold">
                     {planSocio ? `Gimnasio completo con acceso a ${planSocio.dias_por_semana} clases semanales.` : 'Sin especificación de plan contratado.'}
                   </p>
                   {planSocio && (
@@ -202,7 +202,7 @@ export const SocioPanel: React.FC = () => {
                     </p>
                   )}
                 </div>
-                <div className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-sky-600">
+                <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sky-600">
                   <CreditCard className="w-4.5 h-4.5" />
                 </div>
               </div>
@@ -277,7 +277,7 @@ export const SocioPanel: React.FC = () => {
 
       {/* Floating WhatsApp Button */}
       <div className="fixed bottom-24 right-5 z-50 flex flex-col items-end gap-2 group text-xs" id="floating-whatsapp-container">
-        <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 text-slate-800 px-3.5 py-2 rounded-2xl shadow-lg text-[11px] font-bold tracking-tight opacity-0 scale-90 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none select-none font-sans flex items-center gap-2 border-emerald-105">
+        <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 text-slate-800 px-3.5 py-2 rounded-2xl shadow-lg text-[11px] font-bold tracking-tight opacity-0 scale-90 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none select-none font-sans flex items-center gap-2 border-emerald-100">
           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
           <span>¿Consultas? Chateá con nosotros</span>
         </div>

@@ -212,7 +212,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         <div className="bg-amber-50/60 backdrop-blur-xs border border-amber-200 p-5 rounded-2xl space-y-4 shadow-xs animate-fade-in" id="pending-authorizations-section">
           <div className="flex items-center justify-between border-b border-amber-200/50 pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-250/50">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-200/50">
                 <AlertCircle className="w-4 h-4 text-amber-600 animate-pulse" />
               </div>
               <div>
@@ -235,7 +235,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-zinc-900 text-xs truncate leading-none mb-1">{c.apellido}, {c.nombre}</p>
                     <p className="text-[10px] text-zinc-500 truncate leading-none mb-2" title={c.email}>{c.email}</p>
-                    <span className="text-[9px] text-zinc-400 font-sans bg-zinc-50 px-2 py-0.5 rounded-md border border-zinc-150">
+                    <span className="text-[9px] text-zinc-400 font-sans bg-zinc-50 px-2 py-0.5 rounded-md border border-zinc-100">
                       Registrado: {new Date(c.creado_at).toLocaleDateString('es-AR')}
                     </span>
                   </div>
@@ -257,7 +257,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                         eliminarCliente(c.id);
                       }
                     }}
-                    className="bg-red-55 hover:bg-red-100 text-red-650 p-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                    className="bg-red-50 hover:bg-red-100 text-red-600 p-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
                     title="Rechazar solicitud"
                   >
                     <X className="w-4 h-4" />

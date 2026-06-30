@@ -84,15 +84,15 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
           )}
 
           {turnosModalSuccess && (
-            <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg flex items-center gap-2 border border-emerald-250">
+            <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg flex items-center gap-2 border border-emerald-200">
               <CheckCircle className="w-4 h-4 text-emerald-600" />
               <span>{turnosModalSuccess}</span>
             </div>
           )}
 
           {/* Plan stats */}
-          <div className="bg-zinc-50 border border-zinc-150 p-3 rounded-lg text-[11px] text-zinc-650 space-y-1">
-            <span className="font-semibold text-zinc-850 block">Membresía actual: {plan ? plan.nombre : 'Plan base'}</span>
+          <div className="bg-zinc-50 border border-zinc-100 p-3 rounded-lg text-[11px] text-zinc-600 space-y-1">
+            <span className="font-semibold text-zinc-800 block">Membresía actual: {plan ? plan.nombre : 'Plan base'}</span>
             <span>Permite un máximo de <strong className="text-zinc-900">{plan ? plan.dias_por_semana : 5}</strong> días fijos semanales.</span>
             <span className="block mt-1">Ocupados actualmente: <strong className="text-zinc-900">{activeClient.turnos_fijos.length}</strong></span>
           </div>
@@ -117,7 +117,7 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
                         setTurnosModalError('');
                         setTimeout(() => setTurnosModalSuccess(''), 2000);
                       }}
-                      className="text-red-500 hover:text-red-750 p-1.5 bg-red-55 hover:bg-red-100 rounded-md border border-red-100 transition-colors cursor-pointer text-[10px] font-bold"
+                      className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 hover:bg-red-100 rounded-md border border-red-100 transition-colors cursor-pointer text-[10px] font-bold"
                       title="Remover turno"
                     >
                       Remover
@@ -130,7 +130,7 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
 
           {/* Reservar Nuevo Turno */}
           {activeClient.tipo === 'FIJO' && (
-            <div className="pt-4 border-t border-zinc-150 space-y-2">
+            <div className="pt-4 border-t border-zinc-100 space-y-2">
               <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest block font-sans">Reservar Nuevo Horario Semanal</span>
               <div className="flex gap-2">
                 <select
@@ -158,7 +158,7 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
 
           {activeClient.tipo === 'FLEXIBLE' && (
             <div className="pt-2 border-t border-zinc-100">
-              <p className="text-zinc-550 italic text-[11px] leading-relaxed">
+              <p className="text-zinc-500 italic text-[11px] leading-relaxed">
                 * Nota: El socio es de membresía **FLEXIBLE**. Los socios flexibles no poseen turnos semanales fijos, sino que reservan de forma individual cada clase según disponibilidad de la agenda general.
               </p>
             </div>

@@ -30,7 +30,7 @@ export const MorososList: React.FC<MorososListProps> = ({
       <div className="bg-zinc-50 px-5 py-4 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
         <h3 className="font-sans font-bold text-zinc-900 leading-none">Miembros con deuda activa registrada</h3>
         
-        <div className="flex text-xs bg-white p-0.5 rounded-lg border border-zinc-250 font-sans">
+        <div className="flex text-xs bg-white p-0.5 rounded-lg border border-zinc-200 font-sans">
           <button
             onClick={() => setFiltroMora('TODOS')}
             className={`px-3 py-1 rounded-md transition-all border-none bg-transparent cursor-pointer ${filtroMora === 'TODOS' ? 'bg-zinc-900 text-white font-bold' : 'text-zinc-500 hover:text-zinc-900'}`}
@@ -77,13 +77,13 @@ export const MorososList: React.FC<MorososListProps> = ({
                 return (
                   <tr key={c.id} className="hover:bg-zinc-50/50">
                     <td className="p-4">
-                      <div className="font-bold text-zinc-955 flex items-center gap-1.5 flex-wrap">
+                      <div className="font-bold text-zinc-950 flex items-center gap-1.5 flex-wrap">
                         <span>{c.apellido}, {c.nombre}</span>
                         {c.exencion_cobro && c.exencion_cobro !== 'NINGUNA' && (
                           <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold uppercase shrink-0 ${
-                            c.exencion_cobro === 'SUSPENDIDO' ? 'bg-amber-100 text-amber-700 border border-amber-205' :
-                            c.exencion_cobro === 'POSTERGADO' ? 'bg-cyan-100 text-cyan-700 border border-cyan-205' :
-                            'bg-emerald-100 text-emerald-705 border border-emerald-205'
+                            c.exencion_cobro === 'SUSPENDIDO' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                            c.exencion_cobro === 'POSTERGADO' ? 'bg-cyan-100 text-cyan-700 border border-cyan-200' :
+                            'bg-emerald-100 text-emerald-700 border border-emerald-200'
                           }`}>
                             {c.exencion_cobro === 'SUSPENDIDO' ? 'Cobro Suspendido' :
                              c.exencion_cobro === 'POSTERGADO' ? 'Postergado' : 'Perdonado'}
@@ -96,14 +96,14 @@ export const MorososList: React.FC<MorososListProps> = ({
                       <span className="font-semibold text-zinc-800">{pl ? pl.nombre : 'Plan base'}</span>
                     </td>
                     <td className="p-4 font-mono text-zinc-600">{c.ultimo_mes_pagado || 'Sin abonos'}</td>
-                    <td className="p-4 text-zinc-955 font-bold">
+                    <td className="p-4 text-zinc-950 font-bold">
                       {c.estado === 'MOROSO' ? (
                         <span className="font-mono text-red-600 font-bold">{c.atrasoDias} días de atraso</span>
                       ) : (
                         <span className="font-sans text-zinc-400 font-normal">Dentro de fecha límite</span>
                       )}
                     </td>
-                    <td className="p-4 font-mono font-bold text-red-655">
+                    <td className="p-4 font-mono font-bold text-red-700">
                       ${c.deuda_acumulada.toLocaleString('es-AR')}
                     </td>
                     <td className="p-4 text-center">

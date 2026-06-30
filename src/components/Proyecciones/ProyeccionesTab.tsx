@@ -72,7 +72,7 @@ export const ProyeccionesTab: React.FC = () => {
           <div className="space-y-2">
             <h3 className="font-sans font-bold text-zinc-900 text-sm">Información Restringida por Rol (RLS)</h3>
             <p className="text-zinc-500 text-xs leading-relaxed font-medium">
-              El perfil de <strong className="text-red-650 font-bold">OPERADOR</strong> no posee los privilegios necesarios de Base de Datos para acceder a las proyecciones comerciales, cálculos de ingresos teóricos y análisis de capacidad de KAHA GYM.
+              El perfil de <strong className="text-red-600 font-bold">OPERADOR</strong> no posee los privilegios necesarios de Base de Datos para acceder a las proyecciones comerciales, cálculos de ingresos teóricos y análisis de capacidad de KAHA GYM.
             </p>
             <p className="text-zinc-400 text-[11px]">
               Por favor, cambie su rol operativo a <strong className="text-zinc-950 font-semibold">ADMIN (Acceso Total)</strong> en el switcher superior para desbloquear esta sección.
@@ -180,7 +180,7 @@ export const ProyeccionesTab: React.FC = () => {
                       <td className="p-3 font-semibold text-zinc-950">{p.nombre}</td>
                       <td className="p-3 text-zinc-500">{p.dias_por_semana} sesiones fijas</td>
                       <td className="p-3 text-center font-mono font-bold text-zinc-900">{p.cant} alumnos</td>
-                      <td className="p-3 font-mono text-zinc-650">${p.precio.toLocaleString('es-AR')}</td>
+                      <td className="p-3 font-mono text-zinc-600">${p.precio.toLocaleString('es-AR')}</td>
                       <td className="p-3 text-right font-mono font-bold text-zinc-950">${p.subtotal.toLocaleString('es-AR')}</td>
                     </tr>
                   ))}

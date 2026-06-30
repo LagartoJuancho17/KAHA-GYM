@@ -22,25 +22,25 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
     switch (category) {
       case 'ARANCELES':
         return {
-          bg: 'bg-emerald-50 text-emerald-800 border-emerald-150',
+          bg: 'bg-emerald-50 text-emerald-800 border-emerald-100',
           dot: 'bg-emerald-500',
           label: 'Aranceles y Pagos'
         };
       case 'TURNOS':
         return {
-          bg: 'bg-teal-50 text-teal-800 border-teal-150',
+          bg: 'bg-teal-50 text-teal-800 border-teal-100',
           dot: 'bg-teal-500',
           label: 'Horarios y Turnos'
         };
       case 'EVENTOS':
         return {
-          bg: 'bg-amber-50 text-amber-800 border-amber-150',
+          bg: 'bg-amber-50 text-amber-800 border-amber-100',
           dot: 'bg-amber-500',
           label: 'Talleres y Eventos'
         };
       default:
         return {
-          bg: 'bg-sky-50 text-sky-800 border-sky-150',
+          bg: 'bg-sky-50 text-sky-800 border-sky-100',
           dot: 'bg-sky-500',
           label: 'Información General'
         };
@@ -71,7 +71,7 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
           <div 
             key={nov.id} 
             className={`bg-white border rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-sm relative overflow-hidden transition-all hover:shadow-md ${
-              nov.destacado ? 'border-amber-250 ring-2 ring-amber-500/10' : 'border-slate-205'
+              nov.destacado ? 'border-amber-200 ring-2 ring-amber-500/10' : 'border-slate-200'
             }`}
           >
             {nov.destacado && (
@@ -87,7 +87,7 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
                 <span className={`px-2 py-0.5 border rounded-md text-[9px] font-black uppercase tracking-wider font-mono ${theme.bg}`}>
                   {theme.label}
                 </span>
-                <span className="text-[10px] text-slate-450 font-mono flex items-center gap-1">
+                <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   {nov.fecha}
                 </span>
@@ -97,7 +97,7 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
                 {nov.titulo}
               </h3>
 
-              <p className="text-slate-650 text-xs font-sans whitespace-pre-line leading-relaxed">
+              <p className="text-slate-600 text-xs font-sans whitespace-pre-line leading-relaxed">
                 {nov.contenido}
               </p>
             </div>
@@ -133,7 +133,7 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
                 <button
                   onClick={() => onDelete(nov.id)}
                   title="Remover circular"
-                  className="p-1.5 bg-white border border-slate-200 rounded-lg text-rose-505 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-all cursor-pointer"
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-all cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4 text-rose-500" />
                 </button>

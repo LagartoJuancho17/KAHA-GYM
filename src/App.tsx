@@ -13,6 +13,7 @@ import { AuditLogView } from './components/AuditLog/AuditLogView';
 import { SocioPanel } from './components/SocioPanel/SocioPanel';
 import { GoogleSignIn } from './components/Auth/GoogleSignIn';
 import { NovedadesCRUD } from './components/Novedades/NovedadesCRUD';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
@@ -217,12 +218,12 @@ function InnerApp() {
                     autorizarCliente(socioAsociado.id);
                     window.location.reload();
                   }}
-                  className="w-full py-2 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-250 border-dashed font-bold text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  className="w-full py-2 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-200 border-dashed font-bold text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Check className="w-3.5 h-3.5" />
                   Simular Aprobación de Admin
                 </button>
-                <p className="text-[9px] text-slate-450 mt-1 text-center">
+                <p className="text-[9px] text-slate-400 mt-1 text-center">
                   (Como la base es local/localStorage, los navegadores de incógnito o diferentes no comparten base de datos. Haz click aquí para autorizar esta sesión local)
                 </p>
               </div>
@@ -298,7 +299,9 @@ function InnerApp() {
         <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 font-sans antialiased" id="app-wrapper-socio">
           <RoleSwitcher />
           <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
-            <SocioPanel />
+            <ErrorBoundary section="el Panel del Socio">
+              <SocioPanel />
+            </ErrorBoundary>
           </div>
         </div>
         {paymentSuccessData && (
@@ -405,7 +408,7 @@ function InnerApp() {
               <img 
                 src={googleUser.picture} 
                 alt={googleUser.name} 
-                className="w-9 h-9 rounded-full object-cover border border-slate-205"
+                className="w-9 h-9 rounded-full object-cover border border-slate-200"
                 referrerPolicy="no-referrer"
               />
             ) : (
@@ -426,7 +429,7 @@ function InnerApp() {
           
           <button 
             onClick={signOutGoogle}
-            className="w-full py-1.5 bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-655 border border-slate-200 hover:border-red-200 rounded-lg text-[9px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+            className="w-full py-1.5 bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-700 border border-slate-200 hover:border-red-200 rounded-lg text-[9px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
             id="sidebar-signout-trigger-google"
           >
             Cerrar Sesión Google
@@ -468,7 +471,7 @@ function InnerApp() {
                   // Optional: mark as read automatically, or let the user click "Marcar leídas"
                 }
               }}
-              className="relative p-2 text-slate-500 hover:text-slate-850 hover:bg-slate-100 rounded-full transition-all duration-150 cursor-pointer outline-hidden border border-slate-200/50"
+              className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-all duration-150 cursor-pointer outline-hidden border border-slate-200/50"
               id="admin-notifications-bell-trigger"
               aria-label="Notificaciones"
             >
@@ -519,7 +522,7 @@ function InnerApp() {
                             key={notif.id} 
                             className={`flex justify-between items-start p-2.5 rounded-xl border text-[11px] leading-relaxed transition-all ${
                               notif.leido 
-                                ? 'bg-slate-50 border-slate-150 text-slate-550' 
+                                ? 'bg-slate-50 border-slate-100 text-slate-500' 
                                 : 'bg-emerald-50/50 border-emerald-100 text-slate-800 font-medium shadow-2xs'
                             }`}
                           >
@@ -528,7 +531,7 @@ function InnerApp() {
                                 <span className={`w-1.5 h-1.5 rounded-full ${notif.leido ? 'bg-slate-300' : 'bg-emerald-500'}`}></span>
                                 <span className="font-bold text-slate-700">{notif.titulo}</span>
                               </div>
-                              <p className="text-[10px] text-slate-550 leading-relaxed font-sans">{notif.mensaje}</p>
+                              <p className="text-[10px] text-slate-500 leading-relaxed font-sans">{notif.mensaje}</p>
                               <span className="text-[8px] text-slate-400 block font-mono font-medium">{dateFormatted}</span>
                             </div>
 
@@ -555,7 +558,9 @@ function InnerApp() {
 
         {/* Main View Area */}
         <main className="flex-1 p-6 overflow-y-auto">
-          {renderActiveTabContent()}
+          <ErrorBoundary key={activeTab} section={currentTab.label}>
+            {renderActiveTabContent()}
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -596,7 +601,7 @@ function PaymentSuccessModal({ data, onClose }: PaymentSuccessModalProps) {
         </p>
 
         {/* Receipt display card */}
-        <div className="w-full bg-slate-50 border border-slate-150 rounded-2xl p-5 my-6 space-y-3">
+        <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 my-6 space-y-3">
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400 font-mono uppercase">Socio</span>
             <span className="font-bold text-slate-800">{data.clientName}</span>
@@ -615,7 +620,7 @@ function PaymentSuccessModal({ data, onClose }: PaymentSuccessModalProps) {
           </div>
           <div className="flex justify-between items-center text-xs pt-2.5 border-t border-slate-200">
             <span className="text-slate-400 font-mono uppercase">Estado Cuenta</span>
-            <span className="font-bold text-emerald-750 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[9px] border border-emerald-150 uppercase tracking-wide">
+            <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[9px] border border-emerald-100 uppercase tracking-wide">
               ✓ Al Día
             </span>
           </div>
@@ -623,7 +628,7 @@ function PaymentSuccessModal({ data, onClose }: PaymentSuccessModalProps) {
 
         <button
           onClick={onClose}
-          className="w-full bg-slate-900 hover:bg-slate-850 text-white font-bold py-3 px-6 rounded-2xl text-xs transition-all shadow-md active:scale-98 cursor-pointer relative z-10"
+          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-2xl text-xs transition-all shadow-md active:scale-98 cursor-pointer relative z-10"
         >
           Entendido, gracias
         </button>

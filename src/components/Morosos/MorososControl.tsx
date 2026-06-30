@@ -115,10 +115,10 @@ export const MorososControl: React.FC = () => {
         <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between">
           <div>
             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Morosos Críticos (Post-Plazo)</span>
-            <div className="text-3xl font-sans font-bold text-red-650 mt-1">{morososCount} socios</div>
+            <div className="text-3xl font-sans font-bold text-red-600 mt-1">{morososCount} socios</div>
             <span className="text-[10px] text-zinc-400 font-sans mt-1 block">Alumnos sin pago luego de expirado el plazo</span>
           </div>
-          <div className="p-3 ml-4 bg-red-50 text-red-650 rounded-lg">
+          <div className="p-3 ml-4 bg-red-50 text-red-600 rounded-lg">
             <ShieldAlert className="w-6 h-6" />
           </div>
         </div>
@@ -127,7 +127,7 @@ export const MorososControl: React.FC = () => {
         <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between">
           <div>
             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Tasa de Incumplimiento</span>
-            <div className="text-3xl font-sans font-bold text-zinc-955 mt-1">{porcentajeMora}%</div>
+            <div className="text-3xl font-sans font-bold text-zinc-950 mt-1">{porcentajeMora}%</div>
             <span className="text-[10px] text-zinc-400 font-sans mt-1 block">{deudoresCount} alumnos con deuda vencida</span>
           </div>
           <div className="p-3 ml-4 bg-zinc-100 text-zinc-500 rounded-lg">
@@ -173,7 +173,7 @@ export const MorososControl: React.FC = () => {
               <h3 className="text-base font-bold tracking-tight">Cobro Rápido de Morosidad</h3>
               <button
                 onClick={() => setSelectedClienteToClear(null)}
-                className="text-zinc-405 hover:text-white bg-transparent border-none cursor-pointer"
+                className="text-zinc-400 hover:text-white bg-transparent border-none cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -182,15 +182,15 @@ export const MorososControl: React.FC = () => {
             <form onSubmit={handleConfirmFastPagoSubmit} className="p-5 space-y-4 text-xs">
               
               {fastPagoSuccess && (
-                <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-semibold border border-emerald-250">
+                <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-semibold border border-emerald-200">
                   {fastPagoSuccess}
                 </div>
               )}
 
-              <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-150 leading-relaxed">
+              <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 leading-relaxed">
                 <span className="text-zinc-400 text-[10px] uppercase font-bold block mb-0.5">Socio</span>
                 <span className="font-bold text-zinc-900 text-sm block">{selectedClienteToClear.nombre} {selectedClienteToClear.apellido}</span>
-                <span className="text-zinc-555 font-semibold block text-[10px] mt-2">Deuda histórica registrada: <span className="font-mono text-red-650 font-bold">${selectedClienteToClear.deuda_acumulada.toLocaleString('es-AR')}</span></span>
+                <span className="text-zinc-600 font-semibold block text-[10px] mt-2">Deuda histórica registrada: <span className="font-mono text-red-600 font-bold">${selectedClienteToClear.deuda_acumulada.toLocaleString('es-AR')}</span></span>
               </div>
 
               {/* GESTION DE EXCEPCION RAPIDA */}

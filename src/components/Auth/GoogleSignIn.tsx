@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { Shield, Lock, Sparkles, AlertCircle } from 'lucide-react';
 
+// Evita re-inicializar Google Identity Services (genera warnings de "initialize() called multiple times")
+let gsiInitialized = false;
+
 // Decodes Google's credential JWT securely on the client-side
 function decodeJwt(token: string) {
   try {
@@ -41,23 +44,27 @@ export const GoogleSignIn: React.FC = () => {
       if (google && google.accounts && google.accounts.id) {
         clearInterval(interval);
         try {
-          google.accounts.id.initialize({
-            client_id: clientId,
-            callback: (response: any) => {
-              setLoading(true);
-              const payload = decodeJwt(response.credential);
-              if (payload) {
-                setTimeout(() => {
-                  signInWithGoogle(payload.email, payload.name || payload.given_name, payload.picture);
+          // Inicializar solo una vez para evitar el warning de GSI
+          if (!gsiInitialized) {
+            google.accounts.id.initialize({
+              client_id: clientId,
+              callback: (response: any) => {
+                setLoading(true);
+                const payload = decodeJwt(response.credential);
+                if (payload) {
+                  setTimeout(() => {
+                    signInWithGoogle(payload.email, payload.name || payload.given_name, payload.picture);
+                    setLoading(false);
+                  }, 800);
+                } else {
+                  setErrorMsg('Error al decodificar la respuesta segura de Google.');
                   setLoading(false);
-                }, 800);
-              } else {
-                setErrorMsg('Error al decodificar la respuesta segura de Google.');
-                setLoading(false);
-              }
-            },
-            auto_select: false,
-          });
+                }
+              },
+              auto_select: false,
+            });
+            gsiInitialized = true;
+          }
 
           const btnContainer = document.getElementById('google-real-btn-container');
           if (btnContainer) {
@@ -99,7 +106,7 @@ export const GoogleSignIn: React.FC = () => {
               <p className="text-green-600 text-[10px] uppercase font-mono tracking-widest -mt-1">Servicio de Autenticación</p>
             </div>
           </div>
-          <p className="text-slate-650 text-xs mt-3">
+          <p className="text-slate-600 text-xs mt-3">
             Para continuar, inicia sesión con tu dirección de Google. El sistema detectará automáticamente si eres **Socio**, **Profesor** o **Admin**.
           </p>
         </div>
@@ -126,12 +133,12 @@ export const GoogleSignIn: React.FC = () => {
               <div id="google-real-btn-container" className="min-h-[44px] flex items-center justify-center">
                 {/* Fallback spinner before library is loaded */}
                 <div className="text-slate-600 text-xs flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full border-2 border-slate-250 border-t-green-500 animate-spin"></div>
+                  <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-green-500 animate-spin"></div>
                   <span>Cargando componente de Google...</span>
                 </div>
               </div>
 
-              <p className="text-slate-550 text-[10px] text-center px-4 leading-relaxed">
+              <p className="text-slate-500 text-[10px] text-center px-4 leading-relaxed">
                 Abre un flujo seguro en ventana flotante autenticado por servidores de Google.
               </p>
             </div>

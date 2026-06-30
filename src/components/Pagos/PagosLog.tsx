@@ -245,7 +245,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     SERVICIOS: 'bg-sky-50 text-sky-700 border-sky-100',
     INSUMOS: 'bg-amber-50 text-amber-700 border-amber-100',
     PROFESORES: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    OTROS: 'bg-zinc-50 text-zinc-650 border-zinc-200'
+    OTROS: 'bg-zinc-50 text-zinc-600 border-zinc-200'
   };
 
   return (
@@ -296,15 +296,15 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
               <div>
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Evolución de Tendencia</span>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-2xl font-mono font-bold block ${comparativaFinanciera.diferencia >= 0 ? 'text-emerald-605' : 'text-red-600'}`}>
+                  <span className={`text-2xl font-mono font-bold block ${comparativaFinanciera.diferencia >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {comparativaFinanciera.porcent >= 0 ? '+' : ''}{comparativaFinanciera.porcent}%
                   </span>
-                  <span className="text-[10px] bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-mono text-zinc-550">
+                  <span className="text-[10px] bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-mono text-zinc-500">
                     ${comparativaFinanciera.diferencia.toLocaleString('es-AR')}
                   </span>
                 </div>
               </div>
-              <div className={`p-2 ml-4 rounded-lg ${comparativaFinanciera.diferencia >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-550'}`}>
+              <div className={`p-2 ml-4 rounded-lg ${comparativaFinanciera.diferencia >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
                 {comparativaFinanciera.diferencia >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
               </div>
             </div>
@@ -335,7 +335,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
               <div>
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Total Egresos</span>
-                <div className="text-2xl font-mono font-bold text-rose-650 mt-1">${gastosTotalFiltrado.toLocaleString('es-AR')}</div>
+                <div className="text-2xl font-mono font-bold text-rose-600 mt-1">${gastosTotalFiltrado.toLocaleString('es-AR')}</div>
               </div>
               <TrendingDown className="w-6 h-6 text-rose-300" />
             </div>
@@ -410,12 +410,12 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                         </span>
                       </td>
                       <td className="p-4 font-mono text-zinc-500 text-[10px]">{g.fecha}</td>
-                      <td className="p-4 font-mono text-zinc-405 text-[10px]">{g.registrado_por}</td>
-                      <td className="p-4 text-right font-mono font-bold text-rose-650">${g.monto.toLocaleString('es-AR')}</td>
+                      <td className="p-4 font-mono text-zinc-400 text-[10px]">{g.registrado_por}</td>
+                      <td className="p-4 text-right font-mono font-bold text-rose-600">${g.monto.toLocaleString('es-AR')}</td>
                       <td className="p-4 text-center">
                         <button
                           onClick={() => eliminarGasto(g.id)}
-                          className="p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-650 rounded-md transition-colors cursor-pointer border-none bg-transparent"
+                          className="p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-md transition-colors cursor-pointer border-none bg-transparent"
                           title="Eliminar gasto"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -428,7 +428,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
               {gastosFiltrados.length > 0 && (
                 <tfoot>
                   <tr className="bg-zinc-50 border-t border-zinc-200">
-                    <td colSpan={4} className="p-4 font-bold text-xs text-zinc-650 uppercase tracking-wider">Total del período</td>
+                    <td colSpan={4} className="p-4 font-bold text-xs text-zinc-600 uppercase tracking-wider">Total del período</td>
                     <td className="p-4 text-right font-mono font-bold text-rose-700 text-sm">${gastosTotalFiltrado.toLocaleString('es-AR')}</td>
                     <td></td>
                   </tr>
@@ -488,7 +488,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                   {liquidaciones.map(({ prof, turnosProf, clasesTeoricasTotal, ausencias, reemplazos, clasesNetas, montoTotal, yaLiquidado }) => (
                     <tr key={prof.id} className={`hover:bg-zinc-50/50 ${yaLiquidado ? 'opacity-60' : ''}`}>
                       <td className="p-4">
-                        <div className="font-bold text-zinc-905">{prof.nombre}</div>
+                        <div className="font-bold text-zinc-900">{prof.nombre}</div>
                         <div className="text-[10px] text-zinc-400 font-mono">{prof.email}</div>
                       </td>
                       <td className="p-4 text-center">
@@ -497,7 +497,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                             {turnosProf.slice(0, 3).map(t => (
                               <div key={t.id} className="text-[10px] text-zinc-600 font-mono">{t.dia} {t.hora}hs</div>
                             ))}
-                            {turnosProf.length > 3 && <div className="text-[9px] text-zinc-405">+{turnosProf.length - 3} más</div>}
+                            {turnosProf.length > 3 && <div className="text-[9px] text-zinc-400">+{turnosProf.length - 3} más</div>}
                           </div>
                         ) : (
                           <span className="text-zinc-300 italic text-[10px]">Sin turnos asignados</span>
@@ -505,7 +505,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                       </td>
                       <td className="p-4 text-center font-mono font-bold text-zinc-700">{clasesTeoricasTotal}</td>
                       <td className="p-4 text-center">
-                        <span className={`font-mono font-bold ${ausencias > 0 ? 'text-red-650' : 'text-zinc-400'}`}>{ausencias}</span>
+                        <span className={`font-mono font-bold ${ausencias > 0 ? 'text-red-600' : 'text-zinc-400'}`}>{ausencias}</span>
                       </td>
                       <td className="p-4 text-center">
                         <span className={`font-mono font-bold ${reemplazos > 0 ? 'text-emerald-600' : 'text-zinc-400'}`}>{reemplazos > 0 ? `+${reemplazos}` : '0'}</span>
@@ -542,7 +542,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 {liquidaciones.length > 0 && (
                   <tfoot>
                     <tr className="bg-zinc-50 border-t border-zinc-200">
-                      <td colSpan={7} className="p-4 font-bold text-xs text-zinc-650 uppercase tracking-wider">Total estimado del mes</td>
+                      <td colSpan={7} className="p-4 font-bold text-xs text-zinc-600 uppercase tracking-wider">Total estimado del mes</td>
                       <td className="p-4 text-right font-mono font-bold text-emerald-700 text-sm">
                         ${liquidaciones.reduce((s, l) => s + l.montoTotal, 0).toLocaleString('es-AR')}
                       </td>
@@ -567,7 +567,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                   return (
                     <div key={n.id} className="flex justify-between items-center p-3 text-xs">
                       <div className="flex items-center gap-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${n.tipo === 'AUSENCIA' ? 'bg-red-50 text-red-750 border-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${n.tipo === 'AUSENCIA' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                           {n.tipo}
                         </span>
                         <div>
@@ -597,12 +597,12 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 <h3 className="text-base font-bold">Registrar Novedad de Profesor</h3>
                 <p className="text-[10px] text-zinc-400 mt-0.5">Ausencias o reemplazos del mes de liquidación</p>
               </div>
-              <button onClick={() => setShowNovedadModal(false)} className="text-zinc-450 hover:text-white bg-zinc-800 p-1.5 rounded-lg cursor-pointer border-none">
+              <button onClick={() => setShowNovedadModal(false)} className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg cursor-pointer border-none">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <form onSubmit={handleNovedadSubmit} className="p-5 space-y-4 text-xs font-sans">
-              {novedadErr && <div className="bg-red-50 text-red-750 p-2.5 rounded-lg border border-red-200 font-semibold">{novedadErr}</div>}
+              {novedadErr && <div className="bg-red-50 text-red-700 p-2.5 rounded-lg border border-red-200 font-semibold">{novedadErr}</div>}
               {novedadOk && <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg border border-emerald-200 font-semibold">{novedadOk}</div>}
               
               <div className="space-y-1">
@@ -610,7 +610,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 <div className="flex gap-2">
                   {(['AUSENCIA', 'REEMPLAZO'] as const).map(tipo => (
                     <button key={tipo} type="button" onClick={() => setNovedadForm(prev => ({ ...prev, tipo }))}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer border-none ${novedadForm.tipo === tipo ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-zinc-350 bg-white'}`}>
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer border-none ${novedadForm.tipo === tipo ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-zinc-300 bg-white'}`}>
                       {tipo}
                     </button>
                   ))}
@@ -671,7 +671,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
               <button onClick={() => setShowGastoModal(false)} className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg cursor-pointer border-none"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleGastoSubmit} className="p-5 space-y-4 text-xs font-sans">
-              {gastoErr && <div className="bg-red-50 text-red-750 p-2.5 rounded-lg border border-red-200 font-semibold">{gastoErr}</div>}
+              {gastoErr && <div className="bg-red-50 text-red-700 p-2.5 rounded-lg border border-red-200 font-semibold">{gastoErr}</div>}
               {gastoOk && <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg border border-emerald-200 font-semibold">{gastoOk}</div>}
               <div className="space-y-1">
                 <label className="text-zinc-500 font-bold block text-[10px] uppercase">Concepto *</label>
@@ -695,7 +695,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 <div className="flex flex-wrap gap-2">
                   {CATEGORIAS_GASTO.map(cat => (
                     <button key={cat} type="button" onClick={() => setGastoForm(prev => ({ ...prev, categoria: cat }))}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer border-none ${gastoForm.categoria === cat ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs' : 'bg-zinc-50 text-zinc-650 border-zinc-205 hover:border-zinc-350 bg-white'}`}>
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer border-none ${gastoForm.categoria === cat ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-zinc-300 bg-white'}`}>
                       {cat}
                     </button>
                   ))}

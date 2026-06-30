@@ -152,13 +152,13 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   }, [totalMonthlySlots, usedSlots]);
 
   return (
-    <section className="bg-white border border-slate-205 rounded-3xl p-6.5 lg:p-8 shadow-sm relative" id="socio-agenda-block">
+    <section className="bg-white border border-slate-200 rounded-3xl p-6.5 lg:p-8 shadow-sm relative" id="socio-agenda-block">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_90%,rgba(16,185,129,0.01),transparent_40%)] pointer-events-none"></div>
 
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 pb-6 border-b border-slate-100">
         <div>
-          <h2 className="text-base font-black text-slate-805 flex items-center gap-2 tracking-tight">
-            <Calendar className="w-5.5 h-5.5 text-emerald-650" />
+          <h2 className="text-base font-black text-slate-800 flex items-center gap-2 tracking-tight">
+            <Calendar className="w-5.5 h-5.5 text-emerald-600" />
             INSCRIPCIONES Y HORARIOS DISPONIBLES
           </h2>
           <p className="text-slate-500 text-xs font-sans mt-1">
@@ -166,7 +166,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2.5 text-[10px] text-slate-450 font-mono">
+        <div className="flex flex-wrap gap-2.5 text-[10px] text-slate-400 font-mono">
           <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
             <span className="w-2.5 h-2.5 bg-sky-200 border border-sky-400 rounded-full inline-block"></span> 
             <span className="text-slate-600 font-semibold">Tus Días Fijos</span>
@@ -181,26 +181,26 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
       {/* SUMMARY BOX */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8 p-5 bg-slate-50 border border-slate-200 rounded-2xl text-xs">
         <div className="space-y-1.5">
-          <p className="text-[10px] text-slate-455 font-mono uppercase tracking-wider font-extrabold">1. Cupos Disponibles por Asignar este Mes</p>
+          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold">1. Cupos Disponibles por Asignar este Mes</p>
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
             <p className="text-lg font-black text-slate-800">
               {availableSlots} <span className="text-xs text-slate-500 font-medium">de {totalMonthlySlots} cupos totales</span>
             </p>
           </div>
-          <p className="text-[10px] text-slate-505 font-sans leading-normal">
+          <p className="text-[10px] text-slate-500 font-sans leading-normal">
             Puedes asignarlos libremente a cualquier horario con cupo en la grilla inferior.
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-[10px] text-slate-455 font-mono uppercase tracking-wider font-extrabold">2. Días Fijos Asignados</p>
+          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold">2. Días Fijos Asignados</p>
           <div className="flex items-center gap-2">
-            <p className="text-base font-black text-slate-850">
+            <p className="text-base font-black text-slate-800">
               {socio.turnos_fijos.length > 0 ? (
                 <span>{socio.turnos_fijos.length} días fijos semanales <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded">({socio.turnos_fijos.length * 4}/{totalMonthlySlots} cupos)</span></span>
               ) : (
-                <span className="text-slate-450 italic text-xs font-medium">No posees horarios fijos semanales (Flex)</span>
+                <span className="text-slate-400 italic text-xs font-medium">No posees horarios fijos semanales (Flex)</span>
               )}
             </p>
           </div>
@@ -209,7 +209,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
               const turn = turnos.find(t => t.id === tfId);
               if (!turn) return null;
               return (
-                <span key={tfId} className="text-[9px] font-mono font-bold text-slate-650 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-3xs">
+                <span key={tfId} className="text-[9px] font-mono font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-3xs">
                   {turn.dia} {turn.hora.slice(0, 5)} hs
                 </span>
               );
@@ -220,9 +220,9 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
 
       {/* ALL FIXED WARNING */}
       {availableSlots === 0 && usedSlots === totalMonthlySlots && (
-        <div className="mb-8 p-4.5 bg-sky-50 border border-sky-150 rounded-2xl flex items-center gap-3">
+        <div className="mb-8 p-4.5 bg-sky-50 border border-sky-100 rounded-2xl flex items-center gap-3">
           <Info className="w-5 h-5 text-sky-600 shrink-0" />
-          <p className="text-[11px] text-sky-850 font-medium leading-relaxed font-sans">
+          <p className="text-[11px] text-sky-800 font-medium leading-relaxed font-sans">
             ¡Tienes todos tus cupos mensuales asignados de forma fija! Si deseas asistir en otro horario, puedes <strong>reprogramar</strong> tus sesiones haciendo click en "Reprogramar clase" en tus días fijos o desde el listado de sesiones en la pantalla de Inicio.
           </p>
         </div>
@@ -235,7 +235,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             setWeekOffset(prev => prev - 1);
             setBookingTurnId(null);
           }}
-          className="px-3 py-1.5 rounded-xl bg-white border border-slate-205 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
           Semana Anterior
@@ -251,7 +251,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             setWeekOffset(prev => prev + 1);
             setBookingTurnId(null);
           }}
-          className="px-3 py-1.5 rounded-xl bg-white border border-slate-205 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
         >
           Semana Siguiente
           <ChevronRight className="w-4 h-4" />
@@ -259,7 +259,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
       </div>
 
       {/* DIAS CALENDARIO SELECTOR TAB BAR */}
-      <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-205 gap-1 lg:max-w-xl mx-auto mb-8" id="socio-agenda-tabs">
+      <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1 lg:max-w-xl mx-auto mb-8" id="socio-agenda-tabs">
         {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const).map(dia => {
           const isActive = activeDays.has(dia);
           return (
@@ -281,7 +281,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
               className={`py-3.5 text-center text-xs font-bold rounded-xl transition-all cursor-pointer select-none border ${
                 isActive 
                   ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 text-white border-transparent font-black scale-102 shadow-sm ring-2 ring-emerald-500/20' 
-                  : 'text-slate-505 hover:text-slate-800 bg-transparent border-transparent hover:bg-white/50'
+                  : 'text-slate-500 hover:text-slate-800 bg-transparent border-transparent hover:bg-white/50'
               }`}
             >
               <div className="flex flex-col items-center">
@@ -306,9 +306,9 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
       {/* CONTENEDOR DE SLOTS */}
       <div className="space-y-8" id="socio-agenda-slots">
         {turnosDelDia.length === 0 ? (
-          <div className="text-center py-12 bg-slate-50 border border-slate-150 rounded-2xl">
+          <div className="text-center py-12 bg-slate-50 border border-slate-100 rounded-2xl">
             <Info className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-slate-505 italic text-xs font-medium">No hay horarios configurados para los días seleccionados.</p>
+            <p className="text-slate-500 italic text-xs font-medium">No hay horarios configurados para los días seleccionados.</p>
           </div>
         ) : (
           (['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const)
@@ -357,7 +357,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                               </div>
                               <div>
                                 <p className="text-base font-black text-slate-800 tracking-tight">{turno.hora.slice(0, 5)} hs</p>
-                                <p className="text-[10px] text-slate-455 mt-1 font-medium">
+                                <p className="text-[10px] text-slate-500 mt-1 font-medium">
                                   Socios asignados permanentemente: {turno.asignados_ids.length}
                                 </p>
                                 {holdsMyIndividual && (
@@ -416,14 +416,14 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                   });
 
                                   return (
-                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-150 text-xs">
+                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 text-xs">
                                       <div>
                                         <span className="font-bold text-slate-700">{dateFormatted}</span>
-                                        <span className="text-[9px] text-slate-455 font-mono ml-2">({occupiedCount} ocupados)</span>
+                                        <span className="text-[9px] text-slate-500 font-mono ml-2">({occupiedCount} ocupados)</span>
                                       </div>
 
                                       {hasBooking ? (
-                                        <span className="text-[9px] font-bold text-slate-450 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-sans">Ya tienes clase</span>
+                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-sans">Ya tienes clase</span>
                                       ) : isFullOnDate ? (
                                         <div className="flex items-center gap-1.5">
                                           <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded shrink-0">Lleno</span>
@@ -439,7 +439,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                                   setTimeout(() => setErrorMessage(null), 3500);
                                                 }
                                               }}
-                                              className="bg-slate-200 hover:bg-slate-350 text-slate-705 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-slate-300 shadow-3xs"
+                                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-slate-300 shadow-3xs"
                                             >
                                               Salir de Espera
                                             </button>
@@ -499,8 +499,8 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                   });
 
                                   return (
-                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-150 text-xs">
-                                      <span className="font-bold text-slate-705">{dateFormatted}</span>
+                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 text-xs">
+                                      <span className="font-bold text-slate-700">{dateFormatted}</span>
 
                                       {isSuspended ? (
                                         <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded">Suspendida</span>
@@ -543,7 +543,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                     setReprogramTurnId(reprogramTurnId === turno.id ? null : turno.id);
                                     setBookingTurnId(null);
                                   }}
-                                  className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-150 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 font-sans"
+                                  className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 font-sans"
                                 >
                                   <RefreshCw className="w-3.5 h-3.5" />
                                   Reprogramar clase

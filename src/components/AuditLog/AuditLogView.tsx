@@ -1,25 +1,38 @@
 // src/components/AuditLogView.tsx
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useGym } from '../../GymContext';
-import { ShieldCheck, Search, Database, Clock, RefreshCw } from 'lucide-react';
+import { Search, Database } from 'lucide-react';
+
+// Formatea el campo `detalles` (que es un objeto) a texto legible para mostrar/buscar
+function formatDetalles(detalles: any): string {
+  if (detalles === null || detalles === undefined) return '';
+  if (typeof detalles === 'string') return detalles;
+  try {
+    return Object.entries(detalles)
+      .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+      .join(' · ');
+  } catch {
+    return String(detalles);
+  }
+}
 
 export const AuditLogView: React.FC = () => {
-  const { logs } = useGym();
+  const { auditLogs } = useGym();
   const [buscarLog, setBuscarLog] = useState('');
 
   const sortedLogs = useMemo(() => {
-    return [...logs].sort((a, b) => {
-      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    return [...auditLogs].sort((a, b) => {
+      return new Date(b.creado_at).getTime() - new Date(a.creado_at).getTime();
     });
-  }, [logs]);
+  }, [auditLogs]);
 
   const filteredLogs = useMemo(() => {
     if (!buscarLog.trim()) return sortedLogs;
     const query = buscarLog.toLowerCase();
-    return sortedLogs.filter(l => 
+    return sortedLogs.filter(l =>
       l.accion.toLowerCase().includes(query) ||
-      l.usuario.toLowerCase().includes(query) ||
-      (l.detalles && l.detalles.toLowerCase().includes(query))
+      l.usuario_email.toLowerCase().includes(query) ||
+      formatDetalles(l.detalles).toLowerCase().includes(query)
     );
   }, [sortedLogs, buscarLog]);
 
@@ -47,7 +60,7 @@ export const AuditLogView: React.FC = () => {
       </div>
 
       {/* NOTA EXPLICATIVA RLS Y PERSISTENCIA */}
-      <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 flex items-start gap-3 text-xs text-zinc-650 font-sans leading-normal">
+      <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 flex items-start gap-3 text-xs text-zinc-600 font-sans leading-normal">
         <Database className="w-5 h-5 text-zinc-500 flex-shrink-0 mt-0.5" />
         <div>
           <span className="font-bold text-zinc-900 block mb-0.5">Bitácora Transaccional del Servidor</span>
@@ -88,10 +101,10 @@ export const AuditLogView: React.FC = () => {
                   return (
                     <tr key={l.id} className="hover:bg-zinc-50/50">
                       <td className="p-4 font-mono text-[10px] text-zinc-500 whitespace-nowrap">
-                        {new Date(l.timestamp).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}
+                        {new Date(l.creado_at).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}
                       </td>
                       <td className="p-4">
-                        <div className="font-mono text-zinc-850 font-bold text-[11px] truncate w-36" title={l.usuario}>{l.usuario}</div>
+                        <div className="font-mono text-zinc-800 font-bold text-[11px] truncate w-36" title={l.usuario_email}>{l.usuario_email}</div>
                       </td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded-sm border font-bold text-[9px] uppercase tracking-wide inline-block ${badgeColor}`}>
@@ -99,7 +112,7 @@ export const AuditLogView: React.FC = () => {
                         </span>
                       </td>
                       <td className="p-4 font-sans text-zinc-600 font-medium leading-relaxed">
-                        {l.detalles || 'Sin detalles adicionales registrados.'}
+                        {formatDetalles(l.detalles) || 'Sin detalles adicionales registrados.'}
                       </td>
                     </tr>
                   );

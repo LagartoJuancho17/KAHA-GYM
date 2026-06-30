@@ -56,7 +56,7 @@ export const MorososCronSimulator: React.FC<MorososCronSimulatorProps> = ({
   };
 
   return (
-    <div className="bg-zinc-950 text-white rounded-xl border border-zinc-850 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 shadow-xl leading-normal text-xs font-sans">
+    <div className="bg-zinc-950 text-white rounded-xl border border-zinc-800 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 shadow-xl leading-normal text-xs font-sans">
       {/* Info y fecha */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -65,7 +65,7 @@ export const MorososCronSimulator: React.FC<MorososCronSimulatorProps> = ({
         </div>
 
         <p className="text-zinc-400 text-xs font-sans leading-relaxed">
-          La regla comercial determina: <strong>"Día 5 de cada mes a las 23:59 es el vencimiento"</strong>. Cualquier alumno que no registre un pago para el mes se le cambia el estado automáticamente a <strong className="text-red-405">MOROSO</strong> y se le imputa el saldo de su plan.
+          La regla comercial determina: <strong>"Día 5 de cada mes a las 23:59 es el vencimiento"</strong>. Cualquier alumno que no registre un pago para el mes se le cambia el estado automáticamente a <strong className="text-red-400">MOROSO</strong> y se le imputa el saldo de su plan.
         </p>
 
         <p className="text-zinc-400 text-xs font-sans leading-relaxed">

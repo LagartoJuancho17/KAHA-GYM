@@ -89,15 +89,15 @@ export const PagoCSVImportModal: React.FC<PagoCSVImportModalProps> = ({ onClose 
                   </tbody>
                 </table>
               </div>
-              <div className="flex justify-between items-center bg-zinc-50 p-4 border border-zinc-205 rounded-xl font-medium">
-                <span className="text-zinc-650">{statementParsedRows.length} líneas identificadas. Los duplicados serán omitidos.</span>
+              <div className="flex justify-between items-center bg-zinc-50 p-4 border border-zinc-200 rounded-xl font-medium">
+                <span className="text-zinc-600">{statementParsedRows.length} líneas identificadas. Los duplicados serán omitidos.</span>
                 <button onClick={handleConfirmStatementImport} className="px-4 py-2 bg-zinc-900 hover:bg-zinc-700 text-white rounded-lg font-bold text-xs cursor-pointer border-none">Ejecutar Conciliación</button>
               </div>
               {importReport && (
                 <div className="bg-zinc-50 p-4 border border-zinc-200 rounded-xl space-y-2 font-sans">
-                  <h4 className="font-bold text-emerald-700 flex items-center gap-1.5"><Check className="w-5 h-5 text-emerald-605" />Conciliación finalizada</h4>
+                  <h4 className="font-bold text-emerald-700 flex items-center gap-1.5"><Check className="w-5 h-5 text-emerald-600" />Conciliación finalizada</h4>
                   <p className="text-zinc-600 font-medium">Procesados: <strong>{importReport.procesados}</strong> | Registrados: <strong className="text-emerald-600">{importReport.insertados}</strong> | Duplicados: <strong className="text-amber-600">{importReport.duplicados}</strong></p>
-                  {importReport.errores.length > 0 && <div className="bg-white p-2 rounded-lg text-[9.5px] border border-red-200 text-red-650 font-mono">{importReport.errores.map((e, i) => <div key={i}>{e}</div>)}</div>}
+                  {importReport.errores.length > 0 && <div className="bg-white p-2 rounded-lg text-[9.5px] border border-red-200 text-red-600 font-mono">{importReport.errores.map((e, i) => <div key={i}>{e}</div>)}</div>}
                   <button onClick={onClose} className="w-full bg-black text-white rounded-lg py-2 mt-2 font-bold text-xs cursor-pointer border-none">Finalizar</button>
                 </div>
               )}
