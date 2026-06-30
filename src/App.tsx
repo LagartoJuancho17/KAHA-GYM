@@ -1,18 +1,18 @@
 // src/App.tsx
 import { useState, useEffect } from 'react';
 import { GymProvider, useGym } from './GymContext';
-import { RoleSwitcher } from './components/RoleSwitcher';
+import { RoleSwitcher } from './components/Auth/RoleSwitcher';
 import { Dashboard } from './components/Dashboard';
-import { ClientesCRUD } from './components/ClientesCRUD';
-import { PlanesPricing } from './components/PlanesPricing';
-import { TurnosGrid } from './components/TurnosGrid';
-import { PagosLog } from './components/PagosLog';
-import { MorososControl } from './components/MorososControl';
-import { ProyeccionesTab } from './components/ProyeccionesTab';
-import { AuditLogView } from './components/AuditLogView';
-import { SocioPanel } from './components/SocioPanel';
-import { GoogleSignIn } from './components/GoogleSignIn';
-import { NovedadesCRUD } from './components/NovedadesCRUD';
+import { ClientesCRUD } from './components/Clientes/ClientesCRUD';
+import { PlanesPricing } from './components/Planes/PlanesPricing';
+import { TurnosGrid } from './components/Turnos/TurnosGrid';
+import { PagosLog } from './components/Pagos/PagosLog';
+import { MorososControl } from './components/Morosos/MorososControl';
+import { ProyeccionesTab } from './components/Proyecciones/ProyeccionesTab';
+import { AuditLogView } from './components/AuditLog/AuditLogView';
+import { SocioPanel } from './components/SocioPanel/SocioPanel';
+import { GoogleSignIn } from './components/Auth/GoogleSignIn';
+import { NovedadesCRUD } from './components/Novedades/NovedadesCRUD';
 
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
@@ -44,6 +44,18 @@ function InnerApp() {
 
   const [timeString, setTimeString] = useState('');
   const [dateString, setDateString] = useState('');
+
+  // Escape key closes notifications dropdown & sidebar
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowNotificationsDropdown(false);
+        setIsSidebarOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
 
   // --- MERCADO PAGO SUCCESS REDIRECT PROCESSING ---
   const [paymentSuccessData, setPaymentSuccessData] = useState<{ clientName: string; amount: number } | null>(null);
@@ -330,14 +342,21 @@ function InnerApp() {
       `} id="app-sidebar-nav">
         
         <div className="flex flex-col gap-6">
-          {/* Logo / Brand block matching the exact style of APOLO GYM */}
+          {/* Logo / Brand */}
           <div className="mb-2 hidden lg:block">
-            <h1 className="text-slate-900 text-xl font-extrabold tracking-tight" id="sidebar-logo-heading">
-              KAHA GYM 
-              <span className="text-emerald-600 text-xs font-semibold tracking-wider block uppercase mt-0.5" id="sidebar-logo-subtitle">
-                Administración
-              </span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center shadow-sm shrink-0">
+                <Shield className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-slate-900 text-base font-extrabold tracking-tight leading-none" id="sidebar-logo-heading">
+                  KAHA GYM
+                </h1>
+                <span className="text-emerald-600 text-[10px] font-semibold tracking-wider block uppercase mt-0.5" id="sidebar-logo-subtitle">
+                  Panel de Control
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Nav List */}
@@ -356,10 +375,11 @@ function InnerApp() {
                     setActiveTab(item.id);
                     setIsSidebarOpen(false);
                   }}
+                  title={item.desc}
                   className={`
-                    w-full px-4 py-3 rounded-lg flex items-center gap-3 text-xs font-semibold transition-all duration-150 outline-hidden cursor-pointer
-                    ${isSelected 
-                      ? 'bg-emerald-50 text-emerald-850 border border-emerald-100 shadow-xs' 
+                    w-full px-4 py-3 rounded-lg flex items-center gap-3 text-xs font-semibold transition-all duration-150 outline-none cursor-pointer
+                    ${isSelected
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent'
                     }
                   `}
@@ -418,7 +438,7 @@ function InnerApp() {
       {isSidebarOpen && (
         <div 
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-xs z-35 lg:hidden animate-fade-in"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-xs z-[35] lg:hidden animate-fade-in"
         ></div>
       )}
 

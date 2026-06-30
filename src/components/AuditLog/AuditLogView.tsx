@@ -1,6 +1,6 @@
 // src/components/AuditLogView.tsx
 import React, { useMemo, useState } from 'react';
-import { useGym } from '../GymContext';
+import { useGym } from '../../GymContext';
 import { ShieldCheck, Search, Database, Clock, RefreshCw } from 'lucide-react';
 
 export const AuditLogView: React.FC = () => {
