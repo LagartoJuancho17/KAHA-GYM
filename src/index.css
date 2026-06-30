@@ -1,15 +1,83 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sRGB, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* ===== Identidad ANGYM: verde lima neón ===== */
+  /* `lime` = neón de marca (usar con texto OSCURO sobre fondos lima) */
+  --color-lime-50:  #f7ffe3;
+  --color-lime-100: #ecffbf;
+  --color-lime-200: #dcfd85;
+  --color-lime-300: #c8f63e; /* neón de marca */
+  --color-lime-400: #b4e926;
+  --color-lime-500: #97c91d;
+  --color-lime-600: #76a015;
+  --color-lime-700: #5a7a16;
+  --color-lime-800: #475f16;
+  --color-lime-900: #3b4e17;
+  --color-lime-950: #1e2806;
+
+  /* `emerald` es el acento histórico de toda la app (400+ usos): lo
+     remapeamos a una familia verde-lima LEGIBLE (texto/borde/fondos claros).
+     El pop neón se aplica a mano con `lime-300/400` en los shells. */
+  --color-emerald-50:  #f1fae0;
+  --color-emerald-100: #e3f4c0;
+  --color-emerald-200: #cde892;
+  --color-emerald-300: #b2d65f;
+  --color-emerald-400: #93bd2f;
+  --color-emerald-500: #74a017;
+  --color-emerald-600: #5c7d18;
+  --color-emerald-700: #496217;
+  --color-emerald-800: #3a4e16;
+  --color-emerald-900: #2f3f14;
+  --color-emerald-950: #1b2608;
 }
 
-/* Custom styles matching Geometric Balance Design Theme */
+/* Custom styles matching ANGYM Design Theme */
 body {
-  background-color: #f8fafc;
+  background-color: #f4f4f2;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #18181b;
+}
+
+/* Tipografía display ANGYM en todos los títulos */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* ===== Helpers de botones estilo ANGYM ===== */
+/* Píldora oscura con texto claro (CTA primario) */
+.btn-angym {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #18181b;
+  color: #ffffff;
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: background 0.18s ease, transform 0.12s ease;
+  cursor: pointer;
+}
+.btn-angym:hover { background: #000000; }
+.btn-angym:active { transform: scale(0.98); }
+
+/* Círculo de ícono neón (acompaña a los CTA ANGYM) */
+.btn-angym-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-lime-300);
+  color: #18181b;
+  border-radius: 9999px;
 }
 
 .geometric-grid-layout {
@@ -26,17 +94,17 @@ body {
 
 .kpi-card-theme {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
+  border: 1px solid #e7e7e4;
+  border-radius: 1.25rem;
   padding: 1.25rem;
   transition: all 0.2s ease;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
 }
 
 .kpi-card-theme:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  transform: translateY(-1px);
+  border-color: #18181b;
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 .custom-scrollbar::-webkit-scrollbar {

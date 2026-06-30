@@ -100,10 +100,13 @@ export const GoogleSignIn: React.FC = () => {
         {/* BRAND HEADER */}
         <div className="text-center space-y-2">
 
-          <div className="flex justify-center items-center gap-2 mt-2">
-            <div className="text-left">
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">KAHA GYM</h2>
-              <p className="text-green-600 text-[10px] uppercase font-mono tracking-widest -mt-1">Servicio de Autenticación</p>
+          <div className="flex flex-col justify-center items-center gap-3 mt-2">
+            <div className="w-14 h-14 rounded-2xl bg-lime-300 flex items-center justify-center shadow-sm">
+              <Shield className="w-7 h-7 text-zinc-900" />
+            </div>
+            <div className="text-center">
+              <h2 className="font-display text-2xl font-bold text-zinc-900 tracking-tight">KAHA GYM</h2>
+              <p className="text-zinc-400 text-[10px] uppercase font-mono tracking-widest mt-0.5">Servicio de Autenticación</p>
             </div>
           </div>
           <p className="text-slate-600 text-xs mt-3">

@@ -320,11 +320,11 @@ function InnerApp() {
       {/* MOBILE HEADER BAR */}
       <div className="lg:hidden bg-white text-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-200 z-50 sticky top-0 shadow-xs">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center border border-emerald-100">
-            <Shield className="w-4.5 h-4.5 text-emerald-600" />
+          <div className="w-8 h-8 rounded-xl bg-lime-300 flex items-center justify-center">
+            <Shield className="w-4.5 h-4.5 text-zinc-900" />
           </div>
-          <h1 className="text-slate-900 font-extrabold tracking-tight text-sm">
-            KAHA GYM <span className="text-[10px] text-emerald-600 font-semibold block -mt-1">Administración</span>
+          <h1 className="font-display text-zinc-900 font-bold tracking-tight text-sm">
+            KAHA GYM <span className="text-[10px] text-zinc-400 font-semibold block -mt-1 uppercase tracking-widest">Administración</span>
           </h1>
         </div>
         
@@ -348,14 +348,14 @@ function InnerApp() {
           {/* Logo / Brand */}
           <div className="mb-2 hidden lg:block">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center shadow-sm shrink-0">
-                <Shield className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-2xl bg-lime-300 flex items-center justify-center shadow-sm shrink-0">
+                <Shield className="w-5 h-5 text-zinc-900" />
               </div>
               <div>
-                <h1 className="text-slate-900 text-base font-extrabold tracking-tight leading-none" id="sidebar-logo-heading">
+                <h1 className="font-display text-zinc-900 text-base font-bold tracking-tight leading-none" id="sidebar-logo-heading">
                   KAHA GYM
                 </h1>
-                <span className="text-emerald-600 text-[10px] font-semibold tracking-wider block uppercase mt-0.5" id="sidebar-logo-subtitle">
+                <span className="text-zinc-400 text-[10px] font-semibold tracking-widest block uppercase mt-0.5" id="sidebar-logo-subtitle">
                   Panel de Control
                 </span>
               </div>
@@ -380,15 +380,15 @@ function InnerApp() {
                   }}
                   title={item.desc}
                   className={`
-                    w-full px-4 py-3 rounded-lg flex items-center gap-3 text-xs font-semibold transition-all duration-150 outline-none cursor-pointer
+                    w-full px-4 py-3 rounded-full flex items-center gap-3 text-xs font-semibold transition-all duration-150 outline-none cursor-pointer
                     ${isSelected
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent'
+                      ? 'bg-zinc-900 text-white border border-zinc-900 shadow-sm'
+                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border border-transparent'
                     }
                   `}
                   id={`tab-btn-sidebar-${item.id.toLowerCase()}`}
                 >
-                  <Icon className={`w-4 h-4 transition-colors ${isSelected ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 transition-colors ${isSelected ? 'text-lime-300' : 'text-zinc-400'}`} />
                   <span className="flex-1 text-left">{item.label}</span>
                   {pendingCount > 0 && (
                     <span className="bg-amber-500 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-full animate-pulse tracking-wide shadow-sm">
@@ -457,7 +457,7 @@ function InnerApp() {
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
               Entorno Seguro
             </span>
-            <span className="text-base font-bold text-slate-800 flex items-center gap-2 tracking-tight" id="current-tab-label-header">
+            <span className="font-display text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight" id="current-tab-label-header">
               {currentTab.desc}
             </span>
           </div>

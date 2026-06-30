@@ -202,11 +202,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
               if (setShowAddClienteModal) setShowAddClienteModal(true);
               setActiveTab('CLIENTES');
             }}
-            className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="bg-zinc-900 hover:bg-black text-white pl-4 pr-1.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
             id="quick-add-client-btn"
           >
-            <Plus className="w-4 h-4" />
             Nuevo Socio
+            <span className="w-6 h-6 rounded-full bg-lime-300 flex items-center justify-center">
+              <Plus className="w-4 h-4 text-zinc-900" />
+            </span>
           </button>
           
           <button
@@ -214,19 +216,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
               if (setShowAddPagoModal) setShowAddPagoModal(true);
               setActiveTab('PAGOS');
             }}
-            className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             id="quick-add-payment-btn"
           >
-            <Receipt className="w-4 h-4 text-slate-500" />
+            <Receipt className="w-4 h-4 text-zinc-500" />
             Registrar Pago
           </button>
           
           <button
             onClick={() => setActiveTab('TURNOS')}
-            className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             id="quick-schedule-btn"
           >
-            <Grid className="w-4 h-4 text-slate-500" />
+            <Grid className="w-4 h-4 text-zinc-500" />
             Grilla Horarios
           </button>
 
@@ -236,7 +238,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setGastoOk('');
               setShowGastoModal(true);
             }}
-            className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             id="quick-add-expense-btn"
           >
             <Minus className="w-4 h-4" />

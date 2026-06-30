@@ -23,11 +23,11 @@ export const RoleSwitcher: React.FC = () => {
     <div className="bg-white text-slate-700 py-2 px-4 lg:px-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs" id="role-switcher-container">
       {/* Brand + rol activo indicator */}
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="bg-emerald-50 p-1.5 rounded-lg border border-emerald-100 shrink-0" id="gym-logo-badge">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+        <div className="bg-lime-300 p-1.5 rounded-full shrink-0" id="gym-logo-badge">
+          <Sparkles className="w-3.5 h-3.5 text-zinc-900" />
         </div>
         <div className="min-w-0">
-          <span className="font-bold text-slate-800 text-xs tracking-tight">KAHA GYM</span>
+          <span className="font-display font-bold text-zinc-900 text-xs tracking-tight">KAHA GYM</span>
           <span className="text-slate-400 mx-1.5">·</span>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${rolColor}`}>
             {rolLabel}
@@ -40,15 +40,15 @@ export const RoleSwitcher: React.FC = () => {
         <span className="text-[9px] text-slate-400 font-mono uppercase tracking-widest hidden sm:inline">Modo Simulación:</span>
 
         {/* Roles Toggles */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 gap-0.5">
+        <div className="flex items-center bg-zinc-100 p-0.5 rounded-full border border-zinc-200 gap-0.5">
           <button
             onClick={() => { if (!isOperatorBound) setRolActivo('ADMIN'); }}
             disabled={isOperatorBound}
             title={isOperatorBound ? 'Acceso restringido: estás autenticado como Profesor' : 'Vista de Administrador'}
-            className={`px-2.5 py-1 rounded-md transition-all font-semibold flex items-center gap-1 text-[10px] ${
-              isOperatorBound ? 'opacity-30 cursor-not-allowed text-slate-400'
-                : rolActivo === 'ADMIN' ? 'bg-sky-500 text-white shadow-sm cursor-pointer'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 cursor-pointer'
+            className={`px-3 py-1 rounded-full transition-all font-semibold flex items-center gap-1 text-[10px] ${
+              isOperatorBound ? 'opacity-30 cursor-not-allowed text-zinc-400'
+                : rolActivo === 'ADMIN' ? 'bg-zinc-900 text-white shadow-sm cursor-pointer'
+                : 'text-zinc-600 hover:text-zinc-900 hover:bg-white cursor-pointer'
             }`}
             id="role-btn-admin"
           >
@@ -58,10 +58,10 @@ export const RoleSwitcher: React.FC = () => {
           <button
             onClick={() => setRolActivo('OPERADOR')}
             title="Vista de Profesor/Operador"
-            className={`px-2.5 py-1 rounded-md transition-all font-semibold flex items-center gap-1 text-[10px] cursor-pointer ${
+            className={`px-3 py-1 rounded-full transition-all font-semibold flex items-center gap-1 text-[10px] cursor-pointer ${
               rolActivo === 'OPERADOR'
-                ? 'bg-slate-700 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                ? 'bg-zinc-900 text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900 hover:bg-white'
             }`}
             id="role-btn-operator"
           >
@@ -71,10 +71,10 @@ export const RoleSwitcher: React.FC = () => {
           <button
             onClick={() => setRolActivo('SOCIO')}
             title="Vista del Socio (panel del cliente)"
-            className={`px-2.5 py-1 rounded-md transition-all font-semibold flex items-center gap-1 text-[10px] cursor-pointer ${
+            className={`px-3 py-1 rounded-full transition-all font-semibold flex items-center gap-1 text-[10px] cursor-pointer ${
               rolActivo === 'SOCIO'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                ? 'bg-lime-300 text-zinc-900 shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900 hover:bg-white'
             }`}
             id="role-btn-socio"
           >
