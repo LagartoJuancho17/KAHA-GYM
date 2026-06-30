@@ -1,6 +1,6 @@
 // src/components/GoogleSignIn.tsx
 import React, { useState, useEffect } from 'react';
-import { useGym } from '../GymContext';
+import { useGym } from '../../GymContext';
 import { Shield, Lock, Sparkles, AlertCircle } from 'lucide-react';
 
 // Decodes Google's credential JWT securely on the client-side

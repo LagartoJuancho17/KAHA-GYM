@@ -247,10 +247,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (localGastos) setGastos(JSON.parse(localGastos));
     else {
+      const nowISO = new Date().toISOString();
+      const mesActual = nowISO.slice(0, 7); // YYYY-MM
       const initGastos = [
-        { id: 'gas-1', concepto: 'Alquiler Salón Principal', monto: 85000, categoria: 'ALQUILER', fecha: '2026-05-01', registrado_por: 'admin@gimnasio.com.ar', creado_at: '2026-05-01T10:00:00Z' },
-        { id: 'gas-2', concepto: 'Servicio de Luz Edesur', monto: 18400, categoria: 'SERVICIOS', fecha: '2026-05-10', registrado_por: 'admin@gimnasio.com.ar', creado_at: '2026-05-10T12:00:00Z' },
-        { id: 'gas-3', concepto: 'Insumos Limpieza', monto: 7500, categoria: 'INSUMOS', fecha: '2026-05-15', registrado_por: 'admin@gimnasio.com.ar', creado_at: '2026-05-15T15:00:00Z' }
+        { id: 'gas-1', concepto: 'Alquiler Salón Principal', monto: 85000, categoria: 'ALQUILER', fecha: `${mesActual}-01`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-01T10:00:00Z` },
+        { id: 'gas-2', concepto: 'Servicio de Luz Edesur', monto: 18400, categoria: 'SERVICIOS', fecha: `${mesActual}-10`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-10T12:00:00Z` },
+        { id: 'gas-3', concepto: 'Insumos Limpieza', monto: 7500, categoria: 'INSUMOS', fecha: `${mesActual}-15`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-15T15:00:00Z` }
       ];
       setGastos(initGastos as Gasto[]);
       localStorage.setItem('gym_gastos', JSON.stringify(initGastos));
@@ -269,8 +271,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (localNovedadesProfesores) setNovedadesProfesores(JSON.parse(localNovedadesProfesores));
     else {
+      const hoy = new Date().toISOString().slice(0, 10);
       const initNovedadesP = [
-        { id: 'nov-p-1', profesor_id: 'prof-2', fecha: '2026-05-11', turno_id: 'LUNES-08:30', tipo: 'AUSENCIA', creado_at: '2026-05-11T09:00:00Z' }
+        { id: 'nov-p-1', profesor_id: 'prof-2', fecha: hoy, turno_id: 'LUNES-08:30', tipo: 'AUSENCIA', creado_at: new Date().toISOString() }
       ];
       setNovedadesProfesores(initNovedadesP as NovedadProfesor[]);
       localStorage.setItem('gym_novedades_profesores', JSON.stringify(initNovedadesP));

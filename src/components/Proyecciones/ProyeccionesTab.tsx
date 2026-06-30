@@ -1,6 +1,6 @@
 // src/components/ProyeccionesTab.tsx
 import React, { useMemo } from 'react';
-import { useGym } from '../GymContext';
+import { useGym } from '../../GymContext';
 import { Shield, BarChart3, TrendingUp, Sparkles, Scale, AlertOctagon, HelpCircle } from 'lucide-react';
 
 export const ProyeccionesTab: React.FC = () => {

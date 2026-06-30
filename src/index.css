@@ -83,3 +83,52 @@ body {
 .animate-fade-in {
   animation: fadeInOverlay 0.25s ease-out forwards;
 }
+
+/* Scale-in for modals */
+@keyframes scaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.93) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Scale-up (alias for scale-in, slightly slower) */
+@keyframes scaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.90) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Flash success banner */
+@keyframes flashSuccess {
+  0% { opacity: 0; transform: translateY(-6px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+.animate-flash-success {
+  animation: flashSuccess 3s ease-in-out forwards;
+}
+
+/* Subtle scale-101 for hover cards */
+.hover\:scale-101:hover {
+  transform: scale(1.01);
+}

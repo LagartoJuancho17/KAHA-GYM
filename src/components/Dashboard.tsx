@@ -1,5 +1,5 @@
 // src/components/Dashboard.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGym } from '../GymContext';
 import { 
   Users, AlertTriangle, TrendingUp, DollarSign, 
@@ -39,8 +39,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [gastoErr, setGastoErr] = useState('');
   const [gastoOk, setGastoOk] = useState('');
 
-  // Mes corriente de análisis
-  const mesActual = '2026-05';
+  // Mes corriente de análisis (dinámico)
+  const mesActual = new Date().toISOString().slice(0, 7);
 
   // --- CALCULOS DE KPIs ---
   const clientesActivosFicha = clientes.filter(c => c.activo);
@@ -80,19 +80,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Balance neto
   const balanceNeto = ingresosReales - gastosTotal;
 
-  // --- DATOS PARA GRÁFICOS ---
-  const ultimos6Meses = ['2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05'];
+  // --- DATOS PARA GRÁFICOS (dinámico, últimos 6 meses desde hoy) ---
+  const ultimos6Meses = (() => {
+    const meses: string[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    return meses;
+  })();
+
+  // Fallback mock data para meses sin pagos reales (historial demo)
+  const FALLBACK_MESES: Record<string, number> = {
+    '2025-12': 48000, '2026-01': 56000, '2026-02': 62000,
+    '2026-03': 74000, '2026-04': 68000, '2026-05': 72000
+  };
   const ingresosHistoricos = ultimos6Meses.map(mes => {
     const totalMes = pagos
       .filter(p => p.mes_correspondiente === mes)
       .reduce((sum, p) => sum + p.monto, 0);
-    if (totalMes === 0) {
-      if (mes === '2025-12') return 48000;
-      if (mes === '2026-01') return 56000;
-      if (mes === '2026-02') return 62000;
-      if (mes === '2026-03') return 74000;
-      if (mes === '2026-04') return 68000;
-    }
+    if (totalMes === 0) return FALLBACK_MESES[mes] || 0;
     return totalMes;
   });
 
@@ -135,6 +143,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .filter(c => c.estado === 'MOROSO' || c.estado === 'CON_DEUDA')
     .slice(0, 4);
 
+  // Escape key closes modal
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowGastoModal(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, []);
+
   // --- GASTO MODAL HANDLERS ---
   const handleGastoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,13 +181,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // Nombre legible del mes actual
+  const mesNombre = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+
   return (
     <div className="space-y-8 p-6 max-w-7xl mx-auto" id="dashboard-tab-panel">
       {/* SECCIÓN BIENVENIDA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-sans font-bold tracking-tight text-slate-950">Panel de Control General</h2>
-          <p className="text-slate-500 font-sans text-sm">Resumen de indicativos y comportamiento operativo de los socios para el mes cursado</p>
+          <p className="text-slate-500 font-sans text-sm">
+            Indicadores operativos para <span className="font-semibold text-slate-700 capitalize">{mesNombre}</span>
+          </p>
         </div>
         
         {/* BOTONERA ACCESOS RAPIDOS */}
@@ -291,35 +313,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* TARJETAS INDICADORAS DE RENDIMIENTO */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-5">
-        {/* CLIENTES ACTIVOS */}
-        <div className="kpi-card-theme" id="card-active-clients">
+        {/* CLIENTES ACTIVOS - clickable → CLIENTES */}
+        <button
+          onClick={() => setActiveTab('CLIENTES')}
+          className="kpi-card-theme text-left hover:border-sky-200 hover:shadow-sky-50 group"
+          id="card-active-clients"
+        >
           <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Clientes Activos</span>
-            <span className="bg-sky-50 text-sky-700 p-1.5 rounded-lg text-xs font-semibold border border-sky-100">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Socios Activos</span>
+            <span className="bg-sky-50 text-sky-700 p-1.5 rounded-lg text-xs font-semibold border border-sky-100 group-hover:bg-sky-100 transition-colors">
               <Users className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-sans font-bold text-slate-900">{totalActivosCount}</h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">Socios registrados vigentes</p>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
+              Socios vigentes <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+            </p>
           </div>
-        </div>
+        </button>
 
-        {/* % MOROSIDAD */}
-        <div className="kpi-card-theme" id="card-delinquency-rate">
+        {/* % MOROSIDAD - clickable → MOROSIDAD */}
+        <button
+          onClick={() => setActiveTab('MOROSIDAD')}
+          className="kpi-card-theme text-left group hover:border-amber-200"
+          id="card-delinquency-rate"
+        >
           <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Morosidad Activa</span>
-            <span className={`p-1.5 rounded-lg text-xs font-semibold border ${porcentajeMorosidad > 15 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-655 border-amber-100'}`}>
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Morosidad</span>
+            <span className={`p-1.5 rounded-lg text-xs font-semibold border ${porcentajeMorosidad > 15 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
               <AlertTriangle className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-sans font-bold text-slate-900">{porcentajeMorosidad}%</h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">
-              <span className="font-semibold text-red-650">{morososCount}</span> socios en mora
+            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
+              <span className="font-semibold text-red-600">{morososCount}</span> en mora
+              <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity ml-auto" />
             </p>
           </div>
-        </div>
+        </button>
 
         {/* COBRANZA EFECTIVA */}
         <div className="kpi-card-theme" id="card-collection-rate">
@@ -331,15 +364,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-sans font-bold text-slate-900">{porcentajeCobranza}%</h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">Ratio de cobro efectivo</p>
+            <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${porcentajeCobranza >= 80 ? 'bg-emerald-500' : porcentajeCobranza >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                style={{ width: `${Math.min(100, porcentajeCobranza)}%` }}
+              />
+            </div>
           </div>
         </div>
 
-        {/* INGRESOS COBRADOS */}
-        <div className="kpi-card-theme" id="card-actual-income">
+        {/* INGRESOS COBRADOS - clickable → PAGOS */}
+        <button
+          onClick={() => setActiveTab('PAGOS')}
+          className="kpi-card-theme text-left group hover:border-emerald-200"
+          id="card-actual-income"
+        >
           <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ingresos Reales</span>
-            <span className="bg-slate-50 text-slate-700 p-1.5 rounded-lg text-xs font-semibold border border-slate-200">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Ingresos</span>
+            <span className="bg-slate-50 text-slate-700 p-1.5 rounded-lg text-xs font-semibold border border-slate-200 group-hover:bg-emerald-50 group-hover:text-emerald-700 group-hover:border-emerald-100 transition-colors">
               <DollarSign className="w-4 h-4" />
             </span>
           </div>
@@ -347,14 +389,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h3 className="text-2xl font-mono font-bold text-slate-900">
               ${ingresosReales.toLocaleString('es-AR')}
             </h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">ARS recaudados este mes</p>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
+              ARS este mes <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity ml-auto" />
+            </p>
           </div>
-        </div>
+        </button>
 
-        {/* GASTOS TOTALES */}
-        <div className="kpi-card-theme" id="card-total-expenses">
+        {/* GASTOS TOTALES - clickable → PAGOS */}
+        <button
+          onClick={() => setActiveTab('PAGOS')}
+          className="kpi-card-theme text-left group hover:border-rose-200"
+          id="card-total-expenses"
+        >
           <div className="flex justify-between items-start">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Gastos Totales</span>
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Gastos</span>
             <span className="bg-rose-50 text-rose-600 p-1.5 rounded-lg text-xs font-semibold border border-rose-100">
               <TrendingDown className="w-4 h-4" />
             </span>
@@ -363,9 +411,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h3 className="text-2xl font-mono font-bold text-rose-600">
               ${gastosTotal.toLocaleString('es-AR')}
             </h3>
-            <p className="text-slate-400 text-[10px] mt-1 font-sans">Egresos registrados</p>
+            <p className="text-slate-400 text-[10px] mt-1 font-sans flex items-center gap-1">
+              Egresos registrados <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity ml-auto" />
+            </p>
           </div>
-        </div>
+        </button>
 
         {/* BALANCE NETO */}
         <div className={`kpi-card-theme border-l-4 ${balanceNeto >= 0 ? 'border-l-emerald-500' : 'border-l-red-500'}`} id="card-net-balance">
@@ -429,10 +479,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {/* Labels below */}
             {ultimos6Meses.map((mes, idx) => {
               const valorFormated = ingresosHistoricos[idx];
+              const [yyyy, mm] = mes.split('-');
+              const mesLabel = new Date(Number(yyyy), Number(mm) - 1, 1)
+                .toLocaleDateString('es-AR', { month: 'short' })
+                .replace('.', '');
               return (
                 <div key={idx} className="flex flex-col items-center w-12 text-center z-10">
                   <span className="font-semibold text-zinc-950 font-mono">${Math.round(valorFormated / 1000)}k</span>
-                  <span className="text-[10px] text-zinc-400 mt-2 font-sans">{mes}</span>
+                  <span className="text-[10px] text-zinc-400 mt-2 font-sans capitalize">{mesLabel}</span>
                 </div>
               );
             })}

@@ -1,6 +1,6 @@
 // src/components/PlanesPricing.tsx
 import React, { useState } from 'react';
-import { useGym } from '../GymContext';
+import { useGym } from '../../GymContext';
 import { Shield, Sparkles, TrendingUp, HelpCircle, History, Check, DollarSign, PenTool } from 'lucide-react';
 
 export const PlanesPricing: React.FC = () => {
