@@ -67,6 +67,7 @@ export interface Turno {
   asignados_ids: string[]; // cliente_id de clientes asignados fijos
   lista_espera_ids: string[]; // cliente_id de clientes en lista de espera
   profesor?: string; // Profesor asignado a este turno
+  db_uuid?: string; // UUID real en la base de datos de Supabase
 }
 
 export interface Pago {

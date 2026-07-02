@@ -10,6 +10,7 @@ import {
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
   INITIAL_CLIENTES, INITIAL_PAGOS, INITIAL_AUDIT_LOGS, INITIAL_RECUPEROS, INITIAL_NOVEDADES 
 } from './initialMockData';
+import { supabase } from './supabaseClient';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -246,131 +247,350 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [clientes, selectedSocioId]);
 
+  const loadSupabaseData = async () => {
+    if (!supabase) return;
+    try {
+      // 1. Fetch Planes
+      const { data: planesDb, error: planesErr } = await supabase.from('planes').select('*');
+      if (planesErr) throw planesErr;
+
+      // Seed default plan "Aún no sabe" if missing in DB
+      let planesList = planesDb || [];
+      const hasNonePlan = planesList.some(p => p.nombre === 'Aún no sabe');
+      if (!hasNonePlan) {
+        const { data: newPlan, error: insertErr } = await supabase.from('planes').insert({
+          id: '00000000-0000-0000-0000-000000000000',
+          nombre: 'Aún no sabe',
+          dias_por_semana: 5,
+          precio: 0
+        }).select();
+        if (!insertErr && newPlan) {
+          planesList = [...planesList, ...newPlan];
+        }
+      }
+
+      // 2. Fetch Clientes
+      const { data: clientesDb, error: clientesErr } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('creado_at', { ascending: false });
+      if (clientesErr) throw clientesErr;
+
+      // 3. Fetch Turnos
+      const { data: turnosDb, error: turnosErr } = await supabase.from('turnos').select('*');
+      if (turnosErr) throw turnosErr;
+
+      // Seed turnos if empty in Supabase (automatic setup!)
+      let dbTurnos = turnosDb || [];
+      if (dbTurnos.length === 0) {
+        const seedTurnos = generarTurnosIniciales().map(t => {
+          return {
+            dia: t.dia,
+            hora: `${t.hora}:00`,
+            cupo_maximo: t.cupo_maximo
+          };
+        });
+        const { data: newTurnos, error: turnosSeedErr } = await supabase.from('turnos').insert(seedTurnos).select();
+        if (!turnosSeedErr && newTurnos) {
+          dbTurnos = newTurnos;
+        }
+      }
+
+      // 4. Fetch assignments and waitlist
+      const { data: asignacionesDb, error: asigErr } = await supabase.from('asignaciones_turnos').select('*');
+      if (asigErr) throw asigErr;
+
+      const { data: waitlistDb, error: waitErr } = await supabase.from('lista_espera_turnos').select('*');
+      if (waitErr) throw waitErr;
+
+      // 5. Fetch Pagos
+      const { data: pagosDb, error: pagosErr } = await supabase
+        .from('pagos')
+        .select('*')
+        .order('creado_at', { ascending: false });
+      if (pagosErr) throw pagosErr;
+
+      // 6. Fetch Recuperos
+      const { data: recuperosDb, error: recsErr } = await supabase.from('recupero_turnos').select('*');
+      if (recsErr) throw recsErr;
+
+      // 7. Fetch Audit Logs
+      const { data: logsDb, error: logsErr } = await supabase
+        .from('logs_auditoria')
+        .select('*')
+        .order('creado_at', { ascending: false })
+        .limit(100);
+      if (logsErr) throw logsErr;
+
+      // Mapping helpers
+      const getTurnoIdFromUuid = (uuid: string): string => {
+        const matched = dbTurnos.find(t => t.id === uuid);
+        if (!matched) return '';
+        const cleanHora = matched.hora.substring(0, 5); // "07:30:00" -> "07:30"
+        return `${matched.dia}-${cleanHora}`;
+      };
+
+      // Map relation data to local Client structure
+      const clientList: Cliente[] = (clientesDb || []).map(c => {
+        const fixedShifts = (asignacionesDb || [])
+          .filter(a => a.cliente_id === c.id)
+          .map(a => getTurnoIdFromUuid(a.turno_id))
+          .filter(id => id !== '');
+        
+        return {
+          id: c.id,
+          nombre: c.nombre,
+          apellido: c.apellido,
+          email: c.email,
+          telefono: c.telefono || '',
+          tipo: c.tipo as TipoCliente,
+          auto_return: 'approved',
+          estado: c.estado as EstadoCliente,
+          plan_id: c.plan_id || 'p-none',
+          activo: c.activo,
+          deuda_acumulada: Number(c.deuda_acumulada),
+          ultimo_mes_pagado: c.ultimo_mes_pagado || '',
+          turnos_fijos: fixedShifts,
+          exencion_cobro: (c.exencion_cobro || 'NINGUNA') as any,
+          autorizado: c.autorizado ?? true,
+          creado_at: c.creado_at
+        };
+      });
+
+      // Map relation data to local Turno structure
+      const shiftList: Turno[] = dbTurnos.map(t => {
+        const localId = `${t.dia}-${t.hora.substring(0, 5)}`;
+        const assigned = (asignacionesDb || [])
+          .filter(a => a.turno_id === t.id)
+          .map(a => a.cliente_id);
+        const waiting = (waitlistDb || [])
+          .filter(w => w.turno_id === t.id)
+          .map(w => w.cliente_id);
+
+        return {
+          id: localId,
+          dia: t.dia as any,
+          hora: t.hora.substring(0, 5),
+          cupo_maximo: t.cupo_maximo,
+          profesor: t.profesor || undefined,
+          asignados_ids: assigned,
+          lista_espera_ids: waiting,
+          db_uuid: t.id
+        };
+      });
+
+      // Sort turnos by day and time
+      const orderDias = { 'LUNES': 1, 'MARTES': 2, 'MIERCOLES': 3, 'JUEVES': 4, 'VIERNES': 5 };
+      shiftList.sort((a, b) => {
+        const dDiff = (orderDias[a.dia] || 0) - (orderDias[b.dia] || 0);
+        if (dDiff !== 0) return dDiff;
+        return a.hora.localeCompare(b.hora);
+      });
+
+      const mappedPlanes: Plan[] = planesList.map(p => ({
+        id: p.id,
+        nombre: p.nombre,
+        dias_por_semana: p.dias_por_semana,
+        precio: Number(p.precio),
+        creado_at: p.creado_at
+      }));
+
+      const mappedPagos: Pago[] = (pagosDb || []).map(p => {
+        const c = clientList.find(cl => cl.id === p.cliente_id);
+        return {
+          id: p.id,
+          cliente_id: p.cliente_id,
+          cliente_nombre_completo: c ? `${c.nombre} ${c.apellido}` : 'Socio Desconocido',
+          monto: Number(p.monto),
+          medio_pago: p.medio_pago as MedioPago,
+          mes_correspondiente: p.mes_correspondiente,
+          hash_transaccion: p.hash_transaccion,
+          registrado_por: p.registrado_por || 'admin@gimnasio.com.ar',
+          fecha_pago: p.fecha_pago,
+          creado_at: p.creado_at
+        };
+      });
+
+      const mappedRecs: RecuperoTurno[] = (recuperosDb || []).map(r => {
+        const c = clientList.find(cl => cl.id === r.cliente_id);
+        return {
+          id: r.id,
+          cliente_id: r.cliente_id,
+          cliente_nombre: c ? `${c.nombre} ${c.apellido}` : 'Socio Desconocido',
+          turno_original_id: getTurnoIdFromUuid(r.turno_original_id),
+          fecha_inasistencia: r.fecha_inasistencia,
+          turno_recupero_id: r.turno_recupero_id ? getTurnoIdFromUuid(r.turno_recupero_id) : 'PENDIENTE_DEFINICION',
+          fecha_recupero: r.fecha_recupero || '',
+          estado: r.estado as any,
+          fecha_limite: r.fecha_limite
+        };
+      });
+
+      const mappedLogs: AuditLog[] = (logsDb || []).map(l => ({
+        id: l.id,
+        usuario_id: l.usuario_id || '',
+        usuario_email: l.usuario_email || '',
+        accion: l.accion,
+        detalles: l.detalles,
+        creado_at: l.creado_at
+      }));
+
+      setPlanes(mappedPlanes);
+      setClientes(clientList);
+      setTurnos(shiftList);
+      setPagos(mappedPagos);
+      setRecuperos(mappedRecs);
+      setAuditLogs(mappedLogs);
+
+      const localGoogleUser = localStorage.getItem('gym_google_user');
+      if (localGoogleUser) {
+        try {
+          const parsed = JSON.parse(localGoogleUser);
+          if (parsed.role === 'SOCIO') {
+            const matched = clientList.find(c => c.activo && c.email.toLowerCase().trim() === parsed.email.toLowerCase().trim());
+            if (matched) {
+              setSelectedSocioId(matched.id);
+            }
+          }
+        } catch (e) {}
+      }
+
+      console.log('✅ Sincronización exitosa desde Supabase completada');
+    } catch (err) {
+      console.error('❌ Error al inicializar/sincronizar Supabase:', err);
+    }
+  };
+
   // Carga inicial
   useEffect(() => {
+    if (supabase) {
+      loadSupabaseData();
+    } else {
+      const localClientes = localStorage.getItem('gym_clientes');
+      const localPlanes = localStorage.getItem('gym_planes');
+      const localHistorial = localStorage.getItem('gym_historial_precios');
+      const localTurnos = localStorage.getItem('gym_turnos');
+      const localPagos = localStorage.getItem('gym_pagos');
+      const localRecuperos = localStorage.getItem('gym_recuperos');
+      const localLogs = localStorage.getItem('gym_audit_logs');
+      const localNovedades = localStorage.getItem('gym_novedades');
+      const localNotificaciones = localStorage.getItem('gym_notificaciones');
+      const localGastos = localStorage.getItem('gym_gastos');
+      const localProfesores = localStorage.getItem('gym_profesores');
+      const localNovedadesProfesores = localStorage.getItem('gym_novedades_profesores');
+
+      if (localClientes) setClientes(JSON.parse(localClientes));
+      else {
+        setClientes(INITIAL_CLIENTES);
+        localStorage.setItem('gym_clientes', JSON.stringify(INITIAL_CLIENTES));
+      }
+
+      if (localPlanes) {
+        const parsedPlanes = JSON.parse(localPlanes);
+        if (!parsedPlanes.some((p: any) => p.id === 'p-none')) {
+          const updated = [{ id: 'p-none', nombre: 'Aún no sabe', dias_por_semana: 5, precio: 0.00, creado_at: '2026-01-10T10:00:00Z' }, ...parsedPlanes];
+          setPlanes(updated);
+          localStorage.setItem('gym_planes', JSON.stringify(updated));
+        } else {
+          setPlanes(parsedPlanes);
+        }
+      } else {
+        setPlanes(INITIAL_PLANES);
+        localStorage.setItem('gym_planes', JSON.stringify(INITIAL_PLANES));
+      }
+
+      if (localHistorial) setHistorialPrecios(JSON.parse(localHistorial));
+      else {
+        setHistorialPrecios(INITIAL_HISTORIAL_PRECIOS);
+        localStorage.setItem('gym_historial_precios', JSON.stringify(INITIAL_HISTORIAL_PRECIOS));
+      }
+
+      if (localTurnos) setTurnos(JSON.parse(localTurnos));
+      else {
+        const baseTurnos = generarTurnosIniciales();
+        INITIAL_CLIENTES.forEach(c => {
+          if (c.activo && c.tipo === 'FIJO' && c.turnos_fijos) {
+            c.turnos_fijos.forEach(tId => {
+              const index = baseTurnos.findIndex(t => t.id === tId);
+              if (index !== -1) {
+                baseTurnos[index].asignados_ids.push(c.id);
+              }
+            });
+          }
+        });
+        setTurnos(baseTurnos);
+        localStorage.setItem('gym_turnos', JSON.stringify(baseTurnos));
+      }
+
+      if (localPagos) setPagos(JSON.parse(localPagos));
+      else {
+        setPagos(INITIAL_PAGOS);
+        localStorage.setItem('gym_pagos', JSON.stringify(INITIAL_PAGOS));
+      }
+
+      if (localRecuperos) setRecuperos(JSON.parse(localRecuperos));
+      else {
+        setRecuperos(INITIAL_RECUPEROS);
+        localStorage.setItem('gym_recuperos', JSON.stringify(INITIAL_RECUPEROS));
+      }
+
+      if (localLogs) setAuditLogs(JSON.parse(localLogs));
+      else {
+        setAuditLogs(INITIAL_AUDIT_LOGS);
+        localStorage.setItem('gym_audit_logs', JSON.stringify(INITIAL_AUDIT_LOGS));
+      }
+
+      if (localNovedades) setNovedades(JSON.parse(localNovedades));
+      else {
+        setNovedades(INITIAL_NOVEDADES);
+        localStorage.setItem('gym_novedades', JSON.stringify(INITIAL_NOVEDADES));
+      }
+
+      if (localNotificaciones) setNotificaciones(JSON.parse(localNotificaciones));
+      else {
+        setNotificaciones([]);
+        localStorage.setItem('gym_notificaciones', JSON.stringify([]));
+      }
+
+      if (localGastos) setGastos(JSON.parse(localGastos));
+      else {
+        const nowISO = new Date().toISOString();
+        const mesActual = nowISO.slice(0, 7);
+        const initGastos = [
+          { id: 'gas-1', concepto: 'Alquiler Salón Principal', monto: 85000, categoria: 'ALQUILER', fecha: `${mesActual}-01`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-01T10:00:00Z` },
+          { id: 'gas-2', concepto: 'Servicio de Luz Edesur', monto: 18400, categoria: 'SERVICIOS', fecha: `${mesActual}-10`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-10T12:00:00Z` },
+          { id: 'gas-3', concepto: 'Insumos Limpieza', monto: 7500, categoria: 'INSUMOS', fecha: `${mesActual}-15`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-15T15:00:00Z` }
+        ];
+        setGastos(initGastos as Gasto[]);
+        localStorage.setItem('gym_gastos', JSON.stringify(initGastos));
+      }
+
+      if (localProfesores) setProfesores(JSON.parse(localProfesores));
+      else {
+        const initProfesores = [
+          { id: 'prof-1', nombre: 'Juan Ferrari', email: 'jmferrariprofe@gmail.com', telefono: '11-3803-2652', valor_hora: 2500, activo: true },
+          { id: 'prof-2', nombre: 'Carlos Gómez', email: 'carlos@gimnasio.com.ar', telefono: '11-4455-6677', valor_hora: 2000, activo: true },
+          { id: 'prof-3', nombre: 'María Rodríguez', email: 'maria@gimnasio.com.ar', telefono: '11-8899-0011', valor_hora: 2200, activo: true }
+        ];
+        setProfesores(initProfesores as Profesor[]);
+        localStorage.setItem('gym_profesores', JSON.stringify(initProfesores));
+      }
+
+      if (localNovedadesProfesores) setNovedadesProfesores(JSON.parse(localNovedadesProfesores));
+      else {
+        const hoy = new Date().toISOString().slice(0, 10);
+        const initNovedadesP = [
+          { id: 'nov-p-1', profesor_id: 'prof-2', fecha: hoy, turno_id: 'LUNES-08:30', tipo: 'AUSENCIA', creado_at: new Date().toISOString() }
+        ];
+        setNovedadesProfesores(initNovedadesP as NovedadProfesor[]);
+        localStorage.setItem('gym_novedades_profesores', JSON.stringify(initNovedadesP));
+      }
+    }
+
     const localClientes = localStorage.getItem('gym_clientes');
-    const localPlanes = localStorage.getItem('gym_planes');
-    const localHistorial = localStorage.getItem('gym_historial_precios');
-    const localTurnos = localStorage.getItem('gym_turnos');
-    const localPagos = localStorage.getItem('gym_pagos');
-    const localRecuperos = localStorage.getItem('gym_recuperos');
-    const localLogs = localStorage.getItem('gym_audit_logs');
-    const localNovedades = localStorage.getItem('gym_novedades');
-    const localNotificaciones = localStorage.getItem('gym_notificaciones');
-    const localGastos = localStorage.getItem('gym_gastos');
-    const localProfesores = localStorage.getItem('gym_profesores');
-    const localNovedadesProfesores = localStorage.getItem('gym_novedades_profesores');
+    const localGoogleUser = localStorage.getItem('gym_google_user');
     const localRol = localStorage.getItem('gym_rol_activo');
 
-    if (localClientes) setClientes(JSON.parse(localClientes));
-    else {
-      setClientes(INITIAL_CLIENTES);
-      localStorage.setItem('gym_clientes', JSON.stringify(INITIAL_CLIENTES));
-    }
-
-    if (localPlanes) {
-      const parsedPlanes = JSON.parse(localPlanes);
-      if (!parsedPlanes.some((p: any) => p.id === 'p-none')) {
-        const updated = [{ id: 'p-none', nombre: 'Aún no sabe', dias_por_semana: 5, precio: 0.00, creado_at: '2026-01-10T10:00:00Z' }, ...parsedPlanes];
-        setPlanes(updated);
-        localStorage.setItem('gym_planes', JSON.stringify(updated));
-      } else {
-        setPlanes(parsedPlanes);
-      }
-    } else {
-      setPlanes(INITIAL_PLANES);
-      localStorage.setItem('gym_planes', JSON.stringify(INITIAL_PLANES));
-    }
-
-    if (localHistorial) setHistorialPrecios(JSON.parse(localHistorial));
-    else {
-      setHistorialPrecios(INITIAL_HISTORIAL_PRECIOS);
-      localStorage.setItem('gym_historial_precios', JSON.stringify(INITIAL_HISTORIAL_PRECIOS));
-    }
-
-    if (localTurnos) setTurnos(JSON.parse(localTurnos));
-    else {
-      // Registrar asignaciones iniciales en turnos basándose en INITIAL_CLIENTES
-      const baseTurnos = generarTurnosIniciales();
-      INITIAL_CLIENTES.forEach(c => {
-        if (c.activo && c.tipo === 'FIJO' && c.turnos_fijos) {
-          c.turnos_fijos.forEach(tId => {
-            const index = baseTurnos.findIndex(t => t.id === tId);
-            if (index !== -1) {
-              baseTurnos[index].asignados_ids.push(c.id);
-            }
-          });
-        }
-      });
-      setTurnos(baseTurnos);
-      localStorage.setItem('gym_turnos', JSON.stringify(baseTurnos));
-    }
-
-    if (localPagos) setPagos(JSON.parse(localPagos));
-    else {
-      setPagos(INITIAL_PAGOS);
-      localStorage.setItem('gym_pagos', JSON.stringify(INITIAL_PAGOS));
-    }
-
-    if (localRecuperos) setRecuperos(JSON.parse(localRecuperos));
-    else {
-      setRecuperos(INITIAL_RECUPEROS);
-      localStorage.setItem('gym_recuperos', JSON.stringify(INITIAL_RECUPEROS));
-    }
-
-    if (localLogs) setAuditLogs(JSON.parse(localLogs));
-    else {
-      setAuditLogs(INITIAL_AUDIT_LOGS);
-      localStorage.setItem('gym_audit_logs', JSON.stringify(INITIAL_AUDIT_LOGS));
-    }
-
-    if (localNovedades) setNovedades(JSON.parse(localNovedades));
-    else {
-      setNovedades(INITIAL_NOVEDADES);
-      localStorage.setItem('gym_novedades', JSON.stringify(INITIAL_NOVEDADES));
-    }
-
-    if (localNotificaciones) setNotificaciones(JSON.parse(localNotificaciones));
-    else {
-      setNotificaciones([]);
-      localStorage.setItem('gym_notificaciones', JSON.stringify([]));
-    }
-
-    if (localGastos) setGastos(JSON.parse(localGastos));
-    else {
-      const nowISO = new Date().toISOString();
-      const mesActual = nowISO.slice(0, 7); // YYYY-MM
-      const initGastos = [
-        { id: 'gas-1', concepto: 'Alquiler Salón Principal', monto: 85000, categoria: 'ALQUILER', fecha: `${mesActual}-01`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-01T10:00:00Z` },
-        { id: 'gas-2', concepto: 'Servicio de Luz Edesur', monto: 18400, categoria: 'SERVICIOS', fecha: `${mesActual}-10`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-10T12:00:00Z` },
-        { id: 'gas-3', concepto: 'Insumos Limpieza', monto: 7500, categoria: 'INSUMOS', fecha: `${mesActual}-15`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-15T15:00:00Z` }
-      ];
-      setGastos(initGastos as Gasto[]);
-      localStorage.setItem('gym_gastos', JSON.stringify(initGastos));
-    }
-
-    if (localProfesores) setProfesores(JSON.parse(localProfesores));
-    else {
-      const initProfesores = [
-        { id: 'prof-1', nombre: 'Juan Ferrari', email: 'jmferrariprofe@gmail.com', telefono: '11-3803-2652', valor_hora: 2500, activo: true },
-        { id: 'prof-2', nombre: 'Carlos Gómez', email: 'carlos@gimnasio.com.ar', telefono: '11-4455-6677', valor_hora: 2000, activo: true },
-        { id: 'prof-3', nombre: 'María Rodríguez', email: 'maria@gimnasio.com.ar', telefono: '11-8899-0011', valor_hora: 2200, activo: true }
-      ];
-      setProfesores(initProfesores as Profesor[]);
-      localStorage.setItem('gym_profesores', JSON.stringify(initProfesores));
-    }
-
-    if (localNovedadesProfesores) setNovedadesProfesores(JSON.parse(localNovedadesProfesores));
-    else {
-      const hoy = new Date().toISOString().slice(0, 10);
-      const initNovedadesP = [
-        { id: 'nov-p-1', profesor_id: 'prof-2', fecha: hoy, turno_id: 'LUNES-08:30', tipo: 'AUSENCIA', creado_at: new Date().toISOString() }
-      ];
-      setNovedadesProfesores(initNovedadesP as NovedadProfesor[]);
-      localStorage.setItem('gym_novedades_profesores', JSON.stringify(initNovedadesP));
-    }
-
-    const localGoogleUser = localStorage.getItem('gym_google_user');
     if (localGoogleUser) {
       try {
         const parsed = JSON.parse(localGoogleUser);
@@ -547,11 +767,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const plan = planes.find(p => p.id === clientData.plan_id);
     const planPrecio = plan ? plan.precio : 0;
 
+    const newClientId = crypto.randomUUID();
     const newClient: Cliente = {
       ...clientData,
       tipo: clientData.tipo || 'FIJO',
       exencion_cobro: clientData.exencion_cobro || 'NINGUNA',
-      id: `c-${Date.now()}`,
+      id: newClientId,
       estado: 'ACTIVO',
       deuda_acumulada: 0,
       ultimo_mes_pagado: new Date().toISOString().slice(0, 7), // Al día del mes de registro
@@ -563,6 +784,29 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updated = [newClient, ...clientes];
     saveState(updated);
+
+    if (supabase) {
+      const planUuid = newClient.plan_id === 'p-none' ? '00000000-0000-0000-0000-000000000000' : newClient.plan_id;
+      supabase.from('clientes').insert({
+        id: newClient.id,
+        nombre: newClient.nombre,
+        apellido: newClient.apellido,
+        email: newClient.email,
+        telefono: newClient.telefono,
+        tipo: newClient.tipo,
+        estado: newClient.estado,
+        plan_id: planUuid,
+        activo: newClient.activo,
+        deuda_acumulada: newClient.deuda_acumulada,
+        ultimo_mes_pagado: newClient.ultimo_mes_pagado,
+        exencion_cobro: newClient.exencion_cobro,
+        autorizado: newClient.autorizado,
+        creado_at: newClient.creado_at
+      }).then(({ error }) => {
+        if (error) console.error("Error al insertar cliente en Supabase:", error);
+      });
+    }
+
     addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo });
     addToast('add', 'Socio registrado exitosamente.');
     return { success: true, message: 'Cliente registrado exitosamente.', id: newClient.id };
@@ -611,6 +855,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updated);
+
+    if (supabase) {
+      const payload: any = { ...updates };
+      delete payload.id;
+      delete payload.turnos_fijos;
+      delete payload.reservas_individuales;
+      delete payload.clases_suspendidas;
+      if (payload.plan_id) {
+        payload.plan_id = payload.plan_id === 'p-none' ? '00000000-0000-0000-0000-000000000000' : payload.plan_id;
+      }
+      supabase.from('clientes').update(payload).eq('id', id).then(({ error }) => {
+        if (error) console.error("Error al actualizar cliente en Supabase:", error);
+      });
+    }
+
     addAuditLog('CLIENTE_MODIFICADO', { id, cambiados: Object.keys(updates), nota: extraLog });
     return { success: true, message: 'Cliente actualizado exitosamente.' };
   };
@@ -634,6 +893,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      supabase.from('clientes').update({ activo: false, estado: 'INACTIVO' }).eq('id', id).then(({ error }) => {
+        if (error) console.error("Error al dar de baja lógica en Supabase:", error);
+      });
+      supabase.from('asignaciones_turnos').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error("Error al remover asignaciones fijas en Supabase:", error);
+      });
+      supabase.from('lista_espera_turnos').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error("Error al remover lista de espera en Supabase:", error);
+      });
+    }
+
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_BAJA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
     addToast('delete', 'Socio dado de baja exitosamente.');
@@ -648,6 +920,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updatedClientes);
+
+    if (supabase) {
+      supabase.from('clientes').update({ activo: true, estado: 'ACTIVO' }).eq('id', id).then(({ error }) => {
+        if (error) console.error("Error al dar de alta en Supabase:", error);
+      });
+    }
+
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_ALTA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
     addToast('add', 'Socio dado de alta exitosamente.');
@@ -664,6 +943,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updatedClientes);
+
+    if (supabase) {
+      supabase.from('clientes').update({ autorizado: true }).eq('id', id).then(({ error }) => {
+        if (error) console.error("Error al autorizar cliente en Supabase:", error);
+      });
+    }
+
     addAuditLog('CLIENTE_AUTORIZADO', { id, nombre: `${matched.nombre} ${matched.apellido}`, email: matched.email });
     addToast('success', 'Socio autorizado exitosamente.');
     return { success: true, message: 'Cliente autorizado exitosamente.' };
@@ -682,6 +968,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      supabase.from('clientes').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error("Error al eliminar cliente de Supabase:", error);
+      });
+    }
+
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_ELIMINADO_PERMANENTE', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
     addToast('delete', 'Socio eliminado permanentemente.');
@@ -788,6 +1081,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const getUuidFromTurnoId = (tId: string): string => {
+    const matched = turnos.find(t => t.id === tId);
+    return matched?.db_uuid || '';
+  };
+
   // TURNOS
   const asignarClienteFijo = (clienteId: string, turnoId: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
@@ -832,6 +1130,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       saveState(clientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+      if (supabase) {
+        const turnoUuid = getUuidFromTurnoId(turnoId);
+        supabase.from('lista_espera_turnos').insert({
+          cliente_id: clienteId,
+          turno_id: turnoUuid
+        }).then(({ error }) => {
+          if (error) console.error("Error al agregar a lista de espera en Supabase:", error);
+        });
+      }
+
       addAuditLog('TURNO_LISTA_ESPERA_AGREGADO', { cliente: `${cliente.nombre} ${cliente.apellido}`, turno: turnoId });
       addToast('add', 'Socio agregado a la lista de espera.');
       return { success: true, message: 'El horario está completo. El cliente ha sido registrado en la lista de espera.', putInWaitlist: true };
@@ -857,6 +1166,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      const turnoUuid = getUuidFromTurnoId(turnoId);
+      supabase.from('asignaciones_turnos').insert({
+        cliente_id: clienteId,
+        turno_id: turnoUuid
+      }).then(({ error }) => {
+        if (error) console.error("Error al asignar turno fijo en Supabase:", error);
+      });
+    }
+
     addAuditLog('TURNO_ASIGNACION_FIJA', { cliente: `${cliente.nombre} ${cliente.apellido}`, turno: turnoId });
     addToast('add', 'Asignación directa de horario completada.');
     return { success: true, message: 'Asignación directa de horario completada exitosamente.' };
@@ -903,6 +1223,25 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      const turnoUuid = getUuidFromTurnoId(turnoId);
+      supabase.from('asignaciones_turnos').delete().eq('cliente_id', clienteId).eq('turno_id', turnoUuid).then(({ error }) => {
+        if (error) console.error("Error al remover asignación fija en Supabase:", error);
+      });
+      if (waitlistClientLiberado) {
+        supabase.from('lista_espera_turnos').delete().eq('cliente_id', waitlistClientLiberado).eq('turno_id', turnoUuid).then(({ error }) => {
+          if (error) console.error("Error al remover de lista de espera en Supabase:", error);
+        });
+        supabase.from('asignaciones_turnos').insert({
+          cliente_id: waitlistClientLiberado,
+          turno_id: turnoUuid
+        }).then(({ error }) => {
+          if (error) console.error("Error al promover de lista de espera en Supabase:", error);
+        });
+      }
+    }
+
     addAuditLog('TURNO_ASIGNACION_REMOCION', { 
       cliente_id: clienteId, 
       turno_id: turnoId,
@@ -1548,6 +1887,36 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedPagos = [nuevoPago, ...pagos];
 
     saveState(updatedClientes, planes, historialPrecios, turnos, updatedPagos, recuperos, auditLogs);
+
+    if (supabase) {
+      // 1. Insertar pago en Supabase
+      supabase.from('pagos').insert({
+        id: nuevoPago.id,
+        cliente_id: nuevoPago.cliente_id,
+        monto: nuevoPago.monto,
+        medio_pago: nuevoPago.medio_pago,
+        mes_correspondiente: nuevoPago.mes_correspondiente,
+        hash_transaccion: nuevoPago.hash_transaccion,
+        registrado_por: userEmail,
+        fecha_pago: nuevoPago.fecha_pago,
+        creado_at: nuevoPago.creado_at
+      }).then(({ error }) => {
+        if (error) console.error("Error al insertar pago en Supabase:", error);
+      });
+
+      // 2. Actualizar deuda y estado del cliente en Supabase
+      const targetClient = updatedClientes.find(c => c.id === pagoData.cliente_id);
+      if (targetClient) {
+        supabase.from('clientes').update({
+          deuda_acumulada: targetClient.deuda_acumulada,
+          ultimo_mes_pagado: targetClient.ultimo_mes_pagado,
+          estado: targetClient.estado
+        }).eq('id', pagoData.cliente_id).then(({ error }) => {
+          if (error) console.error("Error al actualizar deuda de socio en Supabase:", error);
+        });
+      }
+    }
+
     addAuditLog('PAGO_REGISTRADO', { 
       cliente: cli.nombre + ' ' + cli.apellido, 
       monto: pagoData.monto, 
