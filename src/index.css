@@ -200,3 +200,23 @@ h1, h2, h3, h4 {
 .hover\:scale-101:hover {
   transform: scale(1.01);
 }
+
+/* ===== Toast Notification Animations ===== */
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+  70% {
+    transform: translateX(-8px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

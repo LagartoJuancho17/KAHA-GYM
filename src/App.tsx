@@ -18,7 +18,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
   CalendarRange, ShieldAlert, LineChart, ShieldCheck,
-  Menu, X, MapPin, Shield, Megaphone, Check, Bell, Trash2
+  Menu, X, MapPin, Shield, Megaphone, Check, Bell, Trash2,
+  CheckCircle2, AlertTriangle
 } from 'lucide-react';
 
 type TabID = 'DASHBOARD' | 'CLIENTES' | 'PLANES' | 'TURNOS' | 'PAGOS' | 'MOROSIDAD' | 'PROYECCIONES' | 'AUDITORIA' | 'NOVEDADES';
@@ -40,7 +41,7 @@ function InnerApp() {
   const { 
     rolActivo, googleUser, signOutGoogle, registrarPago, clientes,
     notificaciones, marcarNotificacionesLeidas, eliminarNotificacion,
-    autorizarCliente
+    autorizarCliente, toasts, removeToast
   } = useGym();
 
   const [timeString, setTimeString] = useState('');
@@ -310,6 +311,7 @@ function InnerApp() {
             onClose={() => setPaymentSuccessData(null)} 
           />
         )}
+        <ToastContainer toasts={toasts} onClose={removeToast} />
       </>
     );
   }
@@ -570,6 +572,7 @@ function InnerApp() {
           onClose={() => setPaymentSuccessData(null)} 
         />
       )}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }
@@ -633,6 +636,83 @@ function PaymentSuccessModal({ data, onClose }: PaymentSuccessModalProps) {
           Entendido, gracias
         </button>
       </div>
+    </div>
+  );
+}
+
+interface ToastContainerProps {
+  toasts: any[];
+  onClose: (id: string) => void;
+}
+
+function ToastContainer({ toasts, onClose }: ToastContainerProps) {
+  return (
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none" id="toasts-wrapper-overlay">
+      {toasts.map(toast => (
+        <ToastItem key={toast.id} toast={toast} onClose={onClose} />
+      ))}
+    </div>
+  );
+}
+
+interface ToastItemProps {
+  toast: any;
+  onClose: (id: string) => void;
+}
+
+function ToastItem({ toast, onClose }: ToastItemProps) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose(toast.id);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [toast.id, onClose]);
+
+  const isDelete = toast.type === 'delete';
+  const isError = toast.type === 'error';
+  const isAdd = toast.type === 'add';
+
+  let bgColor = 'bg-white';
+  let borderColor = 'border-slate-200';
+  let textColor = 'text-slate-800';
+  let Icon = CheckCircle2;
+  let iconColor = 'text-emerald-600 bg-emerald-50';
+
+  if (isDelete) {
+    bgColor = 'bg-white';
+    borderColor = 'border-rose-200';
+    textColor = 'text-slate-800';
+    Icon = Trash2;
+    iconColor = 'text-rose-500 bg-rose-50';
+  } else if (isError) {
+    bgColor = 'bg-white';
+    borderColor = 'border-amber-200';
+    textColor = 'text-slate-800';
+    Icon = AlertTriangle;
+    iconColor = 'text-amber-500 bg-amber-50';
+  } else if (isAdd) {
+    bgColor = 'bg-white';
+    borderColor = 'border-lime-200';
+    textColor = 'text-slate-800';
+    Icon = CheckCircle2;
+    iconColor = 'text-lime-600 bg-lime-50';
+  }
+
+  return (
+    <div className={`pointer-events-auto flex items-center justify-between gap-3 p-4 rounded-2xl border ${borderColor} ${bgColor} shadow-xl animate-slide-in-right transition-all duration-300 w-full`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconColor}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <p className={`text-xs font-semibold ${textColor}`}>{toast.message}</p>
+      </div>
+      <button 
+        onClick={() => onClose(toast.id)}
+        className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+        aria-label="Cerrar notificación"
+      >
+        <X className="w-4 h-4" />
+      </button>
     </div>
   );
 }

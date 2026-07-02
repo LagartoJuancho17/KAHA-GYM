@@ -3,7 +3,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, 
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
-  ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, Profesor, NovedadProfesor, WaitlistReserva
+  ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, Profesor, NovedadProfesor, WaitlistReserva,
+  ToastMessage
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -89,12 +90,102 @@ interface GymContextType {
   // Morosidad Simulation
   ejecutarCronMorosidad: (simularFecha: string) => { procesados: number; nuevosMorosos: number; deudaTotal: number; suspendidosSemanaCount: number; dadosBajaCount: number; logLineas: string[] };
   borrarHistorial: () => void;
+
+  // Toasts / Feedback Methods
+  toasts: ToastMessage[];
+  addToast: (type: 'add' | 'delete' | 'success' | 'error', message: string) => void;
+  removeToast: (id: string) => void;
 }
 
 const GymContext = createContext<GymContextType | undefined>(undefined);
 
+// Helper to synthesize a premium sound effect using the Web Audio API (no assets needed, works offline)
+const playAudioTone = (type: 'add' | 'delete' | 'success' | 'error') => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    if (type === 'add' || type === 'success') {
+      // Ascending C5 -> E5 -> G5 chord (gentle and premium chime)
+      const playNote = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.12, startTime + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      
+      playNote(523.25, now, 0.25); // C5
+      playNote(659.25, now + 0.07, 0.25); // E5
+      playNote(783.99, now + 0.14, 0.35); // G5
+    } else if (type === 'delete') {
+      // Descending double beep / drop (G4 -> C4)
+      const playNote = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.18, startTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      
+      playNote(392.00, now, 0.12); // G4
+      playNote(261.63, now + 0.08, 0.22); // C4
+    } else if (type === 'error') {
+      // Short buzzer
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(130, now);
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    }
+  } catch (e) {
+    console.warn("Failed to play audio notification", e);
+  }
+};
+
+// Helper to trigger haptic vibration feedback using the device haptics API
+const triggerVibration = (type: 'add' | 'delete' | 'success' | 'error') => {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    if (type === 'add' || type === 'success') {
+      navigator.vibrate(60); // Single quick pulse
+    } else if (type === 'delete') {
+      navigator.vibrate([100, 50, 100]); // Quick double pulse
+    } else if (type === 'error') {
+      navigator.vibrate([120, 60, 120]); // Triple buzzer pattern
+    }
+  }
+};
+
 export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [historialPrecios, setHistorialPrecios] = useState<HistorialPrecioPlan[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
@@ -473,6 +564,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [newClient, ...clientes];
     saveState(updated);
     addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo });
+    addToast('add', 'Socio registrado exitosamente.');
     return { success: true, message: 'Cliente registrado exitosamente.', id: newClient.id };
   };
 
@@ -544,6 +636,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_BAJA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
+    addToast('delete', 'Socio dado de baja exitosamente.');
   };
 
   const altaCliente = (id: string) => {
@@ -557,6 +650,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveState(updatedClientes);
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_ALTA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
+    addToast('add', 'Socio dado de alta exitosamente.');
   };
 
   const autorizarCliente = (id: string) => {
@@ -571,6 +665,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     saveState(updatedClientes);
     addAuditLog('CLIENTE_AUTORIZADO', { id, nombre: `${matched.nombre} ${matched.apellido}`, email: matched.email });
+    addToast('success', 'Socio autorizado exitosamente.');
     return { success: true, message: 'Cliente autorizado exitosamente.' };
   };
 
@@ -589,6 +684,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_ELIMINADO_PERMANENTE', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
+    addToast('delete', 'Socio eliminado permanentemente.');
   };
 
   // IMPORTACIÓN MASIVA CSV CLIENTES
@@ -737,6 +833,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       saveState(clientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
       addAuditLog('TURNO_LISTA_ESPERA_AGREGADO', { cliente: `${cliente.nombre} ${cliente.apellido}`, turno: turnoId });
+      addToast('add', 'Socio agregado a la lista de espera.');
       return { success: true, message: 'El horario está completo. El cliente ha sido registrado en la lista de espera.', putInWaitlist: true };
     }
 
@@ -761,6 +858,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
     addAuditLog('TURNO_ASIGNACION_FIJA', { cliente: `${cliente.nombre} ${cliente.apellido}`, turno: turnoId });
+    addToast('add', 'Asignación directa de horario completada.');
     return { success: true, message: 'Asignación directa de horario completada exitosamente.' };
   };
 
@@ -810,6 +908,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       turno_id: turnoId,
       promocion_automatica: waitlistClientLiberado ? `Se promovió automáticamente de lista de espera a ${waitlistClientNombre}` : 'Ninguno'
     });
+    addToast('delete', 'Asignación de turno removida.');
   };
 
   const asignarTurnoVariable = (clienteId: string, turnoId: string | null) => {
@@ -1462,6 +1561,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `El socio ${cli.nombre} ${cli.apellido} abonó $${pagoData.monto.toLocaleString('es-AR')} ARS por el mes de ${pagoData.mes_correspondiente} (${pagoData.medio_pago === 'MERCADO_PAGO' ? 'Mercado Pago' : pagoData.medio_pago}).`
     );
 
+    addToast('add', 'Pago registrado exitosamente.');
+
     return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
   };
 
@@ -1843,6 +1944,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
     addAuditLog('GASTO_REGISTRADO', { concepto: gastoData.concepto, monto: gastoData.monto });
+    addToast('add', 'Gasto registrado exitosamente.');
     return { success: true, message: 'Gasto registrado exitosamente.' };
   };
 
@@ -1853,6 +1955,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
     addAuditLog('GASTO_ELIMINADO', { id });
+    addToast('delete', 'Gasto eliminado exitosamente.');
   };
 
   const registrarProfesor = (profesorData: Omit<Profesor, 'id' | 'activo'>) => {
@@ -1867,6 +1970,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
     addAuditLog('PROFESOR_REGISTRADO', { nombre: profesorData.nombre, valor_hora: profesorData.valor_hora });
+    addToast('add', 'Profesor registrado exitosamente.');
     return { success: true, message: 'Profesor registrado exitosamente.' };
   };
 
@@ -1887,6 +1991,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
     addAuditLog('PROFESOR_ELIMINADO', { id });
+    addToast('delete', 'Profesor eliminado permanentemente.');
   };
 
   const registrarNovedadProfesor = (novedadData: Omit<NovedadProfesor, 'id' | 'creado_at'>) => {
@@ -1901,6 +2006,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
     addAuditLog('NOVEDAD_PROFESOR_REGISTRADA', { tipo: novedadData.tipo, fecha: novedadData.fecha });
+    addToast('add', 'Novedad de profesor registrada.');
     return { success: true, message: 'Novedad de profesor registrada exitosamente.' };
   };
 
@@ -1911,6 +2017,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
     addAuditLog('NOVEDAD_PROFESOR_ELIMINADA', { id });
+    addToast('delete', 'Novedad de profesor eliminada.');
   };
 
   const addNovedad = (novData: Omit<Novedad, 'id' | 'fecha'>) => {
@@ -1931,10 +2038,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const updated = [newNov, ...novedades];
-    saveState(clientes, planes, historialPrecios, turnos, pagos, recuperos, [], updated);
     // Para no pisar ni truncar otros datos, pasamos la llamada completa con los estados persistentes actuales
     saveState(clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, updated);
     addAuditLog('NOVEDAD_CREADA', { id: newNov.id, titulo: newNov.titulo });
+    addToast('add', 'Novedad publicada exitosamente.');
     return { success: true, message: 'Novedad publicada exitosamente.' };
   };
 
@@ -1950,6 +2057,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = novedades.filter(n => n.id !== id);
     saveState(clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, updated);
     addAuditLog('NOVEDAD_ELIMINADA', { id, titulo: matched?.titulo });
+    addToast('delete', 'Novedad eliminada exitosamente.');
   };
 
   const borrarHistorial = () => {
@@ -1971,6 +2079,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.location.reload();
   };
 
+  const addToast = (type: 'add' | 'delete' | 'success' | 'error', message: string) => {
+    if (rolActivo === 'ADMIN' || rolActivo === 'OPERADOR') {
+      playAudioTone(type);
+      triggerVibration(type);
+    }
+
+    const newToast: ToastMessage = {
+      id: `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      type,
+      message
+    };
+    setToasts(prev => [...prev, newToast]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
   return (
     <GymContext.Provider value={{
       clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, novedades,
@@ -1989,7 +2115,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       registrarGasto, eliminarGasto, registrarProfesor, updateProfesor, eliminarProfesor, registrarNovedadProfesor, eliminarNovedadProfesor,
       addNovedad, updateNovedad, deleteNovedad,
       ejecutarCronMorosidad,
-      borrarHistorial
+      borrarHistorial,
+      toasts,
+      addToast,
+      removeToast
     }}>
       {children}
     </GymContext.Provider>

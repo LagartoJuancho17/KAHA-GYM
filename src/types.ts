@@ -159,3 +159,10 @@ export interface WaitlistReserva {
   creado_at: string;
 }
 
+export interface ToastMessage {
+  id: string;
+  type: 'add' | 'delete' | 'success' | 'error';
+  message: string;
+}
+
+
