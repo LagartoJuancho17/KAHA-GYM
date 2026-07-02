@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { 
   AlertTriangle, Megaphone, Award, QrCode, Barcode, CreditCard, 
-  Loader2, Home, User, CalendarDays, Receipt
+  Loader2, Home, User, CalendarDays, Receipt, LogOut
 } from 'lucide-react';
 
 import { SocioHeader } from './SocioHeader';
@@ -17,7 +17,7 @@ import { SocioPaymentChoiceModal } from './SocioPaymentChoiceModal';
 export const SocioPanel: React.FC = () => {
   const { 
     clientes, planes, selectedSocioId, googleUser,
-    novedades, setRolActivo
+    novedades, setRolActivo, signOutGoogle
   } = useGym();
 
   const [activeTabSection, setActiveTabSection] = useState<'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES'>('HOME');
@@ -53,6 +53,25 @@ export const SocioPanel: React.FC = () => {
         <p className="text-slate-500 text-xs mt-3 leading-relaxed max-w-xs mx-auto">
           Iniciá sesión con tu cuenta de Google o seleccioná un socio desde el selector en la barra superior para ver tu panel.
         </p>
+        <div className="mt-8 flex flex-col gap-2.5">
+          {googleUser && (
+            <button 
+              onClick={signOutGoogle}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer border border-transparent shadow-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar Sesión Google
+            </button>
+          )}
+          {googleUser?.role !== 'SOCIO' && (
+            <button 
+              onClick={() => setRolActivo('ADMIN')}
+              className="w-full py-2 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-zinc-200 shadow-sm"
+            >
+              Volver a Vista Admin
+            </button>
+          )}
+        </div>
       </div>
     );
   }
