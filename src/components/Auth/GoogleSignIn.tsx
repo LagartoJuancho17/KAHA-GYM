@@ -151,8 +151,7 @@ export const GoogleSignIn: React.FC = () => {
                 key="google-real-btn-container-key"
                 id="google-real-btn-container" 
                 className="min-h-[44px] flex items-center justify-center"
-                dangerouslySetInnerHTML={{ __html: '' }}
-              />
+              ></div>
 
               {!btnLoaded && (
                 <div className="text-slate-600 text-xs flex items-center gap-2 py-2">
