@@ -46,6 +46,8 @@ interface GymContextType {
   googleUser: { email: string; name: string; picture?: string; role: RolUsuario } | null;
   signInWithGoogle: (email: string, name: string, picture?: string) => void;
   signOutGoogle: () => void;
+  pendingRegistrationUser: { email: string; name: string; picture?: string } | null;
+  completeSocioRegistration: (nombre: string, apellido: string, telefono: string) => void;
   
   // Waitlist Reservas
   waitlistReservas: WaitlistReserva[];
@@ -210,6 +212,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const local = localStorage.getItem('gym_google_user');
     return local ? JSON.parse(local) : null;
   });
+  const [pendingRegistrationUser, setPendingRegistrationUser] = useState<{ email: string; name: string; picture?: string } | null>(null);
   const [rolActivo, setRolActivo] = useState<RolUsuario>(() => {
     const localUser = localStorage.getItem('gym_google_user');
     if (localUser) {
@@ -2248,35 +2251,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         detectedRole = 'SOCIO';
         targetSocioId = socioExistente.id;
       } else {
-        // Registrar este nuevo socio automáticamente
-        const partes = nameName.split(' ');
-        const nombre = partes[0] || 'Socio';
-        const apellido = partes.slice(1).join(' ') || 'Nuevo';
-        
-        const nuevoCliente: Cliente = {
-          id: `c-${Date.now()}`,
-          nombre,
-          apellido,
-          email: cleanMail,
-          telefono: '11-0000-0000',
-          tipo: 'FLEXIBLE',
-          estado: 'ACTIVO',
-          plan_id: 'p-3d', // plan default
-          activo: true,
-          deuda_acumulada: 0,
-          ultimo_mes_pagado: new Date().toISOString().slice(0, 7),
-          turnos_fijos: [],
-          exencion_cobro: 'NINGUNA',
-          creado_at: new Date().toISOString(),
-          autorizado: false
-        };
-        
-        const updated = [nuevoCliente, ...clientes];
-        setClientes(updated);
-        localStorage.setItem('gym_clientes', JSON.stringify(updated));
-        
-        detectedRole = 'SOCIO';
-        targetSocioId = nuevoCliente.id;
+        // Redireccionar al formulario de registro para pedir celular
+        setPendingRegistrationUser({ email: cleanMail, name: nameName, picture });
+        return;
       }
     }
 
@@ -2293,9 +2270,74 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('SESION_INICIO_GOOGLE', { email, rol: detectedRole, nombre: nameName });
   };
 
+  const completeSocioRegistration = (nombre: string, apellido: string, telefono: string) => {
+    if (!pendingRegistrationUser) return;
+    const { email, picture } = pendingRegistrationUser;
+    
+    const newSocioId = crypto.randomUUID();
+    const nuevoCliente: Cliente = {
+      id: newSocioId,
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      email: email,
+      telefono: telefono.trim() || '11-0000-0000',
+      tipo: 'FLEXIBLE',
+      estado: 'ACTIVO',
+      plan_id: 'p-none',
+      activo: true,
+      deuda_acumulada: 0,
+      ultimo_mes_pagado: new Date().toISOString().slice(0, 7),
+      turnos_fijos: [],
+      exencion_cobro: 'NINGUNA',
+      creado_at: new Date().toISOString(),
+      autorizado: false
+    };
+
+    const updated = [nuevoCliente, ...clientes];
+    saveState(updated);
+
+    if (supabase) {
+      supabase.from('clientes').insert({
+        id: nuevoCliente.id,
+        nombre: nuevoCliente.nombre,
+        apellido: nuevoCliente.apellido,
+        email: nuevoCliente.email,
+        telefono: nuevoCliente.telefono,
+        tipo: nuevoCliente.tipo,
+        estado: nuevoCliente.estado,
+        plan_id: '00000000-0000-0000-0000-000000000000', // "Aún no sabe"
+        activo: nuevoCliente.activo,
+        deuda_acumulada: nuevoCliente.deuda_acumulada,
+        ultimo_mes_pagado: nuevoCliente.ultimo_mes_pagado,
+        exencion_cobro: nuevoCliente.exencion_cobro,
+        autorizado: nuevoCliente.autorizado,
+        creado_at: nuevoCliente.creado_at
+      }).then(({ error }) => {
+        if (error) console.error("Error al registrar nuevo socio en Supabase:", error);
+      });
+    }
+
+    const newUser = { email, name: `${nombre} ${apellido}`, picture, role: 'SOCIO' as RolUsuario };
+    setGoogleUser(newUser);
+    localStorage.setItem('gym_google_user', JSON.stringify(newUser));
+    setRolActivo('SOCIO');
+    localStorage.setItem('gym_rol_activo', 'SOCIO');
+    setSelectedSocioId(newSocioId);
+
+    addAuditLog('CLIENTE_REGISTRADO_ONBOARDING', { email, nombre: `${nombre} ${apellido}` });
+    addNotificacion(
+      'SISTEMA',
+      'Nuevo Registro Pendiente 👤',
+      `El usuario ${nombre} ${apellido} se registró y espera autorización. Celular: ${telefono}`
+    );
+
+    setPendingRegistrationUser(null);
+  };
+
   const signOutGoogle = () => {
     addAuditLog('SESION_CERRADA_GOOGLE', { email: googleUser?.email });
     setGoogleUser(null);
+    setPendingRegistrationUser(null);
     localStorage.removeItem('gym_google_user');
     setRolActivo('SOCIO');
     localStorage.setItem('gym_rol_activo', 'SOCIO');
@@ -2506,6 +2548,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,
       googleUser, signInWithGoogle, signOutGoogle,
+      pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV,
       updatePrecioPlan,

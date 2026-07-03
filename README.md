@@ -1,4 +1,4 @@
-# Ares Gym — Sistema Web de Gestión Integral 🇦🇷
+# Kaha Gym Gestor — Sistema Web de Gestión Integral 🇦🇷
 
 Un sistema comercial full-stack llave en mano desarrollado para la administración diaria de gimnasios y centros de entrenamiento en Argentina. Diseñado con una interfaz intuitiva para personal administrativo no técnico, combinando automatizaciones de bases de datos con RLS estricto y un entorno de simulación reactivo.
 

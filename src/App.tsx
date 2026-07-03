@@ -14,6 +14,7 @@ import { SocioPanel } from './components/SocioPanel/SocioPanel';
 import { GoogleSignIn } from './components/Auth/GoogleSignIn';
 import { NovedadesCRUD } from './components/Novedades/NovedadesCRUD';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SocioRegistrationForm } from './components/Auth/SocioRegistrationForm';
 
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
@@ -41,7 +42,8 @@ function InnerApp() {
   const { 
     rolActivo, googleUser, signOutGoogle, registrarPago, clientes,
     notificaciones, marcarNotificacionesLeidas, eliminarNotificacion,
-    autorizarCliente, toasts, removeToast
+    autorizarCliente, toasts, removeToast,
+    pendingRegistrationUser
   } = useGym();
 
   const [timeString, setTimeString] = useState('');
@@ -140,6 +142,10 @@ function InnerApp() {
   }, []);
 
   // Block viewing if Google Sign In is not completed (placed after all hook declarations)
+  if (pendingRegistrationUser) {
+    return <SocioRegistrationForm />;
+  }
+
   if (!googleUser) {
     return <GoogleSignIn />;
   }
