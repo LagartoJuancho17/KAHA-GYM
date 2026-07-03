@@ -1748,6 +1748,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return t;
     });
     saveState(clientes, planes, historialPrecios, updated, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      const dbUuid = getUuidFromTurnoId(turnoId);
+      if (dbUuid) {
+        supabase.from('turnos').update({
+          profesor: profesor.trim() || null
+        }).eq('id', dbUuid).then(({ error }) => {
+          if (error) console.error("Error al actualizar profesor del turno en Supabase:", error);
+        });
+      }
+    }
+
     addAuditLog('PROFESOR_TURNO_ASIGNADO', { turno_id: turnoId, profesor });
   };
 
