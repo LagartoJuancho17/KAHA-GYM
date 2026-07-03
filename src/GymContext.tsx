@@ -356,6 +356,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           turnos_fijos: fixedShifts,
           exencion_cobro: (c.exencion_cobro || 'NINGUNA') as any,
           autorizado: c.autorizado ?? true,
+          reservas_individuales: c.reservas_individuales || [],
+          clases_suspendidas: c.clases_suspendidas || [],
           creado_at: c.creado_at
         };
       });
@@ -935,20 +937,26 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('add', 'Socio dado de alta exitosamente.');
   };
 
-  const autorizarCliente = (id: string) => {
+  const autorizarCliente = (id: string, planId?: string) => {
     const matched = clientes.find(c => c.id === id);
     if (!matched) return { success: false, message: 'Cliente no encontrado.' };
+    
+    const finalPlanId = planId || matched.plan_id || 'p-none';
+
     const updatedClientes = clientes.map(c => {
       if (c.id === id) {
-        return { ...c, autorizado: true };
+        return { ...c, autorizado: true, plan_id: finalPlanId };
       }
       return c;
     });
 
-    saveState(updatedClientes);
+    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
 
     if (supabase) {
-      supabase.from('clientes').update({ autorizado: true }).eq('id', id).then(({ error }) => {
+      supabase.from('clientes').update({ 
+        autorizado: true,
+        plan_id: finalPlanId === 'p-none' ? '00000000-0000-0000-0000-000000000000' : finalPlanId
+      }).eq('id', id).then(({ error }) => {
         if (error) console.error("Error al autorizar cliente en Supabase:", error);
       });
     }
@@ -1499,15 +1507,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedClientes = clientes.map(c => {
       if (c.id === clienteId) {
+        const reservas = [...(c.reservas_individuales || []), nuevaReserva];
         return {
           ...c,
-          reservas_individuales: [...(c.reservas_individuales || []), nuevaReserva]
+          reservas_individuales: reservas
         };
       }
       return c;
     });
 
     saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      const targetClient = updatedClientes.find(c => c.id === clienteId);
+      if (targetClient) {
+        supabase.from('clientes').update({
+          reservas_individuales: targetClient.reservas_individuales
+        }).eq('id', clienteId).then(({ error }) => {
+          if (error) console.error("Error al guardar reserva en Supabase:", error);
+        });
+      }
+    }
     addAuditLog('RESERVA_INDIVIDUAL_CREADA', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
       turno_id: turnoId, 
@@ -1672,6 +1692,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const finalClientes = procesarPromocionListaEspera(reserva.turno_id, reserva.fecha, updatedClientes);
     saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      const targetClient = finalClientes.find(c => c.id === clienteId);
+      if (targetClient) {
+        supabase.from('clientes').update({
+          reservas_individuales: targetClient.reservas_individuales || [],
+          clases_suspendidas: targetClient.clases_suspendidas || []
+        }).eq('id', clienteId).then(({ error }) => {
+          if (error) console.error("Error al actualizar cancelacion en Supabase:", error);
+        });
+      }
+    }
     addAuditLog('RESERVA_INDIVIDUAL_CANCELADA', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
       turno_id: reserva.turno_id, 
@@ -1729,6 +1761,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const finalClientes = procesarPromocionListaEspera(turnoId, fecha, updatedClientes);
     saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      const targetClient = finalClientes.find(c => c.id === clienteId);
+      if (targetClient) {
+        supabase.from('clientes').update({
+          clases_suspendidas: targetClient.clases_suspendidas || []
+        }).eq('id', clienteId).then(({ error }) => {
+          if (error) console.error("Error al actualizar suspension en Supabase:", error);
+        });
+      }
+    }
     addAuditLog('CLASE_FIJA_SUSPENDIDA', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
       turno_id: turnoId, 

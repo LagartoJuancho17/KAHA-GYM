@@ -15,6 +15,7 @@ import { GoogleSignIn } from './components/Auth/GoogleSignIn';
 import { NovedadesCRUD } from './components/Novedades/NovedadesCRUD';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SocioRegistrationForm } from './components/Auth/SocioRegistrationForm';
+import { AuthorizeClientModal } from './components/Clientes/AuthorizeClientModal';
 
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
@@ -39,6 +40,13 @@ function InnerApp() {
   const [openTurnosModalId, setOpenTurnosModalId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [authorizingClientId, setAuthorizingClientId] = useState<string | null>(null);
+  const [clientToOpenTurnosAfterAuth, setClientToOpenTurnosAfterAuth] = useState<string | null>(null);
+
+  const handleStartAuthorization = (clientId: string) => {
+    setAuthorizingClientId(clientId);
+    setClientToOpenTurnosAfterAuth(clientId);
+  };
   const { 
     rolActivo, googleUser, signOutGoogle, registrarPago, clientes,
     notificaciones, marcarNotificacionesLeidas, eliminarNotificacion,
@@ -204,38 +212,19 @@ function InnerApp() {
             </p>
           </div>
 
-          {/* Actions */}
-          <div className="space-y-3">
-            <button 
-              onClick={signOutGoogle}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer border border-transparent"
-            >
-              <X className="w-4 h-4" />
-              Cerrar Sesión Google
-            </button>
-            <p className="text-[10px] text-slate-400 mt-2">
-              ¿Eres profesor o admin? Cierra sesión e ingresa con tu correo autorizado.
-            </p>
-            
-            {/* Botón de ayuda para desarrollo local/localStorage */}
-            {socioAsociado && (
-              <div className="pt-4 border-t border-slate-100 mt-4">
-                <button
-                  onClick={() => {
-                    autorizarCliente(socioAsociado.id);
-                    window.location.reload();
-                  }}
-                  className="w-full py-2 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-200 border-dashed font-bold text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  Simular Aprobación de Admin
-                </button>
-                <p className="text-[9px] text-slate-400 mt-1 text-center">
-                  (Como la base es local/localStorage, los navegadores de incógnito o diferentes no comparten base de datos. Haz click aquí para autorizar esta sesión local)
-                </p>
-              </div>
-            )}
-          </div>
+            {/* Actions */}
+            <div className="space-y-3">
+              <button 
+                onClick={signOutGoogle}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer border border-transparent"
+              >
+                <X className="w-4 h-4" />
+                Cerrar Sesión Google
+              </button>
+              <p className="text-[10px] text-slate-400 mt-2">
+                ¿Eres profesor o admin? Cierra sesión e ingresa con tu correo autorizado.
+              </p>
+            </div>
         </div>
       </div>
     );
@@ -262,6 +251,7 @@ function InnerApp() {
           <Dashboard 
             setActiveTab={(tab) => setActiveTab(tab as TabID)} 
             setOpenTurnosModalForId={setOpenTurnosModalId}
+            onStartAuthorization={handleStartAuthorization}
           />
         );
       case 'CLIENTES':
@@ -269,6 +259,7 @@ function InnerApp() {
           <ClientesCRUD 
             openTurnosModalForId={openTurnosModalId}
             setOpenTurnosModalForId={setOpenTurnosModalId}
+            onStartAuthorization={handleStartAuthorization}
           />
         );
       case 'PLANES':
@@ -295,6 +286,7 @@ function InnerApp() {
           <Dashboard 
             setActiveTab={(tab) => setActiveTab(tab as TabID)} 
             setOpenTurnosModalForId={setOpenTurnosModalId}
+            onStartAuthorization={handleStartAuthorization}
           />
         );
     }
@@ -576,6 +568,22 @@ function InnerApp() {
         <PaymentSuccessModal 
           data={paymentSuccessData} 
           onClose={() => setPaymentSuccessData(null)} 
+        />
+      )}
+      {authorizingClientId && (
+        <AuthorizeClientModal 
+          clientId={authorizingClientId}
+          onClose={() => {
+            setAuthorizingClientId(null);
+            setClientToOpenTurnosAfterAuth(null);
+          }}
+          onAuthorized={() => {
+            setAuthorizingClientId(null);
+            if (clientToOpenTurnosAfterAuth) {
+              setOpenTurnosModalId(clientToOpenTurnosAfterAuth);
+              setClientToOpenTurnosAfterAuth(null);
+            }
+          }}
         />
       )}
       <ToastContainer toasts={toasts} onClose={removeToast} />

@@ -20,6 +20,7 @@ interface ClientesCRUDProps {
   setShowAddClienteModal?: (show: boolean) => void;
   openTurnosModalForId?: string | null;
   setOpenTurnosModalForId?: (id: string | null) => void;
+  onStartAuthorization?: (clientId: string) => void;
 }
 
 export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
@@ -28,7 +29,8 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   showAddClienteModal: propShowAddClienteModal,
   setShowAddClienteModal: propSetShowAddClienteModal,
   openTurnosModalForId,
-  setOpenTurnosModalForId
+  setOpenTurnosModalForId,
+  onStartAuthorization
 }) => {
   const { 
     clientes, planes, autorizarCliente, eliminarCliente
@@ -243,8 +245,12 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
                   <button
                     onClick={() => {
-                      autorizarCliente(c.id);
-                      setClientForTurnosModal(c);
+                      if (onStartAuthorization) {
+                        onStartAuthorization(c.id);
+                      } else {
+                        autorizarCliente(c.id);
+                        setClientForTurnosModal(c);
+                      }
                     }}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-transparent shadow-2xs"
                   >
@@ -291,6 +297,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         pagina={pagina}
         setPagina={setPagina}
         filasPorPagina={filasPorPagina}
+        onStartAuthorization={onStartAuthorization}
       />
 
       {/* DETAIL MODAL */}

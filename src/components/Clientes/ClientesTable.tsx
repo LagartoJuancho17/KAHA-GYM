@@ -15,6 +15,7 @@ interface ClientesTableProps {
   pagina: number;
   setPagina: React.Dispatch<React.SetStateAction<number>>;
   filasPorPagina: number;
+  onStartAuthorization?: (clientId: string) => void;
 }
 
 const getWhatsAppLink = (phone: string) => {
@@ -43,7 +44,8 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
   setOpenRowMenuId,
   pagina,
   setPagina,
-  filasPorPagina
+  filasPorPagina,
+  onStartAuthorization
 }) => {
   const { planes, autorizarCliente, bajaLogicaCliente, altaCliente } = useGym();
 
@@ -177,7 +179,11 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                               <button
                                 onClick={() => {
                                   setOpenRowMenuId(null);
-                                  autorizarCliente(c.id);
+                                  if (onStartAuthorization) {
+                                    onStartAuthorization(c.id);
+                                  } else {
+                                    autorizarCliente(c.id);
+                                  }
                                 }}
                                 className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2 transition-colors cursor-pointer border-b border-zinc-100"
                               >
