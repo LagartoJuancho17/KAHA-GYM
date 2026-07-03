@@ -157,7 +157,11 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
 
     // 2. Individual bookings
     (socio.reservas_individuales || []).forEach(r => {
-      if (!isDateInPaidMonth(r.fecha)) return;
+      const hoyStr = new Date().toISOString().slice(0, 10);
+      const belongsToMonth = isDateInPaidMonth(r.fecha);
+      const isFuture = r.fecha >= hoyStr;
+      if (!belongsToMonth && !isFuture) return;
+
       const turn = turnos.find(t => t.id === r.turno_id);
       if (!turn) return;
 

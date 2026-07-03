@@ -330,7 +330,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {turnosDelDiaFiltrado.map(turno => {
                       const holdsMyFijo = socio.turnos_fijos.includes(turno.id);
-                      const misReservasEnTurno = (socio.reservas_individuales || []).filter(r => r.turno_id === turno.id && r.fecha.startsWith(paidMonth));
+                      const misReservasEnTurno = (socio.reservas_individuales || []).filter(r => r.turno_id === turno.id && isDateInSelectedWeek(r.fecha));
                       const holdsMyIndividual = misReservasEnTurno.length > 0;
 
                       return (
