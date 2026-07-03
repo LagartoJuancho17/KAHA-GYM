@@ -42,32 +42,32 @@ export const GoogleSignIn: React.FC = () => {
     const renderGoogleButton = () => {
       const google = (window as any).google;
       if (google && google.accounts && google.accounts.id) {
-        clearInterval(interval);
-        try {
-          // Inicializar solo una vez para evitar el warning de GSI
-          if (!gsiInitialized) {
-            google.accounts.id.initialize({
-              client_id: clientId,
-              callback: (response: any) => {
-                setLoading(true);
-                const payload = decodeJwt(response.credential);
-                if (payload) {
-                  setTimeout(() => {
-                    signInWithGoogle(payload.email, payload.name || payload.given_name, payload.picture);
+        const btnContainer = document.getElementById('google-real-btn-container');
+        if (btnContainer) {
+          clearInterval(interval);
+          try {
+            // Inicializar solo una vez para evitar el warning de GSI
+            if (!gsiInitialized) {
+              google.accounts.id.initialize({
+                client_id: clientId,
+                callback: (response: any) => {
+                  setLoading(true);
+                  const payload = decodeJwt(response.credential);
+                  if (payload) {
+                    setTimeout(() => {
+                      signInWithGoogle(payload.email, payload.name || payload.given_name, payload.picture);
+                      setLoading(false);
+                    }, 800);
+                  } else {
+                    setErrorMsg('Error al decodificar la respuesta segura de Google.');
                     setLoading(false);
-                  }, 800);
-                } else {
-                  setErrorMsg('Error al decodificar la respuesta segura de Google.');
-                  setLoading(false);
-                }
-              },
-              auto_select: false,
-            });
-            gsiInitialized = true;
-          }
+                  }
+                },
+                auto_select: false,
+              });
+              gsiInitialized = true;
+            }
 
-          const btnContainer = document.getElementById('google-real-btn-container');
-          if (btnContainer) {
             btnContainer.innerHTML = ''; // Clean old button
             google.accounts.id.renderButton(btnContainer, {
               theme: 'filled_blue',
@@ -77,9 +77,9 @@ export const GoogleSignIn: React.FC = () => {
               width: '320',
               logo_alignment: 'left'
             });
+          } catch (error) {
+            console.error("Failed to render Google login button:", error);
           }
-        } catch (error) {
-          console.error("Failed to render Google login button:", error);
         }
       }
     };
