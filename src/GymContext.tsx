@@ -1073,6 +1073,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedHistorial = [newCambioHistorial, ...historialPrecios];
 
     saveState(clientes, updatedPlanes, updatedHistorial, turnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      // 1. Actualizar precio en la tabla planes
+      supabase.from('planes').update({ 
+        precio: nuevoPrecio, 
+        actualizado_at: new Date().toISOString() 
+      }).eq('id', planId).then(({ error }) => {
+        if (error) console.error("Error al actualizar precio de plan en Supabase:", error);
+      });
+
+      // 2. Registrar el cambio en la tabla historial_precios_planes (deja ID automático)
+      supabase.from('historial_precios_planes').insert({
+        plan_id: planId,
+        precio_anterior: precioViejo,
+        precio_nuevo: nuevoPrecio,
+        fecha_cambio: newCambioHistorial.fecha_cambio
+      }).then(({ error }) => {
+        if (error) console.error("Error al registrar historial de precio en Supabase:", error);
+      });
+    }
+
     addAuditLog('PRECIO_PLAN_MODIFICADO', { 
       plan: plan.nombre, 
       antes: precioViejo, 
