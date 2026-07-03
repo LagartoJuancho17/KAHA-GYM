@@ -61,8 +61,8 @@ export const GoogleSignIn: React.FC = () => {
                 setLoading(true);
                 const payload = decodeJwt(response.credential);
                 if (payload) {
-                  setTimeout(() => {
-                    signInWithGoogle(payload.email, payload.name || payload.given_name, payload.picture);
+                  setTimeout(async () => {
+                    await signInWithGoogle(payload.email, payload.name || payload.given_name, payload.picture);
                     setLoading(false);
                   }, 800);
                 } else {

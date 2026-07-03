@@ -44,10 +44,10 @@ interface GymContextType {
   
   // Google Authentication simulation states
   googleUser: { email: string; name: string; picture?: string; role: RolUsuario } | null;
-  signInWithGoogle: (email: string, name: string, picture?: string) => void;
+  signInWithGoogle: (email: string, nameName: string, picture?: string) => Promise<void>;
   signOutGoogle: () => void;
   pendingRegistrationUser: { email: string; name: string; picture?: string } | null;
-  completeSocioRegistration: (nombre: string, apellido: string, telefono: string) => void;
+  completeSocioRegistration: (nombre: string, apellido: string, telefono: string) => Promise<void>;
   
   // Waitlist Reservas
   waitlistReservas: WaitlistReserva[];
@@ -2274,7 +2274,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { procesados, nuevosMorosos, deudaTotal, suspendidosSemanaCount, dadosBajaCount, logLineas };
   };
 
-  const signInWithGoogle = (email: string, nameName: string, picture?: string) => {
+  const signInWithGoogle = async (email: string, nameName: string, picture?: string) => {
     const cleanMail = email.trim().toLowerCase();
     let detectedRole: RolUsuario = 'SOCIO';
     let targetSocioId: string | null = null;
@@ -2288,8 +2288,49 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (cleanMail === 'profe@gimnasio.com.ar' || cleanMail === 'profe@aresgym.com') {
       detectedRole = 'OPERADOR';
     } else {
-      // Intentar buscar socio existente
-      const socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+      // Intentar buscar socio existente localmente
+      let socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+      
+      // Si no se encuentra localmente (por ejemplo, si aún se está cargando la base de datos),
+      // buscar directamente en la base de datos de Supabase para evitar registrar de nuevo
+      if (!socioExistente && supabase) {
+        try {
+          const { data: dbClient } = await supabase
+            .from('clientes')
+            .select('*')
+            .eq('email', email.trim())
+            .eq('activo', true)
+            .maybeSingle();
+
+          if (dbClient) {
+            // Sincronizar estado local llamando a loadSupabaseData
+            await loadSupabaseData();
+            // Buscar nuevamente tras la recarga
+            socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail) || {
+              id: dbClient.id,
+              nombre: dbClient.nombre,
+              apellido: dbClient.apellido,
+              email: dbClient.email,
+              telefono: dbClient.telefono || '',
+              tipo: dbClient.tipo as TipoCliente,
+              estado: dbClient.estado as EstadoCliente,
+              plan_id: dbClient.plan_id || 'p-none',
+              activo: dbClient.activo,
+              deuda_acumulada: Number(dbClient.deuda_acumulada),
+              ultimo_mes_pagado: dbClient.ultimo_mes_pagado || '',
+              turnos_fijos: [],
+              exencion_cobro: (dbClient.exencion_cobro || 'NINGUNA') as any,
+              autorizado: dbClient.autorizado ?? true,
+              reservas_individuales: dbClient.reservas_individuales || [],
+              clases_suspendidas: dbClient.clases_suspendidas || [],
+              creado_at: dbClient.creado_at
+            };
+          }
+        } catch (err) {
+          console.error("Error al buscar socio en Supabase en inicio de sesión:", err);
+        }
+      }
+
       if (socioExistente) {
         detectedRole = 'SOCIO';
         targetSocioId = socioExistente.id;
@@ -2313,9 +2354,43 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('SESION_INICIO_GOOGLE', { email, rol: detectedRole, nombre: nameName });
   };
 
-  const completeSocioRegistration = (nombre: string, apellido: string, telefono: string) => {
+  const completeSocioRegistration = async (nombre: string, apellido: string, telefono: string) => {
     if (!pendingRegistrationUser) return;
     const { email, picture } = pendingRegistrationUser;
+    const cleanMail = email.trim().toLowerCase();
+
+    // Doble verificación para evitar duplicados en registro asíncrono
+    let socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+    if (!socioExistente && supabase) {
+      try {
+        const { data: dbClient } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('email', email.trim())
+          .eq('activo', true)
+          .maybeSingle();
+
+        if (dbClient) {
+          await loadSupabaseData();
+          socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+        }
+      } catch (err) {
+        console.error("Error al comprobar duplicado en registro:", err);
+      }
+    }
+
+    if (socioExistente) {
+      // Si ya existe, simplemente lo logueamos y evitamos duplicar la ficha
+      const newUser = { email, name: `${socioExistente.nombre} ${socioExistente.apellido}`, picture, role: 'SOCIO' as RolUsuario };
+      setGoogleUser(newUser);
+      localStorage.setItem('gym_google_user', JSON.stringify(newUser));
+      setRolActivo('SOCIO');
+      localStorage.setItem('gym_rol_activo', 'SOCIO');
+      setSelectedSocioId(socioExistente.id);
+      setPendingRegistrationUser(null);
+      addToast('success', 'Inicio de sesión exitoso (cuenta existente).');
+      return;
+    }
     
     const newSocioId = crypto.randomUUID();
     const nuevoCliente: Cliente = {
@@ -2337,7 +2412,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const updated = [nuevoCliente, ...clientes];
-    saveState(updated);
+    saveState(updated, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
 
     if (supabase) {
       supabase.from('clientes').insert({

@@ -22,7 +22,7 @@ export const SocioRegistrationForm: React.FC = () => {
 
   if (!pendingRegistrationUser) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -40,7 +40,7 @@ export const SocioRegistrationForm: React.FC = () => {
     }
 
     // Complete the onboarding signup
-    completeSocioRegistration(nombre, apellido, telefono);
+    await completeSocioRegistration(nombre, apellido, telefono);
   };
 
   return (
