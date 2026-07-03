@@ -87,7 +87,13 @@ export const GoogleSignIn: React.FC = () => {
     interval = setInterval(renderGoogleButton, 800);
     renderGoogleButton();
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      const btnContainer = document.getElementById('google-real-btn-container');
+      if (btnContainer) {
+        btnContainer.innerHTML = '';
+      }
+    };
   }, [clientId]);
 
   return (
@@ -133,13 +139,16 @@ export const GoogleSignIn: React.FC = () => {
             <div className="flex flex-col items-center justify-center py-4 px-2 bg-slate-50 border border-slate-200 rounded-2xl gap-3">
               <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Botón Oficial de Google</span>
               
-              <div id="google-real-btn-container" className="min-h-[44px] flex items-center justify-center">
-                {/* Fallback spinner before library is loaded */}
-                <div className="text-slate-600 text-xs flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-green-500 animate-spin"></div>
-                  <span>Cargando componente de Google...</span>
-                </div>
-              </div>
+              <div 
+                id="google-real-btn-container" 
+                className="min-h-[44px] flex items-center justify-center"
+                dangerouslySetInnerHTML={{ 
+                  __html: `<div class="text-slate-600 text-xs flex items-center gap-2">
+                    <div class="w-4 h-4 rounded-full border-2 border-slate-200 border-t-green-500 animate-spin text-green-500"></div>
+                    <span>Cargando componente de Google...</span>
+                  </div>` 
+                }}
+              />
 
               <p className="text-slate-500 text-[10px] text-center px-4 leading-relaxed">
                 Abre un flujo seguro en ventana flotante autenticado por servidores de Google.
