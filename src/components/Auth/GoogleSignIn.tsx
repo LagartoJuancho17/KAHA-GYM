@@ -150,7 +150,7 @@ export const GoogleSignIn: React.FC = () => {
 
               <div 
                 id="google-real-btn-container" 
-                className={`min-h-[44px] flex items-center justify-center ${!btnLoaded ? 'hidden' : ''}`}
+                className="min-h-[44px] flex items-center justify-center"
                 dangerouslySetInnerHTML={{ __html: '' }}
               />
 
