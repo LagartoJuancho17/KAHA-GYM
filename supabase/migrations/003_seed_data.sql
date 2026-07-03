@@ -3,10 +3,10 @@
 
 -- 1. Insertar Planes Base con Precios Sugeridos en ARS (Pesos Argentinos)
 INSERT INTO planes (nombre, dias_por_semana, precio) VALUES
-('Plan 2 Días Semana', 2, 14000.00),
-('Plan 3 Días Semana', 3, 18000.00),
-('Plan 4 Días Semana', 4, 21000.00),
-('Plan 5 Días Semana', 5, 24000.00)
+('Plan 2 Días Semana', 2, 65000.00),
+('Plan 3 Días Semana', 3, 85000.00),
+('Plan 4 Días Semana', 4, 115000.00),
+('Plan 5 Días Semana', 5, 135000.00)
 ON CONFLICT (nombre) DO UPDATE SET 
   precio = EXCLUDED.precio,
   dias_por_semana = EXCLUDED.dias_por_semana;

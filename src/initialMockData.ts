@@ -5,10 +5,10 @@ import { Cliente, Plan, Turno, Pago, AuditLog, HistorialPrecioPlan, RecuperoTurn
 
 export const INITIAL_PLANES: Plan[] = [
   { id: 'p-none', nombre: 'Aún no sabe', dias_por_semana: 5, precio: 0.00, creado_at: '2026-01-10T10:00:00Z' },
-  { id: 'p-2d', nombre: 'Plan 2 Días Semana', dias_por_semana: 2, precio: 14000.00, creado_at: '2026-01-10T10:00:00Z' },
-  { id: 'p-3d', nombre: 'Plan 3 Días Semana', dias_por_semana: 3, precio: 18000.00, creado_at: '2026-01-10T10:00:00Z' },
-  { id: 'p-4d', nombre: 'Plan 4 Días Semana', dias_por_semana: 4, precio: 21000.00, creado_at: '2026-01-10T10:00:00Z' },
-  { id: 'p-5d', nombre: 'Plan 5 Días Semana', dias_por_semana: 5, precio: 24000.00, creado_at: '2026-01-10T10:00:00Z' },
+  { id: 'p-2d', nombre: 'Plan 2 Días Semana', dias_por_semana: 2, precio: 65000.00, creado_at: '2026-01-10T10:00:00Z' },
+  { id: 'p-3d', nombre: 'Plan 3 Días Semana', dias_por_semana: 3, precio: 85000.00, creado_at: '2026-01-10T10:00:00Z' },
+  { id: 'p-4d', nombre: 'Plan 4 Días Semana', dias_por_semana: 4, precio: 115000.00, creado_at: '2026-01-10T10:00:00Z' },
+  { id: 'p-5d', nombre: 'Plan 5 Días Semana', dias_por_semana: 5, precio: 135000.00, creado_at: '2026-01-10T10:00:00Z' },
 ];
 
 export const INITIAL_HISTORIAL_PRECIOS: HistorialPrecioPlan[] = [
