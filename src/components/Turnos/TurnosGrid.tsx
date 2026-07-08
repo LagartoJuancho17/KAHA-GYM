@@ -272,17 +272,6 @@ export const TurnosGrid: React.FC = () => {
           >
             Turnera de Tiempo Real
           </button>
-          <button
-            onClick={() => setSubTab('RECUPEROS')}
-            className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
-              subTab === 'RECUPEROS'
-                ? 'bg-white text-zinc-950 shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-950'
-            }`}
-            id="subtab-recuperos-trigger"
-          >
-            Gestión de Recuperos
-          </button>
         </div>
       </div>
 
@@ -534,7 +523,10 @@ export const TurnosGrid: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-            <          {/* REALTIME SHIFT DETAILED MODAL */}
+            </div>
+          </div>
+
+          {/* REALTIME SHIFT DETAILED MODAL */}
           {selectedRealtimeSlot && (
             <TurnoRealtimeModal 
               selectedSlot={selectedRealtimeSlot}
@@ -996,10 +988,6 @@ export const TurnosGrid: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};     );
-      })()}
     </div>
   );
 };
