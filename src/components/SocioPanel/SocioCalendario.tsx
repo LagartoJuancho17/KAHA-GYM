@@ -330,7 +330,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                       <div className="h-px flex-1 bg-slate-200"></div>
                     </div>
                   )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                     {turnosDelDiaFiltrado.map(turno => {
                       const holdsMyFijo = socio.turnos_fijos.includes(turno.id);
                       const misReservasEnTurno = (socio.reservas_individuales || []).filter(r => r.turno_id === turno.id && isDateInSelectedWeek(r.fecha));
@@ -339,7 +339,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                       return (
                         <div 
                           key={turno.id}
-                          className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between gap-4 select-none ${
+                          className={`p-3 sm:p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 sm:gap-4 select-none ${
                             holdsMyFijo 
                               ? 'bg-sky-50/40 border-sky-300 shadow-inner' 
                               : holdsMyIndividual 
@@ -347,21 +347,21 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                 : 'bg-slate-50/30 border-slate-200 hover:border-slate-300'
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2.5 rounded-xl border ${
+                          <div className="flex items-start justify-between gap-1.5">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className={`p-1.5 sm:p-2.5 rounded-xl border shrink-0 ${
                                 holdsMyFijo 
                                   ? 'bg-sky-100 text-sky-700 border-sky-200' 
                                   : holdsMyIndividual 
                                     ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
                                     : 'bg-white text-slate-500 border-slate-200'
                               }`}>
-                                <Calendar className="w-4.5 h-4.5" />
+                                <Calendar className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
                               </div>
                               <div>
-                                <p className="text-base font-black text-slate-800 tracking-tight">{turno.hora.slice(0, 5)} hs</p>
-                                <p className="text-[10px] text-slate-500 mt-1 font-medium">
-                                  Socios asignados permanentemente: {turno.asignados_ids.length}
+                                <p className="text-sm sm:text-base font-black text-slate-800 tracking-tight">{turno.hora.slice(0, 5)} hs</p>
+                                <p className="text-[9px] sm:text-[10px] text-slate-500 mt-0.5 sm:mt-1 font-medium leading-tight">
+                                  Fijos: {turno.asignados_ids.length}
                                 </p>
                                 {holdsMyIndividual && (
                                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -534,22 +534,22 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                             </div>
                           )}
 
-                          <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs mt-1">
-                            <div>
-                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${holdsMyFijo ? 'bg-sky-400 animate-pulse' : holdsMyIndividual ? 'bg-emerald-400' : 'bg-slate-200'}`}></span>
+                          <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between text-xs mt-1">
+                            <div className="shrink-0 mr-1.5">
+                              <span className={`inline-block w-2 h-2 rounded-full ${holdsMyFijo ? 'bg-sky-400 animate-pulse' : holdsMyIndividual ? 'bg-emerald-400' : 'bg-slate-200'}`}></span>
                             </div>
 
-                            <div>
+                            <div className="flex-1 text-right">
                               {holdsMyFijo && (
                                 <button
                                   onClick={() => {
                                     setReprogramTurnId(reprogramTurnId === turno.id ? null : turno.id);
                                     setBookingTurnId(null);
                                   }}
-                                  className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 font-sans"
+                                  className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 font-sans w-full"
                                 >
                                   <RefreshCw className="w-3.5 h-3.5" />
-                                  Reprogramar clase
+                                  <span className="truncate">Reprogramar</span>
                                 </button>
                               )}
 
@@ -559,13 +559,13 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                     setBookingTurnId(bookingTurnId === turno.id ? null : turno.id);
                                     setReprogramTurnId(null);
                                   }}
-                                  className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer font-sans border-none ${
+                                  className={`px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer font-sans border-none w-full text-center ${
                                     bookingTurnId === turno.id
                                       ? 'bg-slate-200 text-slate-700 border border-slate-300'
                                       : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
                                   }`}
                                 >
-                                  {bookingTurnId === turno.id ? 'CERRAR PANEL' : 'RESERVAR CUPO'}
+                                  <span className="truncate">{bookingTurnId === turno.id ? 'CERRAR' : 'RESERVAR'}</span>
                                 </button>
                               )}
                             </div>

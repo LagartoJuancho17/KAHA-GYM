@@ -288,8 +288,13 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
 
         {/* Sessions list */}
         <div className="space-y-3.5">
-          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest font-mono">Mis Sesiones Programadas ({paidMonth})</h4>
-          
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest font-mono">Mis Sesiones Programadas ({paidMonth})</h4>
+            {sesionesDelMes.length > 0 && (
+              <span className="text-[9px] font-bold text-slate-400 font-mono">{sesionesDelMes.length} sesión{sesionesDelMes.length !== 1 ? 'es' : ''}</span>
+            )}
+          </div>
+
           {sesionesDelMes.length === 0 ? (
             <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
               <Calendar className="w-9 h-9 text-slate-300 mx-auto mb-2" />
@@ -299,106 +304,97 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            /* Horizontal scroll-snap carousel — shows 2 cards on mobile, 4 on desktop */
+            <div
+              className="flex gap-3 overflow-x-auto pb-2"
+              style={{
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+              }}
+            >
               {sesionesDelMes.map(sesion => {
                 const dateFormatted = new Date(sesion.fecha + 'T00:00:00').toLocaleDateString('es-AR', {
                   weekday: 'long',
                   day: 'numeric',
-                  month: 'short'
+                  month: 'long'
                 });
-
                 return (
-                  <div 
-                    key={sesion.id} 
-                    className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 transition-all relative overflow-hidden ${
-                      sesion.isSuspended 
-                        ? 'bg-slate-50/80 border-slate-200 opacity-60' 
-                        : sesion.tipo === 'FIJO' 
-                          ? 'bg-sky-50/40 border-sky-200 hover:border-sky-300' 
-                          : 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300'
+                  <div
+                    key={sesion.id}
+                    className={`flex-none flex flex-col justify-between gap-2.5 p-3 sm:p-4 rounded-2xl border transition-all relative overflow-hidden ${
+                      sesion.isSuspended
+                        ? 'bg-slate-50 border-slate-200 opacity-60'
+                        : sesion.tipo === 'FIJO'
+                          ? 'bg-sky-50/50 border-sky-200'
+                          : 'bg-emerald-50/50 border-emerald-200'
                     }`}
+                    style={{
+                      /* 2 visible on mobile, 4 on desktop (accounting for gap) */
+                      width: 'calc(50% - 6px)',
+                      minWidth: '140px',
+                      maxWidth: '220px',
+                      scrollSnapAlign: 'start',
+                    }}
                   >
-                    <div className="flex items-start justify-between gap-2 z-10">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-                          sesion.isSuspended 
-                            ? 'bg-slate-100 text-slate-400 border-slate-200'
-                            : sesion.tipo === 'FIJO' 
-                              ? 'bg-sky-100 text-sky-700 border-sky-100' 
-                              : 'bg-emerald-100 text-emerald-700 border-emerald-100'
-                        }`}>
-                          <Calendar className="w-4.5 h-4.5" />
-                        </div>
-                        <div>
-                          <p className={`text-xs font-black text-slate-800 uppercase tracking-tight leading-none ${sesion.isSuspended ? 'line-through text-slate-400' : ''}`}>
-                            {dateFormatted}
-                          </p>
-                          <p className={`text-[10px] text-slate-500 font-mono mt-1 ${sesion.isSuspended ? 'line-through' : ''}`}>
-                            {sesion.hora} hs • {sesion.tipo === 'FIJO' ? 'Clase Fija Semanal' : 'Reserva Individual'}
-                          </p>
-                        </div>
+                    <div className="flex flex-col gap-1.5">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                        sesion.isSuspended
+                          ? 'bg-slate-100 text-slate-400 border-slate-200'
+                          : sesion.tipo === 'FIJO'
+                            ? 'bg-sky-100 text-sky-700 border-sky-200'
+                            : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                      }`}>
+                        <Calendar className="w-3.5 h-3.5" />
                       </div>
-
-                      {/* Status Badge */}
-                      {sesion.isSuspended ? (
-                        <span className={`text-[8px] font-bold tracking-wider px-2 py-0.5 rounded font-mono border ${
-                          sesion.suspendedInfo?.reintegrado 
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                            : 'bg-rose-50 text-rose-800 border-rose-200'
-                        }`}>
-                          {sesion.suspendedInfo?.reintegrado ? 'SUSPENDIDA (REINTEGRADO)' : 'SUSPENDIDA (SIN REINTEGRO)'}
-                        </span>
-                      ) : (
-                        <span className={`text-[8px] font-bold tracking-wider px-2 py-0.5 rounded font-mono border ${
-                          sesion.tipo === 'FIJO' 
-                            ? 'bg-sky-50 text-sky-800 border-sky-200' 
+                      <div>
+                        <p className={`text-[11px] font-black text-slate-800 leading-tight capitalize ${sesion.isSuspended ? 'line-through text-slate-400' : ''}`}>
+                          {dateFormatted}
+                        </p>
+                        <p className={`text-[9px] text-slate-500 font-mono mt-0.5 ${sesion.isSuspended ? 'line-through' : ''}`}>
+                          {sesion.hora.slice(0, 5)} hs
+                        </p>
+                      </div>
+                      <span className={`text-[7px] font-bold tracking-wider px-1.5 py-0.5 rounded font-mono border self-start ${
+                        sesion.isSuspended
+                          ? (sesion.suspendedInfo?.reintegrado ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200')
+                          : sesion.tipo === 'FIJO'
+                            ? 'bg-sky-50 text-sky-800 border-sky-200'
                             : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        }`}>
-                          {sesion.tipo === 'FIJO' ? 'FIJO' : 'INDIVIDUAL'}
-                        </span>
-                      )}
+                      }`}>
+                        {sesion.isSuspended
+                          ? (sesion.suspendedInfo?.reintegrado ? 'SUSPENDIDA' : 'SIN REINTEGRO')
+                          : sesion.tipo === 'FIJO' ? 'FIJO' : 'INDIVIDUAL'}
+                      </span>
                     </div>
 
-                    {/* Suspension / Cancellation buttons */}
                     {!sesion.isSuspended && (
-                      <div className="flex justify-end pt-2 border-t border-slate-100/50 z-10">
+                      <div className="pt-2 border-t border-slate-100/80">
                         {sesion.tipo === 'FIJO' ? (
                           <button
                             onClick={() => {
-                              if (window.confirm(`¿Confirmas suspender la clase fija del ${dateFormatted} a las ${sesion.hora} hs? Si suspendes con más de 3 horas de anticipación, se te reintegrará el cupo.`)) {
+                              if (window.confirm(`¿Confirmas suspender la clase fija del ${dateFormatted} a las ${sesion.hora} hs?`)) {
                                 const res = suspenderClaseFija(socio.id, sesion.turnoId, sesion.fecha);
-                                if (res.success) {
-                                  setSuccessMessage(res.message);
-                                  setTimeout(() => setSuccessMessage(null), 4000);
-                                } else {
-                                  setErrorMessage(res.message);
-                                  setTimeout(() => setErrorMessage(null), 4000);
-                                }
+                                if (res.success) { setSuccessMessage(res.message); setTimeout(() => setSuccessMessage(null), 4000); }
+                                else { setErrorMessage(res.message); setTimeout(() => setErrorMessage(null), 4000); }
                               }
                             }}
-                            className="text-[9px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                            className="text-[9px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 w-full justify-center border border-transparent hover:border-rose-200"
                           >
-                            <X className="w-3.5 h-3.5" />
-                            Suspender clase
+                            <X className="w-3 h-3" /> Suspender
                           </button>
                         ) : (
                           <button
                             onClick={() => {
-                              if (window.confirm(`¿Confirmas cancelar esta reserva individual del ${dateFormatted} a las ${sesion.hora} hs? Si cancelas con más de 3 horas de anticipación, se te reintegrará el cupo.`)) {
+                              if (window.confirm(`¿Confirmas cancelar la reserva del ${dateFormatted} a las ${sesion.hora} hs?`)) {
                                 const res = cancelarReservaIndividual(socio.id, sesion.originalReserva.id);
-                                if (res.success) {
-                                  setSuccessMessage(res.message);
-                                  setTimeout(() => setSuccessMessage(null), 4000);
-                                } else {
-                                  setErrorMessage(res.message);
-                                  setTimeout(() => setErrorMessage(null), 4000);
-                                }
+                                if (res.success) { setSuccessMessage(res.message); setTimeout(() => setSuccessMessage(null), 4000); }
+                                else { setErrorMessage(res.message); setTimeout(() => setErrorMessage(null), 4000); }
                               }
                             }}
-                            className="text-[9px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                            className="text-[9px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 w-full justify-center border border-transparent hover:border-rose-200"
                           >
-                            <X className="w-3.5 h-3.5" />
-                            Cancelar reserva
+                            <X className="w-3 h-3" /> Cancelar
                           </button>
                         )}
                       </div>
@@ -424,7 +420,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
             Estás anotado en la lista de espera para los siguientes turnos. Si se libera un cupo por cancelación o suspensión de clase, serás promovido automáticamente y recibirás una notificación.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {misWaitlists.map(w => {
               const turn = turnos.find(t => t.id === w.turno_id);
               const dateFormatted = new Date(w.fecha + 'T00:00:00').toLocaleDateString('es-AR', {
@@ -433,13 +429,13 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                 month: 'short'
               });
               return (
-                <div key={w.id} className="bg-white border border-teal-100 rounded-xl p-3.5 shadow-3xs flex justify-between items-center gap-3">
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 capitalize">
+                <div key={w.id} className="bg-white border border-teal-100 rounded-xl p-2.5 sm:p-3.5 shadow-3xs flex justify-between items-center gap-1.5 min-w-0">
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-xs font-bold text-slate-800 capitalize truncate">
                       {dateFormatted}
                     </p>
-                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                      Turno: {turn ? `${turn.hora.slice(0, 5)} hs (${turn.dia})` : 'Turno no encontrado'}
+                    <p className="text-[9px] sm:text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                      {turn ? `${turn.hora.slice(0, 5)} hs` : 'Turno'}
                     </p>
                   </div>
                   <button
@@ -453,7 +449,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                         setTimeout(() => setErrorMessage(null), 3500);
                       }
                     }}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 font-bold px-2.5 py-1.5 rounded-lg text-[9px] transition-all cursor-pointer border border-rose-100"
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-rose-100 shrink-0"
                   >
                     Salir
                   </button>
