@@ -19,8 +19,8 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   isPaying,
   setIsPaying
 }) => {
-  const { registrarPago } = useGym();
-  const [activeTab, setActiveTab] = useState<'MERCADO_PAGO' | 'TRANSFERENCIA'>('MERCADO_PAGO');
+  const { solicitarPagoTransferencia } = useGym();
+  const [activeTab, setActiveTab] = useState<'MERCADO_PAGO' | 'TRANSFERENCIA'>('TRANSFERENCIA');
   const [copied, setCopied] = useState(false);
   const [simulatedSuccessData, setSimulatedSuccessData] = useState<{ clientName: string; amount: number; method: string } | null>(null);
 
@@ -68,22 +68,12 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   };
 
   const handleConfirmTransfer = () => {
-    const simulatedHash = `SIM-TRF-${Date.now()}`;
-    const res = registrarPago({
-      cliente_id: socio.id,
-      cliente_nombre_completo: `${socio.nombre} ${socio.apellido}`,
-      monto: socio.deuda_acumulada,
-      medio_pago: 'TRANSFERENCIA',
-      mes_correspondiente: new Date().toISOString().slice(0, 7),
-      hash_transaccion: simulatedHash,
-      registrado_por: socio.email
-    }, socio.email);
-
+    const res = solicitarPagoTransferencia(socio.id);
     if (res.success) {
       setSimulatedSuccessData({
         clientName: `${socio.nombre} ${socio.apellido}`,
         amount: socio.deuda_acumulada,
-        method: 'TRANSFERENCIA'
+        method: 'REVISION'
       });
     }
   };
@@ -192,14 +182,6 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
                       <span>{isPaying ? 'Iniciando Mercado Pago...' : 'Pagar con Mercado Pago (10% más)'}</span>
                     </button>
 
-                    {/* Simulation Option */}
-                    <button
-                      onClick={handleSimulateMP}
-                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-650 font-bold py-2.5 px-4 rounded-xl text-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200 shadow-3xs"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Simular Aprobación Rápida (Local)</span>
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -283,28 +265,26 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
       {simulatedSuccessData && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-fade-in font-sans">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-100 shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-scale-up">
-            {/* Decorative background gradients */}
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-100 rounded-full blur-3xl opacity-50"></div>
-            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-50 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-50 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
 
-            {/* Big check icon */}
+            {/* Pending / Clock icon */}
             <div className="relative mb-6">
-              <div className="absolute inset-0 bg-emerald-100 rounded-full scale-150 animate-ping opacity-30"></div>
-              <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white border-4 border-white shadow-md relative z-10">
-                <Check className="w-8 h-8 stroke-[3]" />
+              <div className="absolute inset-0 bg-amber-100 rounded-full scale-150 animate-ping opacity-25"></div>
+              <div className="w-16 h-16 rounded-full bg-amber-400 flex items-center justify-center text-white border-4 border-white shadow-md relative z-10">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                </svg>
               </div>
             </div>
 
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
-              {simulatedSuccessData.method === 'TRANSFERENCIA' ? '¡Transferencia Notificada!' : '¡Pago Aprobado (Simulado)!'}
-            </h3>
-            <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-              {simulatedSuccessData.method === 'TRANSFERENCIA' 
-                ? 'Se ha registrado tu transferencia con éxito y el administrador recibirá el comprobante.' 
-                : 'Tu transacción simulada se ha procesado con éxito y se ha reportado al panel administrativo.'}
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">Transferencia en Revisión</h3>
+            <p className="text-slate-500 text-sm mt-2 leading-relaxed max-w-xs">
+              Tu comprobante fue enviado. El equipo de <strong>KAHA GYM</strong> lo revisará y confirmará tu pago a la brevedad.
             </p>
 
-            {/* Receipt display card */}
+            {/* Receipt card */}
             <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 my-6 space-y-3 text-left">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400 font-mono uppercase font-bold">Socio</span>
@@ -312,26 +292,21 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400 font-mono uppercase font-bold">Medio de Pago</span>
-                <span className={`font-semibold px-2 py-0.5 rounded-md border text-[10px] ${
-                  simulatedSuccessData.method === 'TRANSFERENCIA'
-                    ? 'text-emerald-700 bg-emerald-50 border-emerald-100'
-                    : 'text-sky-600 bg-sky-50 border-sky-100'
-                }`}>
-                  {simulatedSuccessData.method === 'TRANSFERENCIA' ? 'TRANSFERENCIA BANCARIA' : 'SIMULACIÓN MERCADO PAGO'}
+                <span className="font-semibold px-2 py-0.5 rounded-md border text-[10px] text-amber-700 bg-amber-50 border-amber-100">
+                  TRANSFERENCIA BANCARIA
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-mono uppercase font-bold">Monto Abonado</span>
-                <span className={`font-black text-sm font-mono ${
-                  simulatedSuccessData.method === 'TRANSFERENCIA' ? 'text-emerald-700' : 'text-sky-700'
-                }`}>
+                <span className="text-slate-400 font-mono uppercase font-bold">Monto Declarado</span>
+                <span className="font-black text-sm font-mono text-emerald-700">
                   ${simulatedSuccessData.amount.toLocaleString('es-AR')} ARS
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs pt-2.5 border-t border-slate-200">
-                <span className="text-slate-400 font-mono uppercase font-bold">Estado Cuenta</span>
-                <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[9px] border border-emerald-100 uppercase tracking-wide">
-                  ✓ Al Día
+                <span className="text-slate-400 font-mono uppercase font-bold">Estado</span>
+                <span className="font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full text-[9px] border border-amber-200 uppercase tracking-wide flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  EN REVISIÓN
                 </span>
               </div>
             </div>

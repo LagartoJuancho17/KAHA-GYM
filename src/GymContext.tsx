@@ -1,7 +1,7 @@
 // src/GymContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
-  Cliente, Plan, HistorialPrecioPlan, Turno, Pago, 
+  Cliente, Plan, HistorialPrecioPlan, Turno, Pago, PagoEnRevision,
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
   ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, Profesor, NovedadProfesor, WaitlistReserva,
   ToastMessage
@@ -85,6 +85,12 @@ interface GymContextType {
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
+
+  // Transferencias en Revision
+  pagosEnRevision: PagoEnRevision[];
+  solicitarPagoTransferencia: (clienteId: string) => { success: boolean; message: string };
+  aprobarPagoTransferencia: (revisionId: string, adminEmail: string) => { success: boolean; message: string };
+  rechazarPagoTransferencia: (revisionId: string) => { success: boolean; message: string };
   
   // Novedades Methods
   addNovedad: (novedad: Omit<Novedad, 'id' | 'fecha'>) => { success: boolean; message: string };
@@ -195,6 +201,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [historialPrecios, setHistorialPrecios] = useState<HistorialPrecioPlan[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
+  const [pagosEnRevision, setPagosEnRevision] = useState<PagoEnRevision[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_pagos_revision');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
   const [recuperos, setRecuperos] = useState<RecuperoTurno[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [novedades, setNovedades] = useState<Novedad[]>([]);
@@ -1958,6 +1970,66 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'No se encontraron turnos fijos asignados en el rango de fechas seleccionado.' };
   };
 
+  // TRANSFERENCIAS EN REVISIÓN
+  const solicitarPagoTransferencia = (clienteId: string): { success: boolean; message: string } => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return { success: false, message: 'Cliente no encontrado.' };
+
+    // Check if there's already a pending review for this client
+    const yaExiste = pagosEnRevision.some(p => p.cliente_id === clienteId && p.estado === 'PENDIENTE');
+    if (yaExiste) return { success: false, message: 'Ya existe una transferencia en revisión para este socio.' };
+
+    const nuevaRevision: PagoEnRevision = {
+      id: `rev-${Date.now()}`,
+      cliente_id: clienteId,
+      cliente_nombre_completo: `${cli.nombre} ${cli.apellido}`,
+      monto: cli.deuda_acumulada,
+      mes_correspondiente: new Date().toISOString().slice(0, 7),
+      solicitado_por_email: cli.email,
+      solicitado_at: new Date().toISOString(),
+      estado: 'PENDIENTE'
+    };
+
+    const updated = [nuevaRevision, ...pagosEnRevision];
+    setPagosEnRevision(updated);
+    localStorage.setItem('gym_pagos_revision', JSON.stringify(updated));
+    return { success: true, message: '¡Transferencia enviada! El equipo de KAHA GYM la revisará y confirmará tu pago.' };
+  };
+
+  const aprobarPagoTransferencia = (revisionId: string, adminEmail: string): { success: boolean; message: string } => {
+    const revision = pagosEnRevision.find(p => p.id === revisionId);
+    if (!revision) return { success: false, message: 'Revisión no encontrada.' };
+
+    // Register the actual payment
+    const res = registrarPago({
+      cliente_id: revision.cliente_id,
+      cliente_nombre_completo: revision.cliente_nombre_completo,
+      monto: revision.monto,
+      medio_pago: 'TRANSFERENCIA',
+      mes_correspondiente: revision.mes_correspondiente,
+      hash_transaccion: `TRF-APROBADO-${revisionId}`,
+      registrado_por: adminEmail
+    }, adminEmail);
+
+    if (!res.success) return res;
+
+    // Mark as approved
+    const updated = pagosEnRevision.map(p => p.id === revisionId ? { ...p, estado: 'APROBADO' as const } : p);
+    setPagosEnRevision(updated);
+    localStorage.setItem('gym_pagos_revision', JSON.stringify(updated));
+    return { success: true, message: 'Transferencia aprobada y pago registrado correctamente.' };
+  };
+
+  const rechazarPagoTransferencia = (revisionId: string): { success: boolean; message: string } => {
+    const revision = pagosEnRevision.find(p => p.id === revisionId);
+    if (!revision) return { success: false, message: 'Revisión no encontrada.' };
+
+    const updated = pagosEnRevision.map(p => p.id === revisionId ? { ...p, estado: 'RECHAZADO' as const } : p);
+    setPagosEnRevision(updated);
+    localStorage.setItem('gym_pagos_revision', JSON.stringify(updated));
+    return { success: true, message: 'Transferencia rechazada.' };
+  };
+
   // CLIENT PAGOS OPERATIONS
   const registrarPago = (pagoData: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => {
     const cli = clientes.find(c => c.id === pagoData.cliente_id);
@@ -2724,6 +2796,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
       registrarPago, importarPagosCSV,
+      pagosEnRevision,
+      solicitarPagoTransferencia,
+      aprobarPagoTransferencia,
+      rechazarPagoTransferencia,
       addNotificacion, marcarNotificacionesLeidas, eliminarNotificacion,
       registrarGasto, eliminarGasto, registrarProfesor, updateProfesor, eliminarProfesor, registrarNovedadProfesor, eliminarNovedadProfesor,
       addNovedad, updateNovedad, deleteNovedad,

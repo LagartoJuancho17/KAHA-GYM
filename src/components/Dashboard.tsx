@@ -24,10 +24,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const { 
     clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, 
-    registrarGasto, autorizarCliente, eliminarCliente 
+    registrarGasto, autorizarCliente, eliminarCliente,
+    pagosEnRevision, aprobarPagoTransferencia, rechazarPagoTransferencia, googleUser
   } = useGym();
 
   const clientesPendientes = clientes.filter(c => c.activo && c.autorizado === false);
+  const transferenciasPendientes = pagosEnRevision?.filter(p => p.estado === 'PENDIENTE') || [];
   
   // Modal state
   const [showGastoModal, setShowGastoModal] = useState(false);
@@ -247,6 +249,73 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* TRANSFERENCIAS PENDIENTES DE REVISIÓN */}
+      {transferenciasPendientes.length > 0 && (
+        <div className="bg-emerald-50/60 backdrop-blur-xs border border-emerald-200 p-5 rounded-2xl space-y-4 shadow-xs animate-fade-in mb-6" id="pending-transfers-section-dashboard">
+          <div className="flex items-center justify-between border-b border-emerald-200/50 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-200/50">
+                <Receipt className="w-4 h-4 text-emerald-600 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-emerald-900 font-sans">Transferencias a Confirmar (Revisión)</h3>
+                <p className="text-[10px] text-emerald-700/80 font-sans mt-0.5">Socios que notificaron pago por transferencia bancaria</p>
+              </div>
+            </div>
+            <span className="bg-emerald-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full shadow-xs">
+              {transferenciasPendientes.length} {transferenciasPendientes.length === 1 ? 'pendiente' : 'pendientes'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {transferenciasPendientes.map(p => (
+              <div key={p.id} className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col justify-between shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 font-bold uppercase text-[11px] shrink-0">
+                    {p.cliente_nombre_completo[0]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-zinc-900 text-xs truncate leading-none mb-1">{p.cliente_nombre_completo}</p>
+                    <p className="text-[10px] text-emerald-700 font-mono font-bold leading-none mb-2">
+                      Monto: ${p.monto.toLocaleString('es-AR')} ARS
+                    </p>
+                    <div className="flex flex-col gap-0.5 text-[9px] text-zinc-500">
+                      <span>Mes: {p.mes_correspondiente}</span>
+                      <span>Notificado: {new Date(p.solicitado_at).toLocaleString('es-AR')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`¿Confirmar y aprobar el pago de $${p.monto.toLocaleString('es-AR')} para ${p.cliente_nombre_completo}?`)) {
+                        aprobarPagoTransferencia(p.id, googleUser?.email || 'admin@kaha.fit');
+                      }
+                    }}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-transparent shadow-2xs"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Aprobar Pago
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`¿Rechazar la solicitud de transferencia de ${p.cliente_nombre_completo}?`)) {
+                        rechazarPagoTransferencia(p.id);
+                      }
+                    }}
+                    className="bg-red-50 hover:bg-red-100 text-red-600 p-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                    title="Rechazar y cancelar"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* SOLICITUDES PENDIENTES DE AUTORIZACIÓN */}
       {clientesPendientes.length > 0 && (

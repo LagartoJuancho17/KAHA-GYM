@@ -176,42 +176,7 @@ export const SocioPanel: React.FC = () => {
 
           {/* Bento grid and member info details */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6" id="socio-bento-dashboard">
-            {/* Card A: Credential Pass */}
-            <div className="bg-gradient-to-tr from-slate-50 via-white to-emerald-50/20 border border-slate-200 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm transition-all hover:border-emerald-400 group text-xs" id="socio-card-member">
-              <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-emerald-500 to-sky-400 rounded-full blur-2xl opacity-10 group-hover:opacity-15 transition-opacity -mr-10 -mt-10 pointer-events-none"></div>
-              
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-200/50 text-emerald-700 font-mono text-[8px] uppercase tracking-wider font-extrabold">
-                    <Award className="w-3 h-3" />
-                    Membresía KAHA
-                  </div>
-                  <h2 className="text-sm font-black text-slate-800 mt-2 tracking-tight">CREDENTIAL PASS</h2>
-                </div>
-                <div className="text-slate-400 group-hover:text-emerald-600 transition-colors">
-                  <QrCode className="w-7 h-7" />
-                </div>
-              </div>
-
-              <div className="py-2">
-                <p className="text-[9px] text-slate-400 font-mono select-all tracking-wider">MEMBER NO: {socio.id.toUpperCase()}</p>
-                <p className="text-lg font-black text-slate-800 tracking-wider uppercase mt-0.5">{socio.nombre} {socio.apellido}</p>
-              </div>
-
-              <div className="border-t border-slate-200 pt-3 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${socio.estado === 'ACTIVO' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">
-                    {socio.estado === 'ACTIVO' ? 'ACTIVO / ACCESO HABILITADO' : 'SUSPENDIDO'}
-                  </span>
-                </div>
-                <div className="opacity-60 group-hover:opacity-90 transition-opacity flex items-center shrink-0">
-                  <Barcode className="w-14 h-6 text-slate-500" />
-                </div>
-              </div>
-            </div>
-
-            {/* Card B: Membership Plan */}
+            {/* Card B: Plan Vigente — now FIRST */}
             <div className="bg-white border border-slate-200 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm hover:border-slate-300 transition-all text-xs" id="socio-card-plan">
               <div className="flex justify-between items-start">
                 <div>
@@ -273,7 +238,65 @@ export const SocioPanel: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Card A: Membresía / Credential Pass — now SECOND */}
+            <div className="bg-gradient-to-tr from-slate-50 via-white to-emerald-50/20 border border-slate-200 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm transition-all hover:border-emerald-400 group text-xs" id="socio-card-member">
+              <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-emerald-500 to-sky-400 rounded-full blur-2xl opacity-10 group-hover:opacity-15 transition-opacity -mr-10 -mt-10 pointer-events-none"></div>
+              
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-200/50 text-emerald-700 font-mono text-[8px] uppercase tracking-wider font-extrabold">
+                    <Award className="w-3 h-3" />
+                    Membresía KAHA
+                  </div>
+                  <h2 className="text-sm font-black text-slate-800 mt-2 tracking-tight">CREDENTIAL PASS</h2>
+                </div>
+                <div className="text-slate-400 group-hover:text-emerald-600 transition-colors">
+                  <QrCode className="w-7 h-7" />
+                </div>
+              </div>
+
+              <div className="py-2">
+                <p className="text-[9px] text-slate-400 font-mono select-all tracking-wider">MEMBER NO: {socio.id.toUpperCase()}</p>
+                <p className="text-lg font-black text-slate-800 tracking-wider uppercase mt-0.5">{socio.nombre} {socio.apellido}</p>
+              </div>
+
+              <div className="border-t border-slate-200 pt-3 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${socio.estado === 'ACTIVO' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">
+                    {socio.estado === 'ACTIVO' ? 'ACTIVO / ACCESO HABILITADO' : 'SUSPENDIDO'}
+                  </span>
+                </div>
+                <div className="opacity-60 group-hover:opacity-90 transition-opacity flex items-center shrink-0">
+                  <Barcode className="w-14 h-6 text-slate-500" />
+                </div>
+              </div>
+            </div>
           </section>
+
+          {/* Soporte card */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5" id="socio-soporte-home">
+            <div className="flex-1 space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 font-mono text-[8px] uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Soporte KAHA GYM
+              </div>
+              <h3 className="text-sm font-black text-slate-800 tracking-tight">¿Necesitás ayuda o cambiar un turno fijo?</h3>
+              <p className="text-slate-500 text-xs leading-relaxed font-medium max-w-lg">
+                Nuestro equipo está disponible para resolver cualquier consulta sobre tu membresía, turnos o pagos. Escribinos directamente por WhatsApp.
+              </p>
+            </div>
+            <a
+              href={`https://wa.me/541178402722?text=${encodeURIComponent(`Hola KAHA GYM, soy el socio ${socio.nombre} ${socio.apellido}. Me contacto desde mi portal de cliente.`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-2xl text-xs flex items-center justify-center gap-2.5 transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-sm"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.66.986 3.284 1.48 4.909 1.481 5.482 0 9.94-4.461 9.943-9.94.002-2.654-1.029-5.15-2.901-7.025C16.726 1.795 14.237.772 11.583.772c-5.485 0-9.94 4.46-9.943 9.94-.001 1.904.5 3.76 1.45 5.421L2.09 21.65l5.557-1.496zm12.355-6.883c-.302-.15-1.787-.882-2.062-.982-.275-.1-.475-.15-.674.15-.2.3-.775.982-.95 1.182-.175.2-.35.225-.65.075-.3-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.784-1.275-2.083.175-.3.275-.475.375-.674.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.925-2.225-.244-.589-.493-.51-.674-.519-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5 0 1.475 1.075 2.9 1.225 3.1.15.2 2.11 3.22 5.11 4.52.714.31 1.272.496 1.706.634.717.228 1.37.195 1.887.118.575-.085 1.788-.73 2.038-1.43.25-.7.25-1.3.175-1.43-.075-.125-.275-.2-.575-.35z"/></svg>
+              Conversar por WhatsApp
+            </a>
+          </div>
         </div>
       )}
 
@@ -331,25 +354,28 @@ export const SocioPanel: React.FC = () => {
         id="socio-bottom-navbar"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)', height: '64px' }}
       >
-        {/* PERFIL */}
+        {/* CARTELERA */}
         <button
-          onClick={() => setActiveTabSection('PERFIL')}
+          onClick={() => setActiveTabSection('NOVEDADES')}
           className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] border-none bg-transparent relative"
-          id="bottom-nav-perfil"
+          id="bottom-nav-novedades"
         >
-          <User className={`w-5 h-5 transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`} />
-          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`}>Perfil</span>
-          {activeTabSection === 'PERFIL' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
+          <Megaphone className={`w-5 h-5 transition-colors ${activeTabSection === 'NOVEDADES' ? 'text-emerald-600' : 'text-slate-400'}`} />
+          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'NOVEDADES' ? 'text-emerald-600' : 'text-slate-400'}`}>Cartelera</span>
+          {activeTabSection === 'NOVEDADES' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
+          {novedades.some(n => n.destacado) && activeTabSection !== 'NOVEDADES' && (
+            <span className="absolute top-1.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full border border-white"></span>
+          )}
         </button>
 
-        {/* RESERVAS */}
+        {/* CONTROL DE CUPOS (RESERVAS) */}
         <button
           onClick={() => setActiveTabSection('RESERVAS')}
           className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] border-none bg-transparent relative"
           id="bottom-nav-reservas"
         >
           <CalendarDays className={`w-5 h-5 transition-colors ${activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-400'}`} />
-          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-400'}`}>Horarios</span>
+          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-400'}`}>Cupos</span>
           {activeTabSection === 'RESERVAS' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
         </button>
 
@@ -372,29 +398,26 @@ export const SocioPanel: React.FC = () => {
           }`}>Home</span>
         </button>
 
-        {/* PAGOS */}
+        {/* PLAN VIGENTE (PAGOS) */}
         <button
           onClick={() => setActiveTabSection('PAGOS')}
           className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] border-none bg-transparent relative"
           id="bottom-nav-pagos"
         >
           <Receipt className={`w-5 h-5 transition-colors ${activeTabSection === 'PAGOS' ? 'text-emerald-600' : 'text-slate-400'}`} />
-          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PAGOS' ? 'text-emerald-600' : 'text-slate-400'}`}>Pagos</span>
+          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PAGOS' ? 'text-emerald-600' : 'text-slate-400'}`}>Plan</span>
           {activeTabSection === 'PAGOS' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
         </button>
 
-        {/* NOVEDADES */}
+        {/* MEMBRESÍA (PERFIL) */}
         <button
-          onClick={() => setActiveTabSection('NOVEDADES')}
+          onClick={() => setActiveTabSection('PERFIL')}
           className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] border-none bg-transparent relative"
-          id="bottom-nav-novedades"
+          id="bottom-nav-perfil"
         >
-          <Megaphone className={`w-5 h-5 transition-colors ${activeTabSection === 'NOVEDADES' ? 'text-emerald-600' : 'text-slate-400'}`} />
-          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'NOVEDADES' ? 'text-emerald-600' : 'text-slate-400'}`}>Cartelera</span>
-          {activeTabSection === 'NOVEDADES' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
-          {novedades.some(n => n.destacado) && activeTabSection !== 'NOVEDADES' && (
-            <span className="absolute top-1.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full border border-white"></span>
-          )}
+          <User className={`w-5 h-5 transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`} />
+          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`}>Membresía</span>
+          {activeTabSection === 'PERFIL' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
         </button>
       </nav>
 

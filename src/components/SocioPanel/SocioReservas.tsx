@@ -605,29 +605,6 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
         </div>
       )}
 
-      {/* 4. DYNAMIC WHATSAPP BOX */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6.5 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-6" id="socio-whatsapp-support">
-        <div className="flex-1 space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 font-mono text-[8px] uppercase tracking-wider">
-            <Phone className="w-3 h-3 text-emerald-500" />
-            Soporte KAHA GYM
-          </div>
-          <h3 className="text-base font-black text-slate-800 tracking-tight">¿Deseas cambiar un turno fijo asignado?</h3>
-          <p className="text-slate-500 text-xs leading-relaxed max-w-2xl font-medium">
-            Los turnos fijos semanales son permanentes y deben ser aprobados o modificados por un Operador / Profesor. Puedes iniciar un chat directo de WhatsApp con nuestro equipo administrativo haciendo click a la derecha.
-          </p>
-        </div>
-
-        <a
-          href={whatsappUrl()}
-          target="_blank"
-          rel="noreferrer"
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-xs animate-pulse hover:animate-none text-center"
-        >
-          <span>Conversar por WhatsApp</span>
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
-      </div>
     </div>
   );
 };

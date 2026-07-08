@@ -83,6 +83,17 @@ export interface Pago {
   creado_at: string;
 }
 
+export interface PagoEnRevision {
+  id: string;
+  cliente_id: string;
+  cliente_nombre_completo: string;
+  monto: number;
+  mes_correspondiente: string;
+  solicitado_por_email: string;
+  solicitado_at: string;
+  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+}
+
 export interface RecuperoTurno {
   id: string;
   cliente_id: string;
