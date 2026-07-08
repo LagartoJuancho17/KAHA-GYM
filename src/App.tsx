@@ -51,7 +51,7 @@ function InnerApp() {
     rolActivo, googleUser, signOutGoogle, registrarPago, clientes,
     notificaciones, marcarNotificacionesLeidas, eliminarNotificacion,
     autorizarCliente, toasts, removeToast,
-    pendingRegistrationUser
+    pendingRegistrationUser, loading
   } = useGym();
 
   const [timeString, setTimeString] = useState('');
@@ -157,6 +157,17 @@ function InnerApp() {
   // Block viewing if Google Sign In is not completed (placed after all hook declarations)
   if (pendingRegistrationUser) {
     return <SocioRegistrationForm />;
+  }
+
+  if (loading && googleUser) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4" id="app-loading-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin"></div>
+          <p className="text-slate-600 font-semibold text-xs font-sans">Cargando datos del gimnasio...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!googleUser) {

@@ -228,71 +228,74 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
         </div>
       )}
 
-      {/* NAVEGACIÓN SEMANAL */}
-      <div className="flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-2xl mb-6 max-w-xl mx-auto" id="socio-week-navigation">
-        <button
-          onClick={() => {
-            setWeekOffset(prev => prev - 1);
-            setBookingTurnId(null);
-          }}
-          className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Semana Anterior
-        </button>
-        <div className="text-center">
-          <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest block font-mono">Semana Seleccionada</span>
-          <span className="text-xs font-bold text-slate-800">
-            {getWeekRangeLabel(weekOffset)}
-          </span>
+      {/* STICKY CONTAINER FOR WEEKLY NAVIGATION AND DAY TABS */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md -mx-6.5 px-6.5 lg:-mx-8 lg:px-8 pt-2 pb-5 border-b border-slate-100/85 space-y-4 mb-6 animate-fade-in" id="socio-sticky-header">
+        {/* NAVEGACIÓN SEMANAL */}
+        <div className="flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-2xl max-w-xl mx-auto" id="socio-week-navigation">
+          <button
+            onClick={() => {
+              setWeekOffset(prev => prev - 1);
+              setBookingTurnId(null);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Semana Anterior
+          </button>
+          <div className="text-center">
+            <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest block font-mono">Semana Seleccionada</span>
+            <span className="text-xs font-bold text-slate-800">
+              {getWeekRangeLabel(weekOffset)}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setWeekOffset(prev => prev + 1);
+              setBookingTurnId(null);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+          >
+            Semana Siguiente
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={() => {
-            setWeekOffset(prev => prev + 1);
-            setBookingTurnId(null);
-          }}
-          className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
-        >
-          Semana Siguiente
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
 
-      {/* DIAS CALENDARIO SELECTOR TAB BAR */}
-      <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1 lg:max-w-xl mx-auto mb-8" id="socio-agenda-tabs">
-        {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const).map(dia => {
-          const isActive = activeDays.has(dia);
-          return (
-            <button
-              key={dia}
-              onClick={() => {
-                setActiveDays(prev => {
-                  const next = new Set(prev);
-                  if (next.has(dia)) {
-                    if (next.size > 1) next.delete(dia);
-                  } else {
-                    next.add(dia);
-                  }
-                  return next;
-                });
-                setBookingTurnId(null);
-                setReprogramTurnId(null);
-              }}
-              className={`py-3.5 text-center text-xs font-bold rounded-xl transition-all cursor-pointer select-none border ${
-                isActive 
-                  ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 text-white border-transparent font-black scale-102 shadow-sm ring-2 ring-emerald-500/20' 
-                  : 'text-slate-500 hover:text-slate-800 bg-transparent border-transparent hover:bg-white/50'
-              }`}
-            >
-              <div className="flex flex-col items-center">
-                <span className="font-mono uppercase text-[9px] tracking-wide">
-                  {dia === 'MIERCOLES' ? 'MIÉ' : dia.slice(0, 3)}
-                </span>
-                <span className={`text-[7px] hidden md:inline tracking-wider mt-0.5 ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>DIA</span>
-              </div>
-            </button>
-          );
-        })}
+        {/* DIAS CALENDARIO SELECTOR TAB BAR */}
+        <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1 lg:max-w-xl mx-auto" id="socio-agenda-tabs">
+          {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const).map(dia => {
+            const isActive = activeDays.has(dia);
+            return (
+              <button
+                key={dia}
+                onClick={() => {
+                  setActiveDays(prev => {
+                    const next = new Set(prev);
+                    if (next.has(dia)) {
+                      if (next.size > 1) next.delete(dia);
+                    } else {
+                      next.add(dia);
+                    }
+                    return next;
+                  });
+                  setBookingTurnId(null);
+                  setReprogramTurnId(null);
+                }}
+                className={`py-3.5 text-center text-xs font-bold rounded-xl transition-all cursor-pointer select-none border ${
+                  isActive 
+                    ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 text-white border-transparent font-black scale-102 shadow-sm ring-2 ring-emerald-500/20' 
+                    : 'text-slate-500 hover:text-slate-800 bg-transparent border-transparent hover:bg-white/50'
+                }`}
+              >
+                <div className="flex flex-col items-center">
+                  <span className="font-mono uppercase text-[9px] tracking-wide">
+                    {dia === 'MIERCOLES' ? 'MIÉ' : dia.slice(0, 3)}
+                  </span>
+                  <span className={`text-[7px] hidden md:inline tracking-wider mt-0.5 ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>DIA</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {activeDays.size > 1 && (

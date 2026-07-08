@@ -99,6 +99,7 @@ interface GymContextType {
   toasts: ToastMessage[];
   addToast: (type: 'add' | 'delete' | 'success' | 'error', message: string) => void;
   removeToast: (id: string) => void;
+  loading: boolean;
 }
 
 const GymContext = createContext<GymContextType | undefined>(undefined);
@@ -213,6 +214,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const local = localStorage.getItem('gym_google_user');
     return local ? JSON.parse(local) : null;
   });
+  const [loading, setLoading] = useState(!!supabase);
   const [pendingRegistrationUser, setPendingRegistrationUser] = useState<{ email: string; name: string; picture?: string } | null>(null);
   const [rolActivo, setRolActivo] = useState<RolUsuario>(() => {
     const localUser = localStorage.getItem('gym_google_user');
@@ -253,6 +255,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loadSupabaseData = async () => {
     if (!supabase) return;
+    setLoading(true);
     try {
       // 1. Fetch Planes
       const { data: planesDb, error: planesErr } = await supabase.from('planes').select('*');
@@ -464,6 +467,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('✅ Sincronización exitosa desde Supabase completada');
     } catch (err) {
       console.error('❌ Error al inicializar/sincronizar Supabase:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2726,7 +2731,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       borrarHistorial,
       toasts,
       addToast,
-      removeToast
+      removeToast,
+      loading
     }}>
       {children}
     </GymContext.Provider>

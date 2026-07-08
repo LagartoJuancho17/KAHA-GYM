@@ -223,14 +223,14 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                   <button
                     onClick={() => setShowPaymentChoiceModal(true)}
                     disabled={isPaying}
-                    className="w-full bg-[#009EE3] hover:bg-[#008bc7] text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs border-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs border-none disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isPaying ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <CreditCard className="w-4 h-4" />
                     )}
-                    <span>{isPaying ? 'Iniciando Mercado Pago...' : 'Pagar con Mercado Pago'}</span>
+                    <span>{isPaying ? 'Procesando Pago...' : 'Pagar Cuota (Mercado Pago / Transferencia)'}</span>
                   </button>
                   {paymentError && (
                     <p className="text-[10px] text-rose-700 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">

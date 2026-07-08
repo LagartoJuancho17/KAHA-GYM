@@ -17,7 +17,7 @@ import { SocioPaymentChoiceModal } from './SocioPaymentChoiceModal';
 export const SocioPanel: React.FC = () => {
   const { 
     clientes, planes, selectedSocioId, googleUser,
-    novedades, setRolActivo, signOutGoogle
+    novedades, setRolActivo, signOutGoogle, loading
   } = useGym();
 
   const [activeTabSection, setActiveTabSection] = useState<'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES'>('HOME');
@@ -41,6 +41,15 @@ export const SocioPanel: React.FC = () => {
     if (!socio) return null;
     return planes.find(p => p.id === socio.plan_id) || null;
   }, [planes, socio]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-3xl" id="socio-panel-loading">
+        <div className="w-10 h-10 rounded-full border-4 border-slate-100 border-t-emerald-600 animate-spin"></div>
+        <p className="text-slate-500 font-semibold text-xs mt-4">Sincronizando información de membresía...</p>
+      </div>
+    );
+  }
 
   if (!socio) {
     return (
@@ -247,14 +256,14 @@ export const SocioPanel: React.FC = () => {
                   <button
                     onClick={() => setShowPaymentChoiceModal(true)}
                     disabled={isPaying}
-                    className="w-full bg-[#009EE3] hover:bg-[#008bc7] text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs border-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs border-none disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isPaying ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <CreditCard className="w-4 h-4" />
                     )}
-                    <span>{isPaying ? 'Iniciando Mercado Pago...' : 'Pagar con Mercado Pago'}</span>
+                    <span>{isPaying ? 'Procesando Pago...' : 'Pagar Cuota (Mercado Pago / Transferencia)'}</span>
                   </button>
                   {paymentError && (
                     <p className="text-[10px] text-rose-600 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">
