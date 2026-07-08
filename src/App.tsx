@@ -80,6 +80,9 @@ function InnerApp() {
     const preferenceId = params.get('preference_id');
 
     if (mpStatus === 'success' && clientId) {
+      // Si la lista de clientes está vacía (cargando desde Supabase), esperamos a la siguiente renderización
+      if (clientes.length === 0) return;
+
       const amount = Number(amountStr) || 0;
       const client = clientes.find(c => c.id === clientId);
       if (client) {
@@ -103,6 +106,8 @@ function InnerApp() {
             amount: amount
           });
         }
+      } else {
+        console.warn(`[Mercado Pago] No se encontró el cliente con ID: ${clientId}`);
       }
 
       // Clean query parameters from URL

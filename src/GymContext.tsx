@@ -57,7 +57,7 @@ interface GymContextType {
   // Clientes Methods
   addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => { success: boolean; message: string; duplicate?: boolean };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
-  autorizarCliente: (id: string) => { success: boolean; message: string };
+  autorizarCliente: (id: string, planId?: string) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
   altaCliente: (id: string) => void;
   eliminarCliente: (id: string) => void;
@@ -80,6 +80,7 @@ interface GymContextType {
   crearReservaIndividual: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
   cancelarReservaIndividual: (clienteId: string, reservaId: string) => { success: boolean; message: string };
   suspenderClaseFija: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
+  revertirSuspensionClaseFija: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
 
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
@@ -1786,6 +1787,50 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const revertirSuspensionClaseFija = (clienteId: string, turnoId: string, fecha: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const isSuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha);
+    if (!isSuspended) {
+      return { success: false, message: 'Esta sesión no está suspendida para esta fecha.' };
+    }
+
+    const updatedClientes = clientes.map(c => {
+      if (c.id === clienteId) {
+        const clasesSuspendidas = (c.clases_suspendidas || []).filter(
+          s => !(s.turno_id === turnoId && s.fecha === fecha)
+        );
+        return {
+          ...c,
+          clases_suspendidas: clasesSuspendidas
+        };
+      }
+      return c;
+    });
+
+    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      const targetClient = updatedClientes.find(c => c.id === clienteId);
+      if (targetClient) {
+        supabase.from('clientes').update({
+          clases_suspendidas: targetClient.clases_suspendidas || []
+        }).eq('id', clienteId).then(({ error }) => {
+          if (error) console.error("Error al actualizar suspension en Supabase:", error);
+        });
+      }
+    }
+
+    addAuditLog('CLASE_FIJA_RESTABLECIDA', { 
+      cliente: `${cliente.nombre} ${cliente.apellido}`, 
+      turno_id: turnoId, 
+      fecha 
+    });
+
+    return { success: true, message: 'Asistencia restablecida con éxito.' };
+  };
+
   const asignarProfesorTurno = (turnoId: string, profesor: string) => {
     const updated = turnos.map(t => {
       if (t.id === turnoId) {
@@ -2672,7 +2717,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
-      crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija,
+      crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
       registrarPago, importarPagosCSV,
       addNotificacion, marcarNotificacionesLeidas, eliminarNotificacion,
       registrarGasto, eliminarGasto, registrarProfesor, updateProfesor, eliminarProfesor, registrarNovedadProfesor, eliminarNovedadProfesor,

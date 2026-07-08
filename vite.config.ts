@@ -52,7 +52,7 @@ export default defineConfig(({ mode }) => {
                   const client = new MercadoPagoConfig({ accessToken: token });
                   const preferenceBuilder = new Preference(client);
 
-                  const result = await preferenceBuilder.create({
+                   const result = await preferenceBuilder.create({
                     body: {
                       items: [
                         {
@@ -69,6 +69,7 @@ export default defineConfig(({ mode }) => {
                         failure: `${baseOrigin}/?mp_status=failure&clientId=${clientId}`
                       },
                       auto_return: 'approved',
+                      notification_url: `${baseOrigin}/api/webhooks/mercadopago`,
                       external_reference: clientId,
                       metadata: {
                         client_id: clientId,

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck } from 'lucide-react';
+import { SearchableSelect } from '../Common/SearchableSelect';
 
 interface TurnoDetailsModalProps {
   turnoId: string;
@@ -36,6 +37,20 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   if (!selectedTurno) return null;
 
   const clientesActivos = clientes.filter(c => c.activo);
+
+  const optionsClientToAssign = useMemo(() => {
+    return clientesActivos
+      .filter(c => !c.turnos_fijos.includes(turnoId))
+      .map(cl => {
+        const clPlan = planes.find(p => p.id === cl.plan_id);
+        const limitText = clPlan ? `${cl.turnos_fijos.length}/${clPlan.dias_por_semana}` : `${cl.turnos_fijos.length}/5`;
+        return {
+          value: cl.id,
+          label: `${cl.apellido}, ${cl.nombre} (${limitText} turnos max)`,
+          searchString: `${cl.nombre} ${cl.apellido}`
+        };
+      });
+  }, [clientesActivos, planes, turnoId]);
 
   // Assign Fijo handler
   const handleAssignFijo = (e: React.FormEvent) => {
@@ -226,23 +241,13 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
             <form onSubmit={handleAssignFijo} className="pt-2.5 space-y-2">
               <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Reservar Horario Fijo</label>
               <div className="flex gap-2">
-                <select
+                <SearchableSelect
+                  options={optionsClientToAssign}
                   value={selectedClientToAssignId}
-                  onChange={(e) => setSelectedClientToAssignId(e.target.value)}
-                  className="flex-1 border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
-                >
-                  <option value="">-- Elige un socio --</option>
-                  {clientesActivos
-                    .filter(c => !c.turnos_fijos.includes(turnoId))
-                    .map(cl => {
-                      const clPlan = planes.find(p => p.id === cl.plan_id);
-                      return (
-                        <option key={cl.id} value={cl.id}>
-                          {cl.apellido}, {cl.nombre} ({cl.turnos_fijos.length}/{clPlan?.dias_por_semana || 5} turnos max)
-                        </option>
-                      );
-                    })}
-                </select>
+                  onChange={setSelectedClientToAssignId}
+                  placeholder="-- Elige un socio --"
+                  noOptionsText="No se encontraron socios"
+                />
                 <button
                   type="submit"
                   className="bg-black hover:bg-zinc-800 text-white font-bold text-xs px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm border-none"

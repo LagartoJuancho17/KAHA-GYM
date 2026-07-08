@@ -69,6 +69,7 @@ app.post('/api/create-preference', async (req, res) => {
           failure: `${baseOrigin}/?mp_status=failure&clientId=${clientId}`
         },
         auto_return: 'approved',
+        notification_url: `${baseOrigin}/api/webhooks/mercadopago`,
         external_reference: clientId,
         metadata: {
           client_id: clientId,

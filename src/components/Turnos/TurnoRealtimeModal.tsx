@@ -1,5 +1,5 @@
 // src/components/Turnos/TurnoRealtimeModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { X, Clock, Trash2, Plus } from 'lucide-react';
@@ -12,7 +12,8 @@ interface TurnoRealtimeModalProps {
 export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selectedSlot, onClose }) => {
   const { 
     turnos, clientes, recuperos,
-    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, addCliente
+    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
+    actualizarEstadoRecupero, addCliente
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
@@ -28,7 +29,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     const suspendidos = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha));
     const fijosActivos = fijos.filter(c => !suspendidos.some(s => s.id === c.id));
     const vars = clientes.filter(c => c.activo && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));
-    const recs = recuperos.filter(r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turno.id && r.fecha_recupero === fecha);
+    const recs = recuperos.filter(r => (r.estado === 'PENDIENTE' || r.estado === 'COMPLETADO') && r.turno_recupero_id === turno.id && r.fecha_recupero === fecha);
 
     return {
       turno,
@@ -101,29 +102,100 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     }
   };
 
-  const handleRemoveRealtimeVariable = (clienteId: string, reservaId: string) => {
+  const checklistItems = useMemo(() => {
+    const items: Array<{
+      id: string;
+      clienteId: string;
+      nombre: string;
+      tipo: 'FIJO' | 'VARIABLE' | 'RECUPERO';
+      presente: boolean;
+      info?: string;
+      key: string;
+    }> = [];
+
+    // Fijos (Activos + Suspendidos)
+    rtData.fijos.forEach(c => {
+      const esAusente = rtData.suspendidos.some(s => s.id === c.id);
+      items.push({
+        id: c.id,
+        clienteId: c.id,
+        nombre: `${c.apellido}, ${c.nombre}`,
+        tipo: 'FIJO',
+        presente: !esAusente,
+        key: `fijo-${c.id}`
+      });
+    });
+
+    // Variables
+    rtData.variables.forEach(c => {
+      items.push({
+        id: c.id,
+        clienteId: c.id,
+        nombre: `${c.apellido}, ${c.nombre}`,
+        tipo: 'VARIABLE',
+        presente: true,
+        key: `var-${c.id}`
+      });
+    });
+
+    // Recuperos
+    rtData.recuperos.forEach(r => {
+      items.push({
+        id: r.id,
+        clienteId: r.cliente_id,
+        nombre: r.cliente_nombre,
+        tipo: 'RECUPERO',
+        presente: r.estado === 'COMPLETADO',
+        info: `Recupera falta del ${r.fecha_inasistencia}`,
+        key: `rec-${r.id}`
+      });
+    });
+
+    return items.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [rtData.fijos, rtData.suspendidos, rtData.variables, rtData.recuperos]);
+
+  const handleToggleAttendance = (item: typeof checklistItems[0]) => {
     setRealtimeError(null);
     setRealtimeSuccess(null);
 
-    const res = cancelarReservaIndividual(clienteId, reservaId);
-    if (res.success) {
-      setRealtimeSuccess(res.message);
+    if (item.tipo === 'FIJO') {
+      if (item.presente) {
+        const res = suspenderClaseFija(item.clienteId, selectedSlot.id, selectedSlot.date);
+        if (res.success) {
+          setRealtimeSuccess(res.message);
+          setTimeout(() => setRealtimeSuccess(null), 3000);
+        } else {
+          setRealtimeError(res.message);
+        }
+      } else {
+        const res = revertirSuspensionClaseFija(item.clienteId, selectedSlot.id, selectedSlot.date);
+        if (res.success) {
+          setRealtimeSuccess(res.message);
+          setTimeout(() => setRealtimeSuccess(null), 3000);
+        } else {
+          setRealtimeError(res.message);
+        }
+      }
+    } else if (item.tipo === 'VARIABLE') {
+      if (item.presente) {
+        const resObj = (clientes.find(c => c.id === item.clienteId)?.reservas_individuales || [])
+          .find(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date);
+        
+        if (resObj) {
+          const res = cancelarReservaIndividual(item.clienteId, resObj.id);
+          if (res.success) {
+            setRealtimeSuccess(res.message);
+            setTimeout(() => setRealtimeSuccess(null), 3000);
+          } else {
+            setRealtimeError(res.message);
+          }
+        }
+      }
+    } else if (item.tipo === 'RECUPERO') {
+      const nextEstado = item.presente ? 'PENDIENTE' : 'COMPLETADO';
+      actualizarEstadoRecupero(item.id, nextEstado);
+      setRealtimeSuccess(nextEstado === 'COMPLETADO' ? 'Asistencia registrada.' : 'Asistencia revertida.');
       setTimeout(() => setRealtimeSuccess(null), 3000);
-    } else {
-      setRealtimeError(res.message);
-    }
-  };
-
-  const handleSuspendRealtimeFixed = (clienteId: string, turnoId: string, date: string) => {
-    setRealtimeError(null);
-    setRealtimeSuccess(null);
-
-    const res = suspenderClaseFija(clienteId, turnoId, date);
-    if (res.success) {
-      setRealtimeSuccess(res.message);
-      setTimeout(() => setRealtimeSuccess(null), 3000);
-    } else {
-      setRealtimeError(res.message);
     }
   };
 
@@ -174,93 +246,70 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             </div>
           )}
 
-          {/* Fijos Activos */}
-          <div className="space-y-2">
-            <h4 className="font-bold text-[10px] text-sky-800 uppercase tracking-widest font-sans border-b border-sky-50 pb-1 flex justify-between items-center">
-              <span>Miembros Fijos Hoy ({rtData.fijosActivos.length})</span>
-              <span className="text-[9px] text-zinc-400 normal-case font-normal">(con turno fijo permanente)</span>
+          {/* Checklist de Asistencia */}
+          <div className="space-y-2.5">
+            <h4 className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest font-sans border-b border-zinc-200 pb-1.5 flex justify-between items-center">
+              <span>Checklist de Asistencia</span>
+              <span className="text-[9px] text-zinc-400 normal-case font-normal">({checklistItems.length} alumnos esperados)</span>
             </h4>
-            {rtData.fijosActivos.length === 0 ? (
-              <p className="text-zinc-400 italic text-[11px] py-1">No asisten alumnos fijos a este turno hoy.</p>
+            
+            {checklistItems.length === 0 ? (
+              <p className="text-zinc-400 italic text-[11.5px] py-2 text-center bg-zinc-50 rounded-lg border border-zinc-150">No hay alumnos agendados para este turno hoy.</p>
             ) : (
-              <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                {rtData.fijosActivos.map(c => (
-                  <div key={c.id} className="flex justify-between items-center p-2 bg-sky-50/50 border border-sky-100 rounded-lg text-xs">
-                    <span className="font-semibold text-sky-950">{c.apellido}, {c.nombre}</span>
-                    <button
-                      onClick={() => handleSuspendRealtimeFixed(c.id, selectedSlot.id, selectedSlot.date)}
-                      className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1 rounded-md border border-rose-100 cursor-pointer text-[10px] font-bold px-2 border-none"
-                      title="Avisar inasistencia y liberar cupo por hoy"
-                    >
-                      Avisar Falta
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Fijos Suspendidos */}
-          {rtData.suspendidos.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="font-bold text-[10px] text-rose-700 uppercase tracking-widest font-sans border-b border-rose-50 pb-1">
-                Miembros con Falta Avisada Hoy ({rtData.suspendidos.length})
-              </h4>
-              <div className="space-y-1.5">
-                {rtData.suspendidos.map(c => (
-                  <div key={c.id} className="flex justify-between items-center p-2 bg-rose-50/30 border border-rose-100 rounded-lg text-xs">
-                    <span className="font-semibold text-rose-800 line-through">{c.apellido}, {c.nombre}</span>
-                    <span className="text-[9px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-extrabold uppercase">Ausente</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Reservas Variables */}
-          <div className="space-y-2">
-            <h4 className="font-bold text-[10px] text-violet-800 uppercase tracking-widest font-sans border-b border-violet-50 pb-1">
-              Reservas Variables / Individuales ({rtData.variables.length})
-            </h4>
-            {rtData.variables.length === 0 ? (
-              <p className="text-zinc-400 italic text-[11px] py-1">No se registran reservas variables para este día.</p>
-            ) : (
-              <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                {rtData.variables.map(c => {
-                  const resObj = (c.reservas_individuales || []).find(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date);
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
+                {checklistItems.map((item) => {
                   return (
-                    <div key={c.id} className="flex justify-between items-center p-2 bg-violet-50/50 border border-violet-100 rounded-lg text-xs">
-                      <span className="font-semibold text-violet-950">{c.apellido}, {c.nombre}</span>
-                      {resObj && (
-                        <button
-                          onClick={() => handleRemoveRealtimeVariable(c.id, resObj.id)}
-                          className="text-rose-500 hover:text-rose-700 bg-rose-50 p-1.5 rounded-md border border-rose-100 cursor-pointer border-none"
-                          title="Cancelar reserva variable"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                    <div
+                      key={item.key}
+                      className={`flex justify-between items-center p-2 rounded-lg border transition-all text-xs ${
+                        item.presente
+                          ? 'bg-emerald-50/20 border-zinc-200 hover:bg-emerald-50/30'
+                          : 'bg-zinc-50/50 border-zinc-200 opacity-80 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none flex-1">
+                        <input
+                          type="checkbox"
+                          checked={item.presente}
+                          onChange={() => handleToggleAttendance(item)}
+                          className="w-3.5 h-3.5 rounded-xs text-emerald-600 border-zinc-300 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <div className="flex flex-col">
+                          <span
+                            className={`font-semibold ${
+                              item.presente ? 'text-zinc-800' : 'text-zinc-400 line-through'
+                            }`}
+                          >
+                            {item.nombre}
+                          </span>
+                          {item.info && (
+                            <span className="text-[9px] text-zinc-400 mt-0.5">
+                              {item.info}
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                      
+                      <div className="shrink-0 pl-2">
+                        {item.tipo === 'FIJO' && (
+                          <span className="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-sm bg-sky-50 text-sky-700 border border-sky-100">
+                            Fijo
+                          </span>
+                        )}
+                        {item.tipo === 'VARIABLE' && (
+                          <span className="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-sm bg-violet-50 text-violet-700 border border-violet-100">
+                            Variable
+                          </span>
+                        )}
+                        {item.tipo === 'RECUPERO' && (
+                          <span className="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-sm bg-amber-50 text-amber-800 border border-amber-100">
+                            Recupero
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
-
-          {/* Recuperos */}
-          <div className="space-y-2">
-            <h4 className="font-bold text-[10px] text-amber-900 uppercase tracking-widest font-sans border-b border-amber-50 pb-1">
-              Recuperos de Clase Programados ({rtData.recuperos.length})
-            </h4>
-            {rtData.recuperos.length === 0 ? (
-              <p className="text-zinc-400 italic text-[11px] py-1">No hay alumnos recuperando clases en este turno hoy.</p>
-            ) : (
-              <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                {rtData.recuperos.map(r => (
-                  <div key={r.id} className="p-2 bg-amber-50/50 border border-amber-100 rounded-lg text-xs font-semibold text-amber-950">
-                    {r.cliente_nombre} <span className="text-[9px] text-amber-600 font-normal">(Faltó el {r.fecha_inasistencia})</span>
-                  </div>
-                ))}
               </div>
             )}
           </div>
