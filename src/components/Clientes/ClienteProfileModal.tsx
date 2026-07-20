@@ -157,10 +157,36 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
             <div className="flex justify-between items-center text-xs">
               <div>
                 <span className="font-semibold text-zinc-950 block">{plan?.nombre || 'Ninguno'}</span>
-                <span className="text-zinc-400 font-sans text-[11px]">{plan?.dias_por_semana || 0} sesiones fijas permitidas por semana</span>
+                <span className="text-zinc-400 font-sans text-[11px]">
+                  {selectedCliente.dias_personalizados ?? plan?.dias_por_semana ?? 0} sesiones fijas permitidas por semana
+                  {selectedCliente.dias_personalizados && (
+                    <span className="ml-1 text-violet-500 font-bold">(personalizado)</span>
+                  )}
+                </span>
               </div>
-              <span className="text-sm font-mono font-bold text-zinc-900">${plan?.precio.toLocaleString('es-AR') || 0} ARS/Mes</span>
+              <div className="text-right">
+                <span className="text-sm font-mono font-bold text-zinc-900 block">
+                  ${(selectedCliente.precio_personalizado ?? plan?.precio ?? 0).toLocaleString('es-AR')} ARS/Mes
+                </span>
+                {selectedCliente.precio_personalizado != null && (
+                  <span className="text-[9px] text-zinc-400 line-through block">
+                    Base: ${plan?.precio.toLocaleString('es-AR')}
+                  </span>
+                )}
+              </div>
             </div>
+            {/* Badge plan personalizado */}
+            {(selectedCliente.precio_personalizado != null || selectedCliente.dias_personalizados != null) && (
+              <div className="mt-3 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 flex items-start gap-2">
+                <span className="text-violet-500 text-xs mt-0.5">✦</span>
+                <div className="text-[10px] text-violet-800">
+                  <span className="font-bold block">Plan Personalizado Activo</span>
+                  {selectedCliente.nota_plan_personalizado && (
+                    <span className="text-violet-600 italic">{selectedCliente.nota_plan_personalizado}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Turnos asignados fijos */}

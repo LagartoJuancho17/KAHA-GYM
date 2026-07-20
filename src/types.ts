@@ -40,6 +40,10 @@ export interface Cliente {
   clases_suspendidas?: ClaseSuspendida[];
   creado_at: string;
   autorizado?: boolean;
+  // Plan Personalizado: sobreescribe precio y/o días del plan base para este socio en particular
+  precio_personalizado?: number;  // Si está definido, reemplaza plan.precio para este socio
+  dias_personalizados?: number;   // Si está definido, reemplaza plan.dias_por_semana para este socio
+  nota_plan_personalizado?: string; // Descripción/motivo del plan especial
 }
 
 export interface Plan {

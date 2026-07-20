@@ -155,6 +155,17 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                     </td>
                     <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
                       <span className="font-semibold text-zinc-800">{plan ? plan.nombre : 'Plan Genérico'}</span>
+                      {(c.precio_personalizado != null || c.dias_personalizados != null) && (
+                        <span className="ml-1.5 text-[8px] font-bold bg-violet-100 text-violet-700 border border-violet-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                          ✦ Personalizado
+                        </span>
+                      )}
+                      <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                        ${(c.precio_personalizado ?? plan?.precio ?? 0).toLocaleString('es-AR')}/mes
+                        {c.precio_personalizado != null && (
+                          <span className="text-violet-500"> ↑ especial</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
                       <span className={`font-mono font-bold ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-zinc-400'}`}>
