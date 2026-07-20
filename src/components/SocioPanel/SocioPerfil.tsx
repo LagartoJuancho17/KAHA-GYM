@@ -65,6 +65,9 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                   <span className="text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider">
                     Socio Activo
                   </span>
+                  <span className="text-[9px] bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-mono font-bold">
+                    {socio.codigo_socio || socio.id}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-medium">
                   <Mail className="w-3.5 h-3.5 text-slate-400" />

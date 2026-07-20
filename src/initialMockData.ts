@@ -88,6 +88,7 @@ export function generarTurnosIniciales(): Turno[] {
 export const INITIAL_CLIENTES: Cliente[] = [
   {
     id: 'c-1',
+    codigo_socio: 'SOC-001',
     nombre: 'Facundo',
     apellido: 'Gómez',
     email: 'facundo.gomez@gmail.com',
@@ -103,6 +104,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
   },
   {
     id: 'c-2',
+    codigo_socio: 'SOC-002',
     nombre: 'Sofía',
     apellido: 'Rodríguez',
     email: 'sofia.rod@hotmail.com',
@@ -118,6 +120,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
   },
   {
     id: 'c-3',
+    codigo_socio: 'SOC-003',
     nombre: 'Mateo',
     apellido: 'Rossi',
     email: 'mateo_rossi@yahoo.com.ar',
@@ -133,6 +136,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
   },
   {
     id: 'c-4',
+    codigo_socio: 'SOC-004',
     nombre: 'Valentina',
     apellido: 'Díaz',
     email: 'diaz.vale@gmail.com',
@@ -148,6 +152,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
   },
   {
     id: 'c-5',
+    codigo_socio: 'SOC-005',
     nombre: 'Emiliano',
     apellido: 'Fernández',
     email: 'emiliano.f@outlook.com',
@@ -163,6 +168,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
   },
   {
     id: 'c-6',
+    codigo_socio: 'SOC-006',
     nombre: 'Catalina',
     apellido: 'López',
     email: 'cata.lopez@gmail.com',
@@ -178,6 +184,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
   },
   {
     id: 'c-7',
+    codigo_socio: 'SOC-007',
     nombre: 'Bautista',
     apellido: 'González',
     email: 'bauti.gonzalez@gmail.com',
@@ -193,6 +200,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
   },
   {
     id: 'c-invitado',
+    codigo_socio: 'SOC-999',
     nombre: 'Invitado',
     apellido: 'de Prueba',
     email: 'invitado@test.com',

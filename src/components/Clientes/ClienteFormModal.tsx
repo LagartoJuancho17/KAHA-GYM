@@ -18,6 +18,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
   const { clientes, planes, addCliente, updateCliente } = useGym();
 
   const [clienteForm, setClienteForm] = useState({
+    codigo_socio: '',
     nombre: '',
     apellido: '',
     email: '',
@@ -34,6 +35,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
   // Reset form
   const resetForm = () => {
     setClienteForm({
+      codigo_socio: '',
       nombre: '',
       apellido: '',
       email: '',
@@ -61,6 +63,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       const cl = clientes.find(c => c.id === editingClienteId);
       if (cl) {
         setClienteForm({
+          codigo_socio: cl.codigo_socio || '',
           nombre: cl.nombre,
           apellido: cl.apellido,
           email: cl.email,
@@ -156,6 +159,19 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
               <span>{formSuccess}</span>
             </div>
           )}
+
+          {/* CÓDIGO / ID DE SOCIO */}
+          <div className="space-y-1">
+            <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Código de Socio / ID Personalizado (Opcional)</label>
+            <input
+              type="text"
+              placeholder="ej: SOC-104 (autogenerado si se omite)"
+              value={clienteForm.codigo_socio}
+              onChange={(e) => setClienteForm(prev => ({ ...prev, codigo_socio: e.target.value }))}
+              className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white font-mono"
+              id="form-codigo-socio"
+            />
+          </div>
 
           {/* NOMBRE */}
           <div className="space-y-1">

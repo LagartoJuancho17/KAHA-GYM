@@ -12,6 +12,7 @@ import { ClienteProfileModal } from './ClienteProfileModal';
 import { ClienteDeleteModal } from './ClienteDeleteModal';
 import { ClienteTurnosModal } from './ClienteTurnosModal';
 import { ClienteCSVImportModal } from './ClienteCSVImportModal';
+import { BajaClasesModal } from './BajaClasesModal';
 
 interface ClientesCRUDProps {
   editingClienteId?: string | null;
@@ -49,6 +50,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   const [showHeaderDropdown, setShowHeaderDropdown] = useState(false);
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
   const [clientForTurnosModal, setClientForTurnosModal] = useState<Cliente | null>(null);
+  const [clientForBajaModal, setClientForBajaModal] = useState<Cliente | null>(null);
   
   // --- FILTROS DE TABLA ---
   const [buscar, setBuscar] = useState('');
@@ -98,7 +100,9 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       result = result.filter(c => 
         c.nombre.toLowerCase().includes(bRaw) || 
         c.apellido.toLowerCase().includes(bRaw) || 
-        c.email.toLowerCase().includes(bRaw)
+        c.email.toLowerCase().includes(bRaw) ||
+        (c.codigo_socio && c.codigo_socio.toLowerCase().includes(bRaw)) ||
+        c.telefono.includes(bRaw)
       );
     }
 
@@ -298,6 +302,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         setPagina={setPagina}
         filasPorPagina={filasPorPagina}
         onStartAuthorization={onStartAuthorization}
+        onOpenBajaClases={(c) => setClientForBajaModal(c)}
       />
 
       {/* DETAIL MODAL */}
@@ -343,6 +348,13 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         isOpen={!!clientForTurnosModal}
         onClose={() => setClientForTurnosModal(null)}
         cliente={clientForTurnosModal}
+      />
+
+      {/* BAJA DE CLASES SELECTIVA MODAL */}
+      <BajaClasesModal 
+        isOpen={!!clientForBajaModal}
+        onClose={() => setClientForBajaModal(null)}
+        cliente={clientForBajaModal}
       />
 
     </div>

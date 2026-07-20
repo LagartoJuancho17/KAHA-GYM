@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Calendar, MoreVertical, Eye, Edit2, UserMinus, UserCheck, Trash2, Check } from 'lucide-react';
+import { Calendar, MoreVertical, Eye, Edit2, UserMinus, UserCheck, Trash2, Check, CalendarX } from 'lucide-react';
 
 interface ClientesTableProps {
   clientesFiltrados: Cliente[];
@@ -16,6 +16,7 @@ interface ClientesTableProps {
   setPagina: React.Dispatch<React.SetStateAction<number>>;
   filasPorPagina: number;
   onStartAuthorization?: (clientId: string) => void;
+  onOpenBajaClases?: (c: Cliente) => void;
 }
 
 const getWhatsAppLink = (phone: string) => {
@@ -45,7 +46,8 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
   pagina,
   setPagina,
   filasPorPagina,
-  onStartAuthorization
+  onStartAuthorization,
+  onOpenBajaClases
 }) => {
   const { planes, autorizarCliente, bajaLogicaCliente, altaCliente } = useGym();
 
@@ -112,7 +114,9 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                             <span className={`px-2 py-0.5 text-[9px] rounded-full font-bold border ${badgeClass}`}>
                               {estadoLabel}
                             </span>
-                            <span className="text-[10px] text-zinc-400 font-mono">ID: {c.id}</span>
+                            <span className="text-[10px] font-mono text-zinc-600 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded font-bold">
+                              {c.codigo_socio || c.id}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -240,6 +244,18 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                                 Dar de Alta
                               </button>
                             )}
+
+                            {/* BAJA CLASES POR AUSENCIA / MES */}
+                            <button
+                              onClick={() => {
+                                setOpenRowMenuId(null);
+                                if (onOpenBajaClases) onOpenBajaClases(c);
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-700 font-medium flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+                            >
+                              <CalendarX className="w-3.5 h-3.5 text-rose-500" />
+                              Baja Clases / Mes
+                            </button>
 
                             {/* ELIMINAR PERMANENTE */}
                             <button

@@ -61,6 +61,7 @@ interface GymContextType {
   bajaLogicaCliente: (id: string) => void;
   altaCliente: (id: string) => void;
   eliminarCliente: (id: string) => void;
+  bajaClasesSocio: (clienteId: string, clases: { turno_id: string; fecha: string }[], opciones?: { esBajaTemporal?: boolean; exencionCobro?: 'SUSPENDIDO' | 'POSTERGADO' | 'NINGUNA' }) => { success: boolean; message: string };
   importarClientesCSV: (clientesImportados: Array<{ nombre: string; apellido: string; email: string; telefono: string; tipo: TipoCliente; plan_nombre: string }>) => { procesados: number; insertados: number; errores: string[] };
 
   // Planes Methods
@@ -790,9 +791,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const plan = planes.find(p => p.id === clientData.plan_id);
     const planPrecio = plan ? plan.precio : 0;
 
+    const nextSeq = String(clientes.length + 1).padStart(3, '0');
+    const customCode = clientData.codigo_socio?.trim() || `SOC-${nextSeq}`;
+
     const newClientId = crypto.randomUUID();
     const newClient: Cliente = {
       ...clientData,
+      codigo_socio: customCode,
       tipo: clientData.tipo || 'FIJO',
       exencion_cobro: clientData.exencion_cobro || 'NINGUNA',
       id: newClientId,
@@ -953,6 +958,73 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_ALTA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
     addToast('add', 'Socio dado de alta exitosamente.');
+  };
+
+  const bajaClasesSocio = (
+    clienteId: string, 
+    clases: { turno_id: string; fecha: string }[], 
+    opciones?: { esBajaTemporal?: boolean; exencionCobro?: 'SUSPENDIDO' | 'POSTERGADO' | 'NINGUNA' }
+  ) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const nuevasSuspensiones: ClaseSuspendida[] = [];
+    const localRecs = [...recuperos];
+    let canceladasCount = 0;
+
+    clases.forEach(({ turno_id, fecha }) => {
+      const alreadySuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === turno_id && s.fecha === fecha);
+      if (!alreadySuspended) {
+        nuevasSuspensiones.push({
+          turno_id,
+          fecha,
+          reintegrado: true,
+          creado_at: new Date().toISOString()
+        });
+
+        // Generar ticket de recupero
+        const expDate = new Date(fecha);
+        expDate.setDate(expDate.getDate() + 30);
+        const expDateStr = expDate.toISOString().slice(0, 10);
+
+        localRecs.push({
+          id: `rec-${Date.now()}-${canceladasCount}`,
+          cliente_id: clienteId,
+          cliente_nombre: `${cliente.nombre} ${cliente.apellido}`,
+          turno_original_id: turno_id,
+          fecha_inasistencia: fecha,
+          turno_recupero_id: 'PENDIENTE_DEFINICION',
+          fecha_recupero: '',
+          estado: 'PENDIENTE',
+          fecha_limite: expDateStr
+        });
+        canceladasCount++;
+      }
+    });
+
+    const updatedClientes = clientes.map(c => {
+      if (c.id === clienteId) {
+        return {
+          ...c,
+          exencion_cobro: opciones?.esBajaTemporal ? (opciones.exencionCobro || 'SUSPENDIDO') : c.exencion_cobro,
+          clases_suspendidas: [...(c.clases_suspendidas || []), ...nuevasSuspensiones]
+        };
+      }
+      return c;
+    });
+
+    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, localRecs, auditLogs, novedades);
+    addAuditLog('CLIENTE_BAJA_CLASES_MES', {
+      cliente: `${cliente.nombre} ${cliente.apellido}`,
+      clases_dadas_de_baja: canceladasCount,
+      baja_temporal: !!opciones?.esBajaTemporal
+    });
+    addToast('delete', `Se dieron de baja ${canceladasCount} clase(s) del socio.`);
+
+    return { 
+      success: true, 
+      message: `Se registraron de baja ${canceladasCount} clase(s) exitosamente${opciones?.esBajaTemporal ? ' y se aplicó suspensión temporal' : ''}.` 
+    };
   };
 
   const autorizarCliente = (id: string, planId?: string) => {
@@ -2404,7 +2476,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (
       cleanMail === 'tobiasarraiza17@gmail.com' ||
       cleanMail === 'totoarr17@gmail.com' ||
-      cleanMail === 'jmferrariprofe@gmail.com'
+      cleanMail === 'jmferrariprofe@gmail.com' ||
+      cleanMail === 'ianvelazquez97@gmail.com'
     ) {
       detectedRole = 'ADMIN';
     } else if (cleanMail === 'profe@gimnasio.com.ar' || cleanMail === 'profe@aresgym.com') {
@@ -2790,7 +2863,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       googleUser, signInWithGoogle, signOutGoogle,
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
-      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, importarClientesCSV,
+      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,

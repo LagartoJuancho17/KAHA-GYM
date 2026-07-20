@@ -1,13 +1,42 @@
 // src/components/SocioPanel/SocioNovedades.tsx
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
-import { Megaphone, Award, User } from 'lucide-react';
+import { Megaphone, Award, User, Search } from 'lucide-react';
 
 export const SocioNovedades: React.FC = () => {
   const { novedades } = useGym();
+  const [filterCategory, setFilterCategory] = useState<string>('TODAS');
+  const [buscarText, setBuscarText] = useState<string>('');
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { TODAS: novedades.length };
+    novedades.forEach(n => {
+      counts[n.categoria] = (counts[n.categoria] || 0) + 1;
+    });
+    return counts;
+  }, [novedades]);
+
+  const filteredNovedades = useMemo(() => {
+    return novedades
+      .filter(n => {
+        if (filterCategory !== 'TODAS' && n.categoria !== filterCategory) return false;
+        if (buscarText.trim()) {
+          const q = buscarText.toLowerCase();
+          return n.titulo.toLowerCase().includes(q) || n.contenido.toLowerCase().includes(q);
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.destacado && !b.destacado) return -1;
+        if (!a.destacado && b.destacado) return 1;
+        return b.fecha.localeCompare(a.fecha);
+      });
+  }, [novedades, filterCategory, buscarText]);
 
   return (
     <section className="bg-white border border-slate-200 rounded-3xl p-6.5 lg:p-8 shadow-sm space-y-6 animate-fade-in" id="socio-novedades-cartelera">
+      
+      {/* HEADER */}
       <div>
         <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider font-mono flex items-center gap-2 mb-2 pb-3 border-b border-slate-100">
           <Megaphone className="w-4.5 h-4.5 text-emerald-600 animate-pulse" />
@@ -18,13 +47,48 @@ export const SocioNovedades: React.FC = () => {
         </p>
       </div>
 
-      {novedades.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 text-xs italic">
-          No hay publicaciones ni comunicados activos en la cartelera por el momento.
+      {/* FILTER & SEARCH */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center pb-2 border-b border-slate-100">
+        <div className="flex flex-wrap gap-1.5">
+          {(['TODAS', 'ARANCELES', 'TURNOS', 'INFORMACION', 'EVENTOS'] as const).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={`px-3 py-1 rounded-xl text-[11px] font-semibold transition-all cursor-pointer border-none flex items-center gap-1.5 ${
+                filterCategory === cat 
+                  ? 'bg-emerald-600 text-white font-bold shadow-2xs' 
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
+              }`}
+            >
+              <span>{cat === 'TODAS' ? 'Todas' : cat}</span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded-full ${
+                filterCategory === cat ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+              }`}>
+                {categoryCounts[cat] || 0}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-56">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+          <input
+            type="text"
+            placeholder="Buscar en la cartelera..."
+            value={buscarText}
+            onChange={(e) => setBuscarText(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-sans focus:outline-none focus:border-emerald-500 transition-all"
+          />
+        </div>
+      </div>
+
+      {filteredNovedades.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50 border border-slate-100 rounded-2xl p-6">
+          No hay publicaciones ni comunicados que coincidan con la búsqueda.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {novedades.map((nov) => {
+          {filteredNovedades.map((nov) => {
             const isArancel = nov.categoria === 'ARANCELES';
             const isTurno = nov.categoria === 'TURNOS';
             const isEvento = nov.categoria === 'EVENTOS';
@@ -98,7 +162,7 @@ export const SocioNovedades: React.FC = () => {
                 </div>
 
                 <div className={`pt-3 border-t flex items-center gap-1 text-[9.5px] font-sans mt-auto pl-2 ${footerCls}`}>
-                  <User className="w-3.5 h-3.5" />
+                  <User className="w-3 h-3" />
                   <span>Publicado por la administración</span>
                 </div>
               </div>

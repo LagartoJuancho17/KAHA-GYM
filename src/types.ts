@@ -22,6 +22,7 @@ export interface ClaseSuspendida {
 
 export interface Cliente {
   id: string;
+  codigo_socio?: string; // ID / código de socio personalizado, ej: "SOC-001"
   nombre: string;
   apellido: string;
   email: string;

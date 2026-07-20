@@ -19,7 +19,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   isPaying,
   setIsPaying
 }) => {
-  const { solicitarPagoTransferencia } = useGym();
+  const { solicitarPagoTransferencia, registrarPago } = useGym();
   const [activeTab, setActiveTab] = useState<'MERCADO_PAGO' | 'TRANSFERENCIA'>('TRANSFERENCIA');
   const [copied, setCopied] = useState(false);
   const [simulatedSuccessData, setSimulatedSuccessData] = useState<{ clientName: string; amount: number; method: string } | null>(null);

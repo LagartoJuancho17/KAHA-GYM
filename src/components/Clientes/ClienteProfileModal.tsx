@@ -88,6 +88,10 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
           {/* Información Personal */}
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+              <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Código / ID de Socio</span>
+              <span className="font-mono font-bold text-zinc-900 block">{selectedCliente.codigo_socio || selectedCliente.id}</span>
+            </div>
+            <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
               <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Correo Electrónico</span>
               <span className="font-semibold text-zinc-900 block">{selectedCliente.email}</span>
             </div>

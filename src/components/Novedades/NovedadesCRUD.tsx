@@ -1,8 +1,7 @@
-// src/components/Novedades/NovedadesCRUD.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Novedad } from '../../types';
-import { Megaphone, Plus, Check } from 'lucide-react';
+import { Megaphone, Plus, Check, Search } from 'lucide-react';
 import { NovedadFormModal } from './NovedadFormModal';
 import { NovedadesList } from './NovedadesList';
 
@@ -13,6 +12,7 @@ export const NovedadesCRUD: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<Novedad | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
+  const [buscarText, setBuscarText] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const openAddModal = () => {
@@ -41,10 +41,31 @@ export const NovedadesCRUD: React.FC = () => {
     updateNovedad(nov.id, { destacado: !nov.destacado });
   };
 
-  const filteredNovedades = novedades.filter(n => {
-    if (filterCategory === 'TODAS') return true;
-    return n.categoria === filterCategory;
-  });
+  // Category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { TODAS: novedades.length };
+    novedades.forEach(n => {
+      counts[n.categoria] = (counts[n.categoria] || 0) + 1;
+    });
+    return counts;
+  }, [novedades]);
+
+  const filteredNovedades = useMemo(() => {
+    return novedades
+      .filter(n => {
+        if (filterCategory !== 'TODAS' && n.categoria !== filterCategory) return false;
+        if (buscarText.trim()) {
+          const q = buscarText.toLowerCase();
+          return n.titulo.toLowerCase().includes(q) || n.contenido.toLowerCase().includes(q);
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.destacado && !b.destacado) return -1;
+        if (!a.destacado && b.destacado) return 1;
+        return b.fecha.localeCompare(a.fecha);
+      });
+  }, [novedades, filterCategory, buscarText]);
 
   return (
     <div className="space-y-6 p-6 max-w-7xl mx-auto" id="novedades-crud-tab-panel">
@@ -78,21 +99,39 @@ export const NovedadesCRUD: React.FC = () => {
         </div>
       )}
 
-      {/* FILTER TABS */}
-      <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-200">
-        {(['TODAS', 'ARANCELES', 'TURNOS', 'INFORMACION', 'EVENTOS'] as const).map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setFilterCategory(cat)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none ${
-              filterCategory === cat 
-                ? 'bg-slate-900 text-white font-bold' 
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
-            }`}
-          >
-            {cat === 'TODAS' ? 'Todas las novedades' : cat}
-          </button>
-        ))}
+      {/* FILTER & SEARCH BAR */}
+      <div className="flex flex-col md:flex-row gap-3 justify-between items-start md:items-center pb-2 border-b border-slate-200">
+        <div className="flex flex-wrap gap-2">
+          {(['TODAS', 'ARANCELES', 'TURNOS', 'INFORMACION', 'EVENTOS'] as const).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none flex items-center gap-1.5 ${
+                filterCategory === cat 
+                  ? 'bg-slate-900 text-white font-bold' 
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <span>{cat === 'TODAS' ? 'Todas' : cat}</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                filterCategory === cat ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {categoryCounts[cat] || 0}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full md:w-64">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <input
+            type="text"
+            placeholder="Buscar avisos..."
+            value={buscarText}
+            onChange={(e) => setBuscarText(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-sans focus:outline-none focus:border-slate-400 transition-all"
+          />
+        </div>
       </div>
 
       {/* NOVEDADES CARTELERA GRID */}

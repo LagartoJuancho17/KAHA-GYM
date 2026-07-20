@@ -15,9 +15,9 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   setSuccessMessage,
   setErrorMessage
 }) => {
-  const { 
+  const {
     turnos, clientes, planes, waitlistReservas,
-    crearReservaIndividual, suspenderClaseFija, agregarListaEsperaReserva, removerListaEsperaReserva
+    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, agregarListaEsperaReserva, removerListaEsperaReserva
   } = useGym();
 
   const [weekOffset, setWeekOffset] = useState<number>(0);
@@ -176,6 +176,43 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             <span className="text-slate-600 font-semibold">Tus Reservas Individuales</span>
           </span>
         </div>
+      </div>
+
+      {/* MULTI-DAY SELECTION BANNER & SUMMARY */}
+      <div className="mb-6 p-4 bg-sky-50/80 border border-sky-200 rounded-2xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-sky-600 text-white font-black text-[10px] flex items-center justify-center font-mono">
+              {socio.turnos_fijos.length}
+            </span>
+            <h4 className="font-bold text-sky-950 text-xs uppercase tracking-wider font-mono">
+              Selección Multi-Día de tu Plan ({socio.turnos_fijos.length} de {planSocio?.dias_por_semana || 5} días elegidos por semana)
+            </h4>
+          </div>
+          <span className="text-[10px] font-mono font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded-lg border border-sky-200">
+            {planSocio?.nombre || 'Plan Estándar'}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-sky-900 font-sans leading-relaxed">
+          Cada día que seleccionas de la grilla reserva automáticamente tu lugar fijo para todas las semanas del mes.
+        </p>
+
+        {socio.turnos_fijos.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1 border-t border-sky-200/60">
+            <span className="text-[10px] text-sky-700 font-bold self-center font-mono">Días Semanales Confirmados:</span>
+            {socio.turnos_fijos.map((tfId, idx) => {
+              const turn = turnos.find(t => t.id === tfId);
+              if (!turn) return null;
+              return (
+                <span key={tfId} className="text-[10px] font-mono font-bold text-sky-900 bg-white border border-sky-300 px-2.5 py-1 rounded-xl shadow-2xs flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-[9px] flex items-center justify-center font-black">{idx + 1}</span>
+                  {turn.dia} {turn.hora.slice(0, 5)} hs
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* SUMMARY BOX */}
@@ -399,7 +436,10 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                     w => w.cliente_id === socio.id && w.turno_id === turno.id && w.fecha === dateStr
                                   );
                                   
-                                  const hasBooking = (socio.reservas_individuales || []).some(r => r.fecha === dateStr) || 
+                                  const miReservaIndividualEnFecha = (socio.reservas_individuales || []).find(r => r.turno_id === turno.id && r.fecha === dateStr);
+
+                                  const hasBooking = !!miReservaIndividualEnFecha ||
+                                                     (socio.reservas_individuales || []).some(r => r.fecha === dateStr) ||
                                                      socio.turnos_fijos.some(tfId => {
                                                        const tfTurn = turnos.find(t => t.id === tfId);
                                                        if (!tfTurn) return false;
@@ -412,7 +452,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                                        }
                                                        return false;
                                                      });
-                                  
+
                                   const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
                                     day: 'numeric',
                                     month: 'short'
@@ -425,7 +465,25 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                         <span className="text-[9px] text-slate-500 font-mono ml-2">({occupiedCount} ocupados)</span>
                                       </div>
 
-                                      {hasBooking ? (
+                                      {miReservaIndividualEnFecha ? (
+                                        <button
+                                          onClick={() => {
+                                            if (window.confirm(`¿Confirmas cancelar la reserva del ${dateFormatted} a las ${turno.hora.slice(0, 5)} hs?`)) {
+                                              const res = cancelarReservaIndividual(socio.id, miReservaIndividualEnFecha.id);
+                                              if (res.success) {
+                                                setSuccessMessage(res.message);
+                                                setTimeout(() => setSuccessMessage(null), 4000);
+                                              } else {
+                                                setErrorMessage(res.message);
+                                                setTimeout(() => setErrorMessage(null), 4000);
+                                              }
+                                            }
+                                          }}
+                                          className="text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100 px-2 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                                        >
+                                          <X className="w-3 h-3" /> Cancelar
+                                        </button>
+                                      ) : hasBooking ? (
                                         <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-sans">Ya tienes clase</span>
                                       ) : isFullOnDate ? (
                                         <div className="flex items-center gap-1.5">
