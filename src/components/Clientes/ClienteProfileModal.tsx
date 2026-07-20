@@ -1,8 +1,7 @@
-// src/components/Clientes/ClienteProfileModal.tsx
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Edit2, X, Trash2 } from 'lucide-react';
+import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle } from 'lucide-react';
 
 interface ClienteProfileModalProps {
   isOpen: boolean;
@@ -28,6 +27,18 @@ const getWhatsAppLink = (phone: string) => {
   return `https://wa.me/${formattedPhone}`;
 };
 
+const DIA_LABEL: Record<string, string> = {
+  LUNES: 'Lun', MARTES: 'Mar', MIERCOLES: 'Mié', JUEVES: 'Jue', VIERNES: 'Vie'
+};
+
+const DIA_COLOR: Record<string, string> = {
+  LUNES:    'bg-indigo-50 border-indigo-200 text-indigo-800',
+  MARTES:   'bg-violet-50 border-violet-200 text-violet-800',
+  MIERCOLES:'bg-sky-50 border-sky-200 text-sky-800',
+  JUEVES:   'bg-amber-50 border-amber-200 text-amber-800',
+  VIERNES:  'bg-rose-50 border-rose-200 text-rose-800',
+};
+
 export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   isOpen,
   onClose,
@@ -35,7 +46,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   onStartEdit,
   onDeleteClick
 }) => {
-  const { clientes, planes, pagos } = useGym();
+  const { clientes, planes, pagos, turnos } = useGym();
 
   if (!isOpen || !clienteId) return null;
 
@@ -154,40 +165,143 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
 
           {/* Turnos asignados fijos */}
           <div className="border border-zinc-200 p-4 rounded-xl">
-            <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-2 font-sans border-b border-zinc-100 pb-2">Turnos Fijos Reservados</h4>
+            <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-3 font-sans border-b border-zinc-100 pb-2 flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+              Turnos Fijos Asignados
+              <span className="ml-auto bg-zinc-100 text-zinc-600 font-mono px-2 py-0.5 rounded-full text-[9px] font-bold">
+                {selectedCliente.tipo === 'FIJO' ? `${selectedCliente.turnos_fijos.length} turno${selectedCliente.turnos_fijos.length !== 1 ? 's' : ''}` : 'N/A'}
+              </span>
+            </h4>
             {selectedCliente.tipo === 'FLEXIBLE' ? (
-              <p className="text-zinc-400 italic text-xs">Los miembros de tipo FLEXIBLE no reservan turnos permanentes, asisten de acuerdo con los cupos libres diarios.</p>
+              <p className="text-zinc-400 italic text-xs">Los socios FLEXIBLE no tienen turnos fijos. Asisten según cupos libres diarios.</p>
             ) : selectedCliente.turnos_fijos.length === 0 ? (
-              <p className="text-zinc-400 italic text-xs">El alumno no posee turnos fijos agendados actualmente. Puedes reservarlos desde el panel de Turnos.</p>
+              <p className="text-zinc-400 italic text-xs">Sin turnos fijos asignados. Podés reservarlos desde el panel de Turnos.</p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {selectedCliente.turnos_fijos.map(tId => (
-                  <div key={tId} className="bg-zinc-100 border border-zinc-200 py-2 px-3 rounded-lg flex justify-between items-center text-zinc-900 font-semibold">
-                    <span>{tId.split('-')[0]}</span>
-                    <span className="font-mono text-zinc-500 font-medium">{tId.split('-')[1]}hs</span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {selectedCliente.turnos_fijos.map(tId => {
+                  const turno = turnos.find(t => t.id === tId);
+                  if (!turno) {
+                    return (
+                      <div key={tId} className="bg-zinc-50 border border-zinc-200 py-2 px-3 rounded-lg text-xs text-zinc-500 font-mono">
+                        {tId} <span className="text-zinc-300">(sin datos)</span>
+                      </div>
+                    );
+                  }
+                  const ocupacion = Math.round((turno.asignados_ids.length / turno.cupo_maximo) * 100);
+                  const colorClass = DIA_COLOR[turno.dia] || 'bg-zinc-50 border-zinc-200 text-zinc-800';
+                  return (
+                    <div key={tId} className={`border rounded-xl p-3 ${colorClass}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-[10px] font-black uppercase tracking-widest opacity-70">{DIA_LABEL[turno.dia] || turno.dia}</span>
+                          <span className="font-mono font-bold text-sm flex items-center gap-1">
+                            <Clock className="w-3 h-3 opacity-60" />
+                            {turno.hora}hs
+                          </span>
+                          {turno.profesor && (
+                            <span className="text-[10px] bg-white/70 px-2 py-0.5 rounded-full border border-current/20 font-medium">
+                              👤 {turno.profesor}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="flex items-center gap-1 justify-end text-[10px] font-semibold">
+                            <Users className="w-3 h-3 opacity-60" />
+                            <span>{turno.asignados_ids.length}/{turno.cupo_maximo}</span>
+                          </div>
+                          <div className="w-16 bg-black/10 rounded-full h-1 mt-1">
+                            <div
+                              className="h-1 rounded-full bg-current"
+                              style={{ width: `${Math.min(ocupacion, 100)}%`, opacity: 0.5 }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
           {/* Turno Variable Reservado */}
           <div className="border border-zinc-200 p-4 rounded-xl">
-            <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-2 font-sans border-b border-zinc-100 pb-2">Turno Variable Reservado (Tiempo Real)</h4>
-            {selectedCliente.turno_variable ? (
-              <div className="bg-emerald-50 border border-emerald-100 py-2 px-3 rounded-lg flex justify-between items-center text-emerald-900 font-semibold text-xs">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>Reserva Variable Activa:</span>
-                </span>
-                <span className="font-mono bg-white px-2 py-0.5 border border-emerald-100 rounded text-[11px]">
-                  {selectedCliente.turno_variable.split('-')[0]} — {selectedCliente.turno_variable.split('-')[1]}hs
-                </span>
-              </div>
-            ) : (
-              <p className="text-zinc-400 italic text-xs">El alumno no posee una reserva de turno variable activa actualmente.</p>
+            <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-3 font-sans border-b border-zinc-100 pb-2 flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-emerald-500" />
+              Turno Variable Reservado (Tiempo Real)
+            </h4>
+            {selectedCliente.turno_variable ? (() => {
+              const tv = turnos.find(t => t.id === selectedCliente.turno_variable);
+              return (
+                <div className="bg-emerald-50 border border-emerald-200 py-3 px-4 rounded-xl">
+                  <div className="flex items-center justify-between gap-3 text-emerald-900">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block shrink-0" />
+                      <div>
+                        <span className="font-bold text-xs block">
+                          {tv ? `${tv.dia} — ${tv.hora}hs` : selectedCliente.turno_variable}
+                        </span>
+                        {tv?.profesor && (
+                          <span className="text-[10px] text-emerald-600 flex items-center gap-1 mt-0.5">
+                            👤 Profe: {tv.profesor}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {tv && (
+                      <div className="text-right text-[10px] text-emerald-700 font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {tv.asignados_ids.length}/{tv.cupo_maximo} fijos
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })() : (
+              <p className="text-zinc-400 italic text-xs">Sin reserva de turno variable activa actualmente.</p>
             )}
           </div>
+
+          {/* Reservas Individuales */}
+          {(selectedCliente.reservas_individuales && selectedCliente.reservas_individuales.length > 0) && (
+            <div className="border border-zinc-200 p-4 rounded-xl">
+              <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-3 font-sans border-b border-zinc-100 pb-2 flex items-center gap-2">
+                <BookOpen className="w-3.5 h-3.5 text-sky-500" />
+                Reservas de Fechas Individuales
+                <span className="ml-auto bg-sky-50 text-sky-600 font-mono px-2 py-0.5 rounded-full text-[9px] font-bold border border-sky-100">
+                  {selectedCliente.reservas_individuales.length} reserva{selectedCliente.reservas_individuales.length !== 1 ? 's' : ''}
+                </span>
+              </h4>
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                {[...selectedCliente.reservas_individuales]
+                  .sort((a, b) => b.fecha.localeCompare(a.fecha))
+                  .map(res => {
+                    const turno = turnos.find(t => t.id === res.turno_id);
+                    const fechaObj = new Date(res.fecha + 'T12:00:00');
+                    const esPasado = fechaObj < new Date();
+                    return (
+                      <div key={res.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs ${esPasado ? 'bg-zinc-50 border-zinc-100 text-zinc-500' : 'bg-sky-50 border-sky-100 text-sky-900'}`}>
+                        <div className="flex items-center gap-2">
+                          {esPasado
+                            ? <CheckCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                            : <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+                          }
+                          <span className="font-semibold">
+                            {fechaObj.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </span>
+                          {turno && <span className="font-mono text-[10px] opacity-70">{turno.hora}hs</span>}
+                        </div>
+                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${esPasado ? 'bg-zinc-200 text-zinc-500' : 'bg-sky-200 text-sky-700'}`}>
+                          {esPasado ? 'Realizada' : 'Próxima'}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
 
           {/* Historial de Pagos */}
           <div className="border border-zinc-200 p-4 rounded-xl">

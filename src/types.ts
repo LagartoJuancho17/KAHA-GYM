@@ -4,7 +4,7 @@
 export type TipoCliente = 'FIJO' | 'FLEXIBLE';
 export type EstadoCliente = 'ACTIVO' | 'CON_DEUDA' | 'MOROSO' | 'INACTIVO';
 export type MedioPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO' | 'UALA' | 'OTRO';
-export type RolUsuario = 'ADMIN' | 'OPERADOR' | 'SOCIO';
+export type RolUsuario = 'ADMIN' | 'OPERADOR' | 'PROFESOR' | 'SOCIO';
 
 export interface ReservaIndividual {
   id: string;

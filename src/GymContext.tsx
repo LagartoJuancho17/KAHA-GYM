@@ -2107,7 +2107,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cli = clientes.find(c => c.id === pagoData.cliente_id);
     if (!cli) return { success: false, message: 'Cliente no encontrado.' };
 
-    const cleanHash = pagoData.hash_transaccion?.trim() || `MP-${Date.now()}`;
+    const cleanHash = pagoData.hash_transaccion?.trim() || `TXN-${Date.now()}`;
     
     // Prevención de duplicados por hash
     if (pagoData.hash_transaccion) {
@@ -2117,36 +2117,35 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    // Generar UUID real compatible con Supabase
+    const pagoId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `pay-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    const now = new Date().toISOString();
+
     const nuevoPago: Pago = {
       ...pagoData,
-      id: `pay-${Date.now()}`,
-      fecha_pago: new Date().toISOString(),
+      id: pagoId,
+      fecha_pago: now,
       hash_transaccion: cleanHash,
-      creado_at: new Date().toISOString()
+      creado_at: now
     };
 
     // Actualizar ficha del cliente (bajar deudas e indicar mes pagado)
-    const precioPlan = planes.find(p => p.id === cli.plan_id)?.precio || 0;
-    
     const updatedClientes = clientes.map(c => {
       if (c.id === pagoData.cliente_id) {
-        // Reducimos deuda acumulada por el monto pagado
         const nuevaDeuda = Math.max(0, c.deuda_acumulada - pagoData.monto);
-        
-        // Mapeamos el mes
         let ultimoMes = c.ultimo_mes_pagado;
         if (!ultimoMes || pagoData.mes_correspondiente > ultimoMes) {
           ultimoMes = pagoData.mes_correspondiente;
         }
-
-        // Si la deuda se redujo a 0, recalcular el estado a ACTIVO
         let nuevoEstado = c.estado;
         if (nuevaDeuda === 0) {
           nuevoEstado = 'ACTIVO';
         } else if (nuevoEstado === 'MOROSO' && nuevaDeuda > 0) {
           nuevoEstado = 'CON_DEUDA';
         }
-
         return {
           ...c,
           deuda_acumulada: nuevaDeuda,
@@ -2163,18 +2162,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (supabase) {
       // 1. Insertar pago en Supabase
+      // Nota: 'registrado_por' es FK a perfiles_usuario(id) UUID — se omite para evitar error de tipo
+      // ya que solo tenemos el email del operador, no su UUID de perfil.
       supabase.from('pagos').insert({
-        id: nuevoPago.id,
+        id: pagoId,
         cliente_id: nuevoPago.cliente_id,
         monto: nuevoPago.monto,
         medio_pago: nuevoPago.medio_pago,
         mes_correspondiente: nuevoPago.mes_correspondiente,
-        hash_transaccion: nuevoPago.hash_transaccion,
-        registrado_por: userEmail,
-        fecha_pago: nuevoPago.fecha_pago,
-        creado_at: nuevoPago.creado_at
-      }).then(({ error }) => {
-        if (error) console.error("Error al insertar pago en Supabase:", error);
+        hash_transaccion: cleanHash,
+        fecha_pago: now,
+        creado_at: now
+      }).then(({ error, data }) => {
+        if (error) {
+          console.error('[Supabase] Error al insertar pago:', error.message, error.details, error.hint);
+        } else {
+          console.log('[Supabase] Pago guardado correctamente:', pagoId);
+        }
       });
 
       // 2. Actualizar deuda y estado del cliente en Supabase
@@ -2185,7 +2189,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ultimo_mes_pagado: targetClient.ultimo_mes_pagado,
           estado: targetClient.estado
         }).eq('id', pagoData.cliente_id).then(({ error }) => {
-          if (error) console.error("Error al actualizar deuda de socio en Supabase:", error);
+          if (error) console.error('[Supabase] Error al actualizar deuda del cliente:', error.message);
         });
       }
     }
@@ -2194,7 +2198,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cliente: cli.nombre + ' ' + cli.apellido, 
       monto: pagoData.monto, 
       mes: pagoData.mes_correspondiente, 
-      medio: pagoData.medio_pago 
+      medio: pagoData.medio_pago,
+      registrado_por: userEmail
     }, userEmail);
 
     addNotificacion(
@@ -2480,6 +2485,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cleanMail === 'ianvelazquez97@gmail.com'
     ) {
       detectedRole = 'ADMIN';
+    } else if (
+      cleanMail === 'denisetomatis@gmail.com' ||
+      cleanMail === 'lucasobueno@live.com'
+    ) {
+      detectedRole = 'PROFESOR';
     } else if (cleanMail === 'profe@gimnasio.com.ar' || cleanMail === 'profe@aresgym.com') {
       detectedRole = 'OPERADOR';
     } else {

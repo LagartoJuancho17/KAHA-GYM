@@ -246,22 +246,28 @@ function InnerApp() {
     );
   }
 
-  const TAB_ITEMS = [
-    { id: 'DASHBOARD' as TabID, label: 'Dashboard', icon: LayoutDashboard, desc: 'Panel de Control General' },
-    { id: 'CLIENTES' as TabID, label: 'Socios', icon: Users, desc: 'Gestión Integral de Socios' },
-    { id: 'PLANES' as TabID, label: 'Planes', icon: Dribbble, desc: 'Control de Membresías y Planes' },
-    { id: 'TURNOS' as TabID, label: 'Cupos y Turnos', icon: CalendarRange, desc: 'Grilla de Horarios y Reservas' },
-    { id: 'PAGOS' as TabID, label: 'Pagos e Ingresos', icon: Landmark, desc: 'Libro Contable y Facturación' },
-    { id: 'NOVEDADES' as TabID, label: 'Novedades', icon: Megaphone, desc: 'Gestión de Comunicados y Novedades' },
-    { id: 'MOROSIDAD' as TabID, label: 'Control de Mora', icon: ShieldAlert, desc: 'Seguimiento de Deudas' },
-    { id: 'PROYECCIONES' as TabID, label: 'Previsiones', icon: LineChart, desc: 'Proyecciones Financieras' },
-    { id: 'AUDITORIA' as TabID, label: 'Auditoría DB', icon: ShieldCheck, desc: 'Registro de Operaciones de Base' },
+  const ALL_TAB_ITEMS = [
+    { id: 'DASHBOARD' as TabID, label: 'Dashboard', icon: LayoutDashboard, desc: 'Panel de Control General', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'CLIENTES' as TabID, label: 'Socios', icon: Users, desc: 'Gestión Integral de Socios', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
+    { id: 'PLANES' as TabID, label: 'Planes', icon: Dribbble, desc: 'Control de Membresías y Planes', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'TURNOS' as TabID, label: 'Cupos y Turnos', icon: CalendarRange, desc: 'Grilla de Horarios y Reservas', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
+    { id: 'PAGOS' as TabID, label: 'Pagos e Ingresos', icon: Landmark, desc: 'Libro Contable y Facturación', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'NOVEDADES' as TabID, label: 'Novedades', icon: Megaphone, desc: 'Gestión de Comunicados y Novedades', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
+    { id: 'MOROSIDAD' as TabID, label: 'Control de Mora', icon: ShieldAlert, desc: 'Seguimiento de Deudas', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'PROYECCIONES' as TabID, label: 'Previsiones', icon: LineChart, desc: 'Proyecciones Financieras', roles: ['ADMIN'] },
+    { id: 'AUDITORIA' as TabID, label: 'Auditoría DB', icon: ShieldCheck, desc: 'Registro de Operaciones de Base', roles: ['ADMIN'] },
   ];
 
-  const currentTab = TAB_ITEMS.find(t => t.id === activeTab) || TAB_ITEMS[0];
+  const TAB_ITEMS = ALL_TAB_ITEMS.filter(t => t.roles.includes(rolActivo));
+
+  // Si el tab activo no es accesible para el rol actual, redirigir al primero permitido
+  const validTabIds = TAB_ITEMS.map(t => t.id);
+  const resolvedActiveTab = validTabIds.includes(activeTab) ? activeTab : (TAB_ITEMS[0]?.id ?? 'CLIENTES');
+
+  const currentTab = TAB_ITEMS.find(t => t.id === resolvedActiveTab) || TAB_ITEMS[0];
 
   const renderActiveTabContent = () => {
-    switch (activeTab) {
+    switch (resolvedActiveTab) {
       case 'DASHBOARD':
         return (
           <Dashboard 
@@ -340,7 +346,9 @@ function InnerApp() {
             <Shield className="w-4.5 h-4.5 text-zinc-900" />
           </div>
           <h1 className="font-display text-zinc-900 font-bold tracking-tight text-sm">
-            KAHA GYM <span className="text-[10px] text-zinc-400 font-semibold block -mt-1 uppercase tracking-widest">Administración</span>
+            KAHA GYM <span className="text-[10px] text-zinc-400 font-semibold block -mt-1 uppercase tracking-widest">
+              {rolActivo === 'PROFESOR' ? 'Panel Profesores' : 'Administración'}
+            </span>
           </h1>
         </div>
         
@@ -372,7 +380,7 @@ function InnerApp() {
                   KAHA GYM
                 </h1>
                 <span className="text-zinc-400 text-[10px] font-semibold tracking-widest block uppercase mt-0.5" id="sidebar-logo-subtitle">
-                  Panel de Control
+                  {rolActivo === 'PROFESOR' ? 'Panel Profesores' : 'Panel de Control'}
                 </span>
               </div>
             </div>
@@ -439,6 +447,11 @@ function InnerApp() {
               <p className="text-[9px] text-slate-500 font-mono truncate mt-1 leading-none" title={googleUser?.email}>
                 {googleUser?.email || 'N/A'}
               </p>
+              {rolActivo === 'PROFESOR' && (
+                <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded bg-violet-50 border border-violet-200 text-violet-700 text-[8px] font-bold uppercase tracking-wide">
+                  👩‍🏫 Profesor/a
+                </span>
+              )}
             </div>
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" title="Verificado con Google SSO"></div>
           </div>
