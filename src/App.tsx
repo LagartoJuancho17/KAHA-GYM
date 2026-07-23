@@ -480,13 +480,16 @@ function InnerApp() {
 
         {/* GEOMETRIC THEMED SUB-HEADER (Matching the clean header element) */}
         <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-row items-center justify-between gap-3 shadow-xs" id="sub-header-container">
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
-              Entorno Seguro
-            </span>
-            <span className="font-display text-base sm:text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight truncate" id="current-tab-label-header">
-              {currentTab.desc}
-            </span>
+          <div className="min-w-0 flex-1 flex items-center gap-3">
+            <img src={logoKaha} alt="KAHA GYM Logo" className="w-8 h-8 rounded-lg object-contain shrink-0 hidden sm:block shadow-2xs" />
+            <div className="min-w-0">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
+                Entorno Seguro
+              </span>
+              <span className="font-display text-base sm:text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight truncate" id="current-tab-label-header">
+                {currentTab.desc}
+              </span>
+            </div>
           </div>
 
           {/* BELL NOTIFICATIONS TRIGGER */}
