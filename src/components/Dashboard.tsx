@@ -504,65 +504,81 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </button>
       </div>
 
-      {/* GRÁFICOS VISUALES */}
+      {/* GRÁFICOS VISUALES PREMIUM */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* GRÁFICO 1: EVOLUCIÓN HISTÓRICA INGRESOS (LINEA DYNAMIC SVG) */}
-        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl col-span-1 lg:col-span-2 flex flex-col justify-between shadow-2xs">
+        {/* GRÁFICO 1: EVOLUCIÓN HISTÓRICA INGRESOS (CURVA BEZIER FLUIDA) */}
+        <div className="bg-white border border-zinc-200/80 p-6 rounded-3xl col-span-1 lg:col-span-2 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400">Evolución de Ingresos</h3>
-              <p className="text-xs font-bold text-zinc-900 font-sans mt-0.5">Histórico de Cobranza (ARS)</p>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-slate-400">Evolución Financiera</h3>
+              </div>
+              <p className="text-sm font-extrabold text-zinc-900 font-display mt-0.5">Ingresos Recaudados (Últimos 6 Meses)</p>
             </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60 font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Datos en Vivo</span>
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200/80 text-emerald-800 px-3 py-1 rounded-full text-[10px] font-bold font-mono shadow-2xs">
+              <span>🚀 Tendencia Positiva</span>
             </div>
           </div>
 
-          <div className="relative h-60 w-full flex items-end justify-between font-mono text-[10px] text-zinc-500 pt-4 pb-2">
-            {/* SVG Background Gradient & Line Path */}
-            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <div className="relative h-64 w-full flex items-end justify-between font-mono text-[10px] text-zinc-500 pt-6 pb-2">
+            {/* SVG Background Grid & Smooth Bezier Path */}
+            <svg className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
               <defs>
-                <linearGradient id="incomeAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                <linearGradient id="smoothAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.28" />
+                  <stop offset="50%" stopColor="#10b981" stopOpacity="0.08" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
                 </linearGradient>
+                <filter id="emeraldGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="3" floodColor="#059669" floodOpacity="0.3" />
+                </filter>
               </defs>
 
-              {/* Grid Lines */}
-              <line x1="0" y1="20" x2="100" y2="20" stroke="#f4f4f5" strokeDasharray="3,3" strokeWidth="1" />
-              <line x1="0" y1="45" x2="100" y2="45" stroke="#f4f4f5" strokeDasharray="3,3" strokeWidth="1" />
-              <line x1="0" y1="70" x2="100" y2="70" stroke="#f4f4f5" strokeDasharray="3,3" strokeWidth="1" />
+              {/* Dotted Horizontal Grid Lines */}
+              <line x1="0" y1="20" x2="100" y2="20" stroke="#f1f5f9" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0" y1="45" x2="100" y2="45" stroke="#f1f5f9" strokeDasharray="3,3" strokeWidth="1" />
+              <line x1="0" y1="70" x2="100" y2="70" stroke="#f1f5f9" strokeDasharray="3,3" strokeWidth="1" />
 
-              {/* Polygon Gradient & Polyline */}
+              {/* Smooth Cubic Bezier Line & Area Polygon */}
               {(() => {
-                const pointsArr = ingresosHistoricos.map((val, idx) => {
+                const points = ingresosHistoricos.map((val, idx) => {
                   const x = (idx / (ingresosHistoricos.length - 1)) * 100;
                   const ratio = maxIngreso > 0 ? val / maxIngreso : 0;
                   const y = 75 - (ratio * 55); 
-                  return `${x},${y}`;
+                  return { x, y };
                 });
-                const polygonPoints = `0,85 ${pointsArr.join(' ')} 100,85`;
-                const polylinePoints = pointsArr.join(' ');
+
+                // Build Cubic Bezier string
+                let bezierPath = `M ${points[0].x},${points[0].y}`;
+                for (let i = 0; i < points.length - 1; i++) {
+                  const p0 = points[i];
+                  const p1 = points[i + 1];
+                  const cpX = (p0.x + p1.x) / 2;
+                  bezierPath += ` C ${cpX},${p0.y} ${cpX},${p1.y} ${p1.x},${p1.y}`;
+                }
+
+                const areaPath = `${bezierPath} L 100,85 L 0,85 Z`;
 
                 return (
                   <>
-                    <polygon points={polygonPoints} fill="url(#incomeAreaGradient)" />
-                    <polyline
+                    <path d={areaPath} fill="url(#smoothAreaGrad)" />
+                    <path
+                      d={bezierPath}
                       fill="none"
                       stroke="#059669"
-                      strokeWidth="2.5"
+                      strokeWidth="3"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      points={polylinePoints}
+                      filter="url(#emeraldGlow)"
                     />
                   </>
                 );
               })()}
             </svg>
 
-            {/* Interactive Overlay for Points & Tooltips */}
+            {/* Interactive Nodes & Tooltips */}
             <div className="relative z-10 w-full h-full flex justify-between items-end">
               {ultimos6Meses.map((mes, idx) => {
                 const val = ingresosHistoricos[idx];
@@ -574,26 +590,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   .replace('.', '');
 
                 return (
-                  <div key={mes} className="flex-1 flex flex-col items-center justify-between h-full relative group">
+                  <div key={mes} className="flex-1 flex flex-col items-center justify-between h-full relative group cursor-pointer">
                     {/* Tooltip on Hover */}
                     <div 
-                      className="absolute left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] px-2.5 py-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30 whitespace-nowrap shadow-lg font-sans font-bold border border-zinc-800"
-                      style={{ top: `${topPercent - 28}%` }}
+                      className="absolute left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10.5px] px-3 py-1.5 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 whitespace-nowrap shadow-xl font-sans font-bold border border-zinc-800 flex items-center gap-1.5 group-hover:-translate-y-1"
+                      style={{ top: `${topPercent - 32}%` }}
                     >
-                      ${val.toLocaleString('es-AR')} ARS
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span>${val.toLocaleString('es-AR')} ARS</span>
                     </div>
 
-                    {/* Point Dot */}
+                    {/* Glowing Node Dot */}
                     <div 
-                      className="absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white border-2 border-emerald-600 shadow-md group-hover:scale-125 group-hover:bg-emerald-500 transition-all cursor-pointer z-20"
+                      className="absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white border-2 border-emerald-600 shadow-lg ring-4 ring-emerald-500/15 group-hover:ring-emerald-500/40 group-hover:scale-130 group-hover:bg-emerald-500 transition-all duration-200 z-20"
                       style={{ top: `${topPercent}%` }}
-                      title={`${mesLabel}: $${val.toLocaleString('es-AR')}`}
                     ></div>
 
-                    {/* Label below */}
+                    {/* Month Label */}
                     <div className="mt-auto pt-2 text-center">
-                      <span className="font-semibold text-zinc-950 block font-mono text-[10px]">${Math.round(val / 1000)}k</span>
-                      <span className="text-[10px] text-zinc-400 font-sans capitalize">{mesLabel}</span>
+                      <span className="font-bold text-zinc-900 block font-mono text-[10.5px]">${Math.round(val / 1000)}k</span>
+                      <span className="text-[10px] text-zinc-400 font-sans font-medium capitalize">{mesLabel}</span>
                     </div>
                   </div>
                 );
@@ -602,21 +618,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* GRÁFICO 2: CLIENTES POR PLAN (DONA) */}
-        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl flex flex-col justify-between shadow-2xs">
+        {/* GRÁFICO 2: CLIENTES POR PLAN (DONA MULTICOLOR) */}
+        <div className="bg-white border border-zinc-200/80 p-6 rounded-3xl flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
           <div>
-            <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400 mb-1">Distribución por Plan</h3>
-            <p className="text-xs font-bold text-zinc-900 font-sans mb-4">Socios activos contratados</p>
+            <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-slate-400 mb-0.5">Membresías</h3>
+            <p className="text-sm font-extrabold text-zinc-900 font-display mb-4">Distribución por Plan</p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-6 justify-center">
-            <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
+            <div className="relative w-38 h-38 flex items-center justify-center shrink-0">
               <svg className="w-full h-full transform -rotate-90">
-                <circle cx="72" cy="72" r="50" fill="transparent" stroke="#f4f4f5" strokeWidth="16" />
+                <circle cx="76" cy="76" r="54" fill="transparent" stroke="#f1f5f9" strokeWidth="18" />
                 {totalPlanSum > 0 ? (() => {
                   let accumulatedOffset = 0;
-                  const colores = ['#09090b', '#10b981', '#f59e0b', '#6366f1', '#ec4899'];
-                  const r = 50;
+                  const colores = ['#09090b', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                  const r = 54;
                   const circ = 2 * Math.PI * r;
 
                   return planDistribucion.map((p, idx) => {
@@ -629,38 +645,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     return (
                       <circle
                         key={p.id || p.nombre}
-                        cx="72"
-                        cy="72"
+                        cx="76"
+                        cy="76"
                         r={r}
                         fill="transparent"
                         stroke={colores[idx % colores.length]}
-                        strokeWidth="16"
+                        strokeWidth="18"
                         strokeDasharray={strokeDasharray}
                         strokeDashoffset={strokeDashoffset}
-                        className="transition-all duration-300 hover:opacity-80 cursor-pointer"
+                        className="transition-all duration-300 hover:opacity-85 hover:stroke-width-[20] cursor-pointer"
                       />
                     );
                   });
                 })() : (
-                  <circle cx="72" cy="72" r="50" fill="transparent" stroke="#e4e4e7" strokeWidth="16" />
+                  <circle cx="76" cy="76" r="54" fill="transparent" stroke="#e2e8f0" strokeWidth="18" />
                 )}
               </svg>
 
-              <div className="absolute text-center">
-                <span className="text-2xl font-bold text-zinc-950 font-sans">{totalActivosCount}</span>
-                <p className="text-[9px] text-zinc-400 font-sans uppercase font-semibold">Activos</p>
+              <div className="absolute text-center flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-3xl font-extrabold text-zinc-900 font-display leading-none">{totalActivosCount}</span>
+                <span className="text-[9px] text-zinc-400 font-sans font-bold uppercase tracking-wider mt-0.5">Socios Activos</span>
               </div>
             </div>
 
-            <div className="space-y-2 text-xs flex-1 w-full">
+            <div className="space-y-2.5 text-xs flex-1 w-full">
               {planDistribucion.map((p, idx) => {
-                const colores = ['bg-zinc-950', 'bg-emerald-500', 'bg-amber-500', 'bg-indigo-500', 'bg-pink-500'];
+                const colores = ['bg-zinc-900', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500', 'bg-pink-500'];
                 const pct = totalActivosCount > 0 ? Math.round((p.cantidad / totalActivosCount) * 100) : 0;
                 return (
-                  <div key={p.id || p.nombre} className="flex justify-between items-center gap-2">
+                  <div key={p.id || p.nombre} className="flex justify-between items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className={`w-3 h-3 rounded-full shrink-0 ${colores[idx % colores.length]}`}></span>
-                      <span className="text-zinc-700 font-sans font-medium text-xs truncate">{p.nombre}</span>
+                      <span className={`w-3 h-3 rounded-full shrink-0 ${colores[idx % colores.length]} shadow-2xs`}></span>
+                      <span className="text-zinc-800 font-sans font-semibold text-xs truncate">{p.nombre}</span>
                     </div>
                     <span className="font-mono font-bold text-zinc-900 shrink-0">{p.cantidad} <span className="text-zinc-400 font-normal">({pct}%)</span></span>
                   </div>
@@ -674,35 +690,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* OCUPACIÓN POR HORARIO & ALERTAS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* GRÁFICO 3: OCUPACIÓN POR TURNO/HORA */}
-        <div className="bg-white border border-zinc-200/70 p-6 rounded-3xl col-span-1 lg:col-span-2">
-          <h3 className="text-[11px] font-mono font-semibold uppercase tracking-widest text-zinc-400 mb-4">Saturación Promedio de Ocupación según Horarios</h3>
+        {/* GRÁFICO 3: OCUPACIÓN POR TURNO/HORA (BARRAS DE DEGRADADO FLUIDAS) */}
+        <div className="bg-white border border-zinc-200/80 p-6 rounded-3xl col-span-1 lg:col-span-2 shadow-xs hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-slate-400 mb-0.5">Capacidad Operativa</h3>
+              <p className="text-sm font-extrabold text-zinc-900 font-display">Saturación por Horarios de Entrenamiento</p>
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-2.5 py-1 rounded-full font-semibold">
+              Turnos en Grilla
+            </span>
+          </div>
           
           <div className="space-y-3">
             {ocupacionPorHorario.map(h => {
-              let barColor = 'bg-emerald-500';
-              let textColor = 'text-emerald-700 bg-emerald-50';
+              let barGradient = 'from-emerald-400 to-teal-500';
+              let badgeColor = 'text-emerald-800 bg-emerald-50 border-emerald-200/80';
               if (h.porcent >= 70 && h.porcent < 90) {
-                barColor = 'bg-amber-500';
-                textColor = 'text-amber-700 bg-amber-50';
+                barGradient = 'from-amber-400 to-orange-500';
+                badgeColor = 'text-amber-800 bg-amber-50 border-amber-200/80';
               } else if (h.porcent >= 90) {
-                barColor = 'bg-red-500';
-                textColor = 'text-red-700 bg-red-50';
+                barGradient = 'from-rose-500 to-pink-600';
+                badgeColor = 'text-rose-800 bg-rose-50 border-rose-200/80';
               }
 
               return (
-                <div key={h.hora} className="flex items-center justify-between gap-4 text-xs">
-                  <div className="w-12 font-mono font-bold text-zinc-950">{h.hora}hs</div>
-                  <div className="flex-1 bg-zinc-100 h-5 rounded-md overflow-hidden relative border border-zinc-200/50">
+                <div key={h.hora} className="flex items-center justify-between gap-4 text-xs group">
+                  <div className="w-14 font-mono font-bold text-zinc-900 text-xs shrink-0 flex items-center gap-1">
+                    <span>{h.hora}</span>
+                    <span className="text-[9px] text-slate-400 font-normal">hs</span>
+                  </div>
+                  <div className="flex-1 bg-slate-100 h-6 rounded-xl overflow-hidden relative border border-slate-200/60 shadow-inner">
                     <div 
-                      className={`${barColor} h-full transition-all duration-500`}
-                      style={{ width: `${Math.min(100, h.porcent)}%` }}
+                      className={`bg-gradient-to-r ${barGradient} h-full transition-all duration-700 rounded-xl shadow-2xs`}
+                      style={{ width: `${Math.min(100, Math.max(5, h.porcent))}%` }}
                     ></div>
-                    <span className="absolute inset-y-0 right-3 font-mono font-semibold flex items-center text-[10px] text-zinc-600">
-                      {h.asig} fijos / cap. {h.cupo}
+                    <span className="absolute inset-y-0 right-3 font-mono font-semibold flex items-center text-[10px] text-slate-600 select-none">
+                      {h.asig} inscritos / cap. {h.cupo}
                     </span>
                   </div>
-                  <div className={`w-12 text-center py-0.5 rounded-md font-bold font-mono text-[10px] ${textColor}`}>
+                  <div className={`w-14 text-center py-1 rounded-xl font-extrabold font-mono text-[10.5px] border ${badgeColor} shrink-0`}>
                     {h.porcent}%
                   </div>
                 </div>
