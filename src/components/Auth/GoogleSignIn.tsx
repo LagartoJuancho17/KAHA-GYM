@@ -115,9 +115,7 @@ export const GoogleSignIn: React.FC = () => {
         <div className="text-center space-y-2">
 
           <div className="flex flex-col justify-center items-center gap-3 mt-2">
-            <div className="w-14 h-14 rounded-2xl bg-lime-300 flex items-center justify-center shadow-sm">
-              <Shield className="w-7 h-7 text-zinc-900" />
-            </div>
+            <img src="/logokaha.png" alt="KAHA GYM Logo" className="w-14 h-14 rounded-2xl object-contain drop-shadow-sm" />
             <div className="text-center">
               <h2 className="font-display text-2xl font-bold text-zinc-900 tracking-tight">KAHA GYM</h2>
               <p className="text-zinc-400 text-[10px] uppercase font-mono tracking-widest mt-0.5">Servicio de Autenticación</p>

@@ -56,9 +56,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
             <Menu className="w-5.5 h-5.5 text-slate-700" />
           </button>
 
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-400 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-200">
-            <Sparkles className="w-4 h-4 text-white animate-pulse" />
-          </div>
+          <img src="/logokaha.png" alt="KAHA GYM Logo" className="w-9 h-9 rounded-xl object-contain drop-shadow-xs shrink-0" />
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="text-sm font-black text-slate-800 tracking-wider uppercase">KAHA Portal</h1>
@@ -219,9 +217,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
           >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="w-8.5 h-8.5 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <Shield className="w-4.5 h-4.5 text-emerald-600" />
-                </div>
+                <img src="/logokaha.png" alt="KAHA GYM Logo" className="w-8.5 h-8.5 rounded-lg object-contain shrink-0" />
                 <div>
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">KAHA Menú</h3>
                   <span className="text-[8px] text-slate-400 font-mono uppercase tracking-widest block -mt-0.5">Socio Autogestión</span>

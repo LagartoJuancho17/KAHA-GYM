@@ -13,6 +13,7 @@ import { SocioPerfil } from './SocioPerfil';
 import { SocioPagos } from './SocioPagos';
 import { SocioNovedades } from './SocioNovedades';
 import { SocioPaymentChoiceModal } from './SocioPaymentChoiceModal';
+import { Footer } from '../Common/Footer';
 
 export const SocioPanel: React.FC = () => {
   const { 
@@ -326,9 +327,12 @@ export const SocioPanel: React.FC = () => {
         <SocioNovedades />
       )}
 
+      {/* FOOTER GENERAL */}
+      <Footer />
+
       {/* Floating WhatsApp Button */}
-      <div className="fixed bottom-24 right-5 z-50 flex flex-col items-end gap-2 group text-xs" id="floating-whatsapp-container">
-        <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 text-slate-800 px-3.5 py-2 rounded-2xl shadow-lg text-[11px] font-bold tracking-tight opacity-0 scale-90 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none select-none font-sans flex items-center gap-2 border-emerald-100">
+      <div className="fixed bottom-24 right-5 z-50 flex items-center gap-2 group text-xs" id="floating-social-container">
+        <div className="bg-white/95 backdrop-blur-md border border-slate-200/60 text-slate-800 px-3 py-1.5 rounded-2xl shadow-lg text-[10.5px] font-bold tracking-tight opacity-0 scale-90 translate-y-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none select-none font-sans flex items-center gap-2 border-emerald-100 mr-1">
           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
           <span>¿Consultas? Chateá con nosotros</span>
         </div>
@@ -337,13 +341,13 @@ export const SocioPanel: React.FC = () => {
           href={`https://wa.me/541178402722?text=${encodeURIComponent(`Hola KAHA GYM, soy el socio ${socio.nombre} ${socio.apellido}. Me contacto desde mi portal de cliente.`)}`}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center justify-center w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-500/35 transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 relative"
+          className="flex items-center justify-center w-13 h-13 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-500/35 transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-hidden relative shrink-0"
           aria-label="Contactar por WhatsApp"
           id="floating-whatsapp-btn"
         >
           <span className="absolute inset-0 rounded-full bg-emerald-500/40 animate-ping opacity-60 pointer-events-none"></span>
-          <svg className="w-6 h-6 fill-current text-white relative z-10" viewBox="0 0 24 24">
-            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.66.986 3.284 1.48 4.909 1.481 5.482 0 9.94-4.461 9.943-9.94.002-2.654-1.029-5.15-2.901-7.025C16.726 1.795 14.237.772 11.583.772c-5.485 0-9.94 4.46-9.943 9.94-.001 1.904.5 3.76 1.45 5.421L2.09 21.65l5.557-1.496zm12.355-6.883c-.302-.15-1.787-.882-2.062-.982-.275-.1-.475-.15-.674.15-.2.3-.775.982-.95 1.182-.175.2-.35.225-.65.075-.3-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.784-1.275-2.083.175-.3.275-.475.375-.674.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.925-2.225-.244-.589-.493-.51-.674-.519-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5 0 1.475 1.075 2.9 1.225 3.1.15.2 2.11 3.22 5.11 4.52.714.31 1.272.496 1.706.634.717.228 1.37.195 1.887.118.575-.085 1.788-.73 2.038-1.43.25-.7.25-1.3.175-1.43-.075-.125-.275-.2-.575-.35z"/>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" className="bi bi-whatsapp relative z-10 text-white" viewBox="0 0 16 16">
+            <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"/>
           </svg>
         </a>
       </div>

@@ -142,8 +142,8 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-slate-800">KAHA Gimnasio - Sede Principal</h4>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                      Av. Cabildo 1420, Belgrano, Ciudad Autónoma de Buenos Aires, Argentina.
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed font-semibold">
+                      Ramón L. Falcón 5330, Ciudad Autónoma de Buenos Aires, Argentina.
                     </p>
                     <p className="text-[9px] text-slate-400 mt-1 font-mono">
                       Horarios: Lunes a Viernes 07:00 hs - 22:00 hs

@@ -16,6 +16,7 @@ import { NovedadesCRUD } from './components/Novedades/NovedadesCRUD';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SocioRegistrationForm } from './components/Auth/SocioRegistrationForm';
 import { AuthorizeClientModal } from './components/Clientes/AuthorizeClientModal';
+import { Footer } from './components/Common/Footer';
 
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
@@ -342,9 +343,7 @@ function InnerApp() {
       {/* MOBILE HEADER BAR */}
       <div className="lg:hidden bg-white text-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-200 z-50 sticky top-0 shadow-xs">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-lime-300 flex items-center justify-center">
-            <Shield className="w-4.5 h-4.5 text-zinc-900" />
-          </div>
+          <img src="/logokaha.png" alt="KAHA GYM" className="w-8 h-8 rounded-xl object-contain shrink-0" />
           <h1 className="font-display text-zinc-900 font-bold tracking-tight text-sm">
             KAHA GYM <span className="text-[10px] text-zinc-400 font-semibold block -mt-1 uppercase tracking-widest">
               {rolActivo === 'PROFESOR' ? 'Panel Profesores' : 'Administración'}
@@ -372,9 +371,7 @@ function InnerApp() {
           {/* Logo / Brand */}
           <div className="mb-2 hidden lg:block">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-lime-300 flex items-center justify-center shadow-sm shrink-0">
-                <Shield className="w-5 h-5 text-zinc-900" />
-              </div>
+              <img src="/logokaha.png" alt="KAHA GYM" className="w-9 h-9 rounded-xl object-contain shrink-0" />
               <div>
                 <h1 className="font-display text-zinc-900 text-base font-bold tracking-tight leading-none" id="sidebar-logo-heading">
                   KAHA GYM
@@ -586,10 +583,13 @@ function InnerApp() {
         </header>
 
         {/* Main View Area */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto flex flex-col justify-between">
           <ErrorBoundary key={activeTab} section={currentTab.label}>
             {renderActiveTabContent()}
           </ErrorBoundary>
+
+          {/* FOOTER GENERAL */}
+          <Footer />
         </main>
       </div>
 
