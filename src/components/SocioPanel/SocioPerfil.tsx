@@ -136,20 +136,30 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
 
               <div>
                 <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider font-mono mb-3">Sede Registrada</h3>
-                <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-4">
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl text-emerald-600 shrink-0">
+                <a 
+                  href="https://maps.app.goo.gl/H7dHcgqtfwbygpEY6"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 hover:border-slate-300 rounded-2xl flex items-start gap-4 transition-all group block cursor-pointer"
+                  title="Abrir ubicación en Google Maps"
+                  id="socio-profile-maps-link"
+                >
+                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl text-emerald-600 shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
                     <MapPin className="w-5 h-5 text-emerald-600" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-800">KAHA Gimnasio - Sede Principal</h4>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed font-semibold">
+                    <h4 className="text-xs font-bold text-slate-800 group-hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+                      KAHA Gimnasio - Sede Principal
+                      <span className="text-[10px] text-emerald-600 font-mono font-normal underline">Abrir Maps ↗</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed font-semibold group-hover:text-slate-900">
                       Ramón L. Falcón 5330, Ciudad Autónoma de Buenos Aires, Argentina.
                     </p>
                     <p className="text-[9px] text-slate-400 mt-1 font-mono">
                       Horarios: Lunes a Viernes 07:00 hs - 22:00 hs
                     </p>
                   </div>
-                </div>
+                </a>
               </div>
             </div>
 

@@ -7,13 +7,23 @@ export const Footer: React.FC = () => {
   return (
     <footer className="mt-12 pt-6 pb-20 lg:pb-8 border-t border-slate-200 text-slate-500 font-sans text-xs" id="kaha-site-footer">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 px-4">
-        <div className="flex items-center gap-3 text-slate-700 font-medium text-center sm:text-left">
-          <img src={logoKaha} alt="KAHA GYM Logo" className="w-8 h-8 rounded-xl object-contain shrink-0 shadow-xs" />
+        <a
+          href="https://maps.app.goo.gl/H7dHcgqtfwbygpEY6"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 text-slate-700 hover:text-slate-900 font-medium text-center sm:text-left group transition-all cursor-pointer"
+          title="Abrir en Google Maps"
+          id="footer-maps-link"
+        >
+          <img src={logoKaha} alt="KAHA GYM Logo" className="w-8 h-8 rounded-xl object-contain shrink-0 shadow-xs group-hover:scale-105 transition-transform" />
           <div>
-            <span className="font-bold text-slate-900 block leading-tight">KAHA GYM — Sede Principal</span>
-            <span className="text-[11px] text-slate-500 font-mono">Dirección: Ramón L. Falcón 5330, CABA</span>
+            <span className="font-bold text-slate-900 block leading-tight group-hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+              KAHA GYM — Sede Principal
+              <MapPin className="w-3.5 h-3.5 text-rose-500 inline shrink-0" />
+            </span>
+            <span className="text-[11px] text-slate-500 font-mono group-hover:underline">Dirección: Ramón L. Falcón 5330, CABA</span>
           </div>
-        </div>
+        </a>
 
         <div className="flex items-center gap-3">
           {/* INSTAGRAM */}
