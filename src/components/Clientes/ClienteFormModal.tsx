@@ -17,6 +17,8 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
 }) => {
   const { clientes, planes, addCliente, updateCliente } = useGym();
 
+  const [isCustomPlan, setIsCustomPlan] = useState(false);
+
   const [clienteForm, setClienteForm] = useState({
     codigo_socio: '',
     nombre: '',
@@ -51,6 +53,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       dias_personalizados: '',
       nota_plan_personalizado: ''
     });
+    setIsCustomPlan(false);
     setFormError('');
     setFormSuccess('');
   };
@@ -68,6 +71,8 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
     if (editingClienteId && isOpen) {
       const cl = clientes.find(c => c.id === editingClienteId);
       if (cl) {
+        const hasCustom = cl.precio_personalizado != null || cl.dias_personalizados != null || Boolean(cl.nota_plan_personalizado);
+        setIsCustomPlan(hasCustom);
         setClienteForm({
           codigo_socio: cl.codigo_socio || '',
           nombre: cl.nombre,
@@ -100,6 +105,14 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       return;
     }
 
+    const payload = {
+      ...clienteForm,
+      plan_id: clienteForm.plan_id || planes[0]?.id || '',
+      precio_personalizado: isCustomPlan && clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : undefined,
+      dias_personalizados: isCustomPlan && clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : undefined,
+      nota_plan_personalizado: isCustomPlan ? (clienteForm.nota_plan_personalizado || undefined) : undefined
+    };
+
     if (editingClienteId) {
       const existing = clientes.find(c => c.id === editingClienteId);
       let nuevoEstado = existing?.estado || 'ACTIVO';
@@ -112,11 +125,8 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       }
 
       const res = updateCliente(editingClienteId, {
-        ...clienteForm,
-        estado: nuevoEstado,
-        precio_personalizado: clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : undefined,
-        dias_personalizados: clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : undefined,
-        nota_plan_personalizado: clienteForm.nota_plan_personalizado || undefined
+        ...payload,
+        estado: nuevoEstado
       });
       if (res.success) {
         setFormSuccess(res.message);
@@ -128,12 +138,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
         setFormError(res.message);
       }
     } else {
-      const res = addCliente({
-        ...clienteForm,
-        precio_personalizado: clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : undefined,
-        dias_personalizados: clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : undefined,
-        nota_plan_personalizado: clienteForm.nota_plan_personalizado || undefined
-      });
+      const res = addCliente(payload);
       if (res.success) {
         setFormSuccess(res.message);
         setTimeout(() => {
@@ -246,20 +251,106 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
             />
           </div>
 
-          {/* PLAN */}
+          {/* PLAN BASE CONTRATADO */}
           <div className="space-y-1">
             <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Plan Base Contratado</label>
             <select
-              value={clienteForm.plan_id}
-              onChange={(e) => setClienteForm(prev => ({ ...prev, plan_id: e.target.value }))}
-              className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer"
+              value={isCustomPlan ? 'PERSONALIZADO' : clienteForm.plan_id}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'PERSONALIZADO') {
+                  setIsCustomPlan(true);
+                } else {
+                  setIsCustomPlan(false);
+                  setClienteForm(prev => ({
+                    ...prev,
+                    plan_id: val,
+                    precio_personalizado: '',
+                    dias_personalizados: '',
+                    nota_plan_personalizado: ''
+                  }));
+                }
+              }}
+              className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer font-medium"
               id="form-plan"
             >
               {planes.map(p => (
                 <option key={p.id} value={p.id}>{p.nombre} — (${p.precio.toLocaleString('es-AR')})</option>
               ))}
+              <option value="PERSONALIZADO">✦ Plan Personalizado / Especial</option>
             </select>
           </div>
+
+          {/* CAMPOS DE PLAN PERSONALIZADO (SOLO SE DESPLIEGAN AL SELECCIONAR "PERSONALIZADO") */}
+          {isCustomPlan && (
+            <div className="space-y-3 border border-violet-200 bg-violet-50/60 rounded-xl p-3.5 animate-scale-in">
+              <div className="flex items-center justify-between border-b border-violet-200/60 pb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-violet-700 flex items-center gap-1">
+                  ✦ Opciones de Plan Personalizado
+                </span>
+                <span className="text-[9px] text-violet-600 font-semibold bg-violet-100 px-2 py-0.5 rounded-full border border-violet-200">
+                  Membresía Especial
+                </span>
+              </div>
+
+              {/* PLAN BASE DE REFERENCIA */}
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Plan Base de Referencia</label>
+                <select
+                  value={clienteForm.plan_id}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, plan_id: e.target.value }))}
+                  className="w-full border border-violet-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-violet-400 outline-hidden bg-white cursor-pointer font-medium"
+                  id="form-plan-base-referencia"
+                >
+                  {planes.map(p => (
+                    <option key={p.id} value={p.id}>{p.nombre} — (Base estándar: ${p.precio.toLocaleString('es-AR')})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Precio Especial ($ ARS/mes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="ej: 15000"
+                    value={clienteForm.precio_personalizado}
+                    onChange={(e) => setClienteForm(prev => ({ ...prev, precio_personalizado: e.target.value }))}
+                    className="w-full border border-violet-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-violet-400 outline-hidden bg-white font-mono"
+                    id="form-precio-personalizado"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Días/Semana Personalizados</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="7"
+                    step="1"
+                    placeholder="ej: 3"
+                    value={clienteForm.dias_personalizados}
+                    onChange={(e) => setClienteForm(prev => ({ ...prev, dias_personalizados: e.target.value }))}
+                    className="w-full border border-violet-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-violet-400 outline-hidden bg-white font-mono"
+                    id="form-dias-personalizados"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Nota / Motivo del Plan Especial</label>
+                <input
+                  type="text"
+                  placeholder="ej: Acuerdo temporada de invierno, familiar de empleado..."
+                  value={clienteForm.nota_plan_personalizado}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, nota_plan_personalizado: e.target.value }))}
+                  className="w-full border border-violet-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-violet-400 outline-hidden bg-white"
+                  id="form-nota-plan-personalizado"
+                />
+              </div>
+            </div>
+          )}
 
           {/* TIPO DE MEMBRESÍA */}
           <div className="space-y-1">
@@ -307,63 +398,6 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
               />
             </div>
           )}
-
-          {/* PLAN PERSONALIZADO */}
-          <div className="space-y-3 border border-violet-200 bg-violet-50/50 rounded-xl p-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-violet-700">✦ Plan Personalizado (Opcional)</span>
-              <span className="text-[9px] text-violet-500 font-medium">Sobreescribe el plan base para este socio</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Precio Especial ($ ARS/mes)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="ej: 15000"
-                  value={clienteForm.precio_personalizado}
-                  onChange={(e) => setClienteForm(prev => ({ ...prev, precio_personalizado: e.target.value }))}
-                  className="w-full border border-violet-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-violet-400 outline-hidden bg-white font-mono"
-                  id="form-precio-personalizado"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Días/Semana Personalizados</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="7"
-                  step="1"
-                  placeholder="ej: 3"
-                  value={clienteForm.dias_personalizados}
-                  onChange={(e) => setClienteForm(prev => ({ ...prev, dias_personalizados: e.target.value }))}
-                  className="w-full border border-violet-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-violet-400 outline-hidden bg-white font-mono"
-                  id="form-dias-personalizados"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Nota / Motivo del Plan Especial</label>
-              <input
-                type="text"
-                placeholder="ej: Acuerdo temporada de invierno, familiar de empleado..."
-                value={clienteForm.nota_plan_personalizado}
-                onChange={(e) => setClienteForm(prev => ({ ...prev, nota_plan_personalizado: e.target.value }))}
-                className="w-full border border-violet-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-violet-400 outline-hidden bg-white"
-                id="form-nota-plan-personalizado"
-              />
-            </div>
-            {(clienteForm.precio_personalizado !== '' || clienteForm.dias_personalizados !== '') && (
-              <button
-                type="button"
-                onClick={() => setClienteForm(prev => ({ ...prev, precio_personalizado: '', dias_personalizados: '', nota_plan_personalizado: '' }))}
-                className="text-[9px] text-violet-500 hover:text-red-500 underline cursor-pointer bg-transparent border-none"
-              >
-                ✕ Quitar plan personalizado
-              </button>
-            )}
-          </div>
 
           <div className="pt-4 border-t border-zinc-100 flex justify-end gap-2 text-xs font-semibold">
             <button

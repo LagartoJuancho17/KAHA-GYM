@@ -249,7 +249,7 @@ function InnerApp() {
   const ALL_TAB_ITEMS = [
     { id: 'DASHBOARD' as TabID, label: 'Dashboard', icon: LayoutDashboard, desc: 'Panel de Control General', roles: ['ADMIN', 'OPERADOR'] },
     { id: 'CLIENTES' as TabID, label: 'Socios', icon: Users, desc: 'Gestión Integral de Socios', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
-    { id: 'PLANES' as TabID, label: 'Planes', icon: Dribbble, desc: 'Control de Membresías y Planes', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'PLANES' as TabID, label: 'Planes', icon: Dribbble, desc: 'Control de Membresías y Planes', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'TURNOS' as TabID, label: 'Cupos y Turnos', icon: CalendarRange, desc: 'Grilla de Horarios y Reservas', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'PAGOS' as TabID, label: 'Pagos e Ingresos', icon: Landmark, desc: 'Libro Contable y Facturación', roles: ['ADMIN', 'OPERADOR'] },
     { id: 'NOVEDADES' as TabID, label: 'Novedades', icon: Megaphone, desc: 'Gestión de Comunicados y Novedades', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },

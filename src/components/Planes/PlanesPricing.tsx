@@ -61,7 +61,7 @@ export const PlanesPricing: React.FC = () => {
           <Shield className="w-5 h-5 text-amber-500 flex-shrink-0" />
           <div className="leading-normal">
             <span className="font-bold block text-amber-950">Acceso de Tarifas Restringido por Rol (RLS)</span>
-            Has ingresado al sistema como <span className="font-bold">OPERADOR</span>. Por políticas de seguridad de base de datos de la empresa, los operadores poseen permisos de solo lectura para los abonos mensuales y no pueden alterar valores monetarios ni visualizar proyecciones de rentabilidad.
+            Has ingresado al sistema como <span className="font-bold">{rolActivo}</span>. Por políticas de seguridad de base de datos, tu usuario posee permisos de solo lectura para las cuotas y planes, no pudiendo alterar valores monetarios.
           </div>
         </div>
       )}
