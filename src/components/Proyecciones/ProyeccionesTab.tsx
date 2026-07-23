@@ -57,7 +57,7 @@ export const ProyeccionesTab: React.FC = () => {
   }, [turnos]);
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto" id="proyecciones-analytics-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto" id="proyecciones-analytics-tab-panel">
       
       {/* SECCIÓN CABECERA */}
       <div>

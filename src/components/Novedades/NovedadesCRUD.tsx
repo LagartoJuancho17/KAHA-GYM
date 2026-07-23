@@ -68,7 +68,7 @@ export const NovedadesCRUD: React.FC = () => {
   }, [novedades, filterCategory, buscarText]);
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto" id="novedades-crud-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto" id="novedades-crud-tab-panel">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

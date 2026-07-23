@@ -57,7 +57,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans" id="profile-detailed-modal">
-      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-2xl overflow-hidden relative animate-scale-in">
+      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-2xl relative animate-scale-in flex flex-col max-h-[92vh]">
         
         {/* Header */}
         <div className="bg-zinc-900 text-white p-6 flex justify-between items-center">
@@ -94,10 +94,10 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
         </div>
 
         {/* Content body */}
-        <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1">
           
           {/* Información Personal */}
-          <div className="grid grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
               <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Código / ID de Socio</span>
               <span className="font-mono font-bold text-zinc-900 block">{selectedCliente.codigo_socio || selectedCliente.id}</span>

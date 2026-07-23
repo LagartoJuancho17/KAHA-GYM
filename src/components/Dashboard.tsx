@@ -188,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const mesNombre = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto" id="dashboard-tab-panel">
+    <div className="space-y-8 p-3 sm:p-6 max-w-7xl mx-auto" id="dashboard-tab-panel">
       {/* SECCIÓN BIENVENIDA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -405,7 +405,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="relative z-10">
-            <div className={`font-display text-5xl xl:text-6xl font-bold leading-none tracking-tight ${balanceNeto >= 0 ? 'text-lime-300' : 'text-rose-400'}`}>
+            <div className={`font-display text-3xl sm:text-5xl xl:text-6xl font-bold leading-none tracking-tight ${balanceNeto >= 0 ? 'text-lime-300' : 'text-rose-400'}`}>
               {balanceNeto >= 0 ? '' : '−'}${Math.abs(balanceNeto).toLocaleString('es-AR')}
             </div>
             <p className="text-zinc-400 text-xs mt-2 capitalize">{mesNombre} · Ingresos − Egresos</p>

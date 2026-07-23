@@ -148,7 +148,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans" id="client-form-modal">
-      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-md overflow-hidden animate-scale-in">
+      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-md flex flex-col max-h-[90vh] animate-scale-in">
         <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
           <h3 className="text-base font-bold tracking-tight">
             {editingClienteId ? 'Modificar ficha de Alumno' : 'Registrar Nuevo Socio'}
@@ -162,7 +162,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmitForm} className="p-5 space-y-4 text-xs font-sans">
+        <form onSubmit={handleSubmitForm} className="p-5 space-y-4 text-xs font-sans overflow-y-auto flex-1">
           {formError && (
             <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-center gap-2 border border-red-200">
               <AlertCircle className="w-4 h-4 flex-shrink" />
@@ -314,7 +314,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
               <span className="text-[10px] font-black uppercase tracking-widest text-violet-700">✦ Plan Personalizado (Opcional)</span>
               <span className="text-[9px] text-violet-500 font-medium">Sobreescribe el plan base para este socio</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Precio Especial ($ ARS/mes)</label>
                 <input

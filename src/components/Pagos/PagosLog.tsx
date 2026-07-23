@@ -249,27 +249,29 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   };
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto" id="pagos-log-tab-panel">
+    <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto" id="pagos-log-tab-panel">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Finanzas & Pagos</h2>
-          <p className="text-zinc-500 font-sans text-sm font-medium">Ingresos, egresos y liquidación de profesores</p>
-        </div>
+      <div className="flex flex-col gap-3" id="pagos-header">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Finanzas &amp; Pagos</h2>
+            <p className="text-zinc-500 font-sans text-sm font-medium">Ingresos, egresos y liquidación de profesores</p>
+          </div>
 
-        {/* SUB-TABS */}
-        <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200 gap-1">
-          {([['INGRESOS', 'Ingresos y Cuotas'], ['EGRESOS', 'Gastos y Egresos'], ['LIQUIDACION', 'Liquidación Profes']] as [SubTab, string][]).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setActiveSubTab(key)}
-              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none bg-transparent ${
-                activeSubTab === key ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          {/* SUB-TABS */}
+          <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200 gap-1 w-full sm:w-auto">
+            {([['INGRESOS', 'Ingresos'], ['EGRESOS', 'Egresos'], ['LIQUIDACION', 'Liquid. Profes']] as [SubTab, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setActiveSubTab(key)}
+                className={`flex-1 sm:flex-none px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none bg-transparent ${
+                  activeSubTab === key ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

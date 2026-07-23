@@ -37,7 +37,7 @@ export const AuditLogView: React.FC = () => {
   }, [sortedLogs, buscarLog]);
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto" id="audit-logs-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto" id="audit-logs-tab-panel">
       
       {/* SECCIÓN CABECERA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

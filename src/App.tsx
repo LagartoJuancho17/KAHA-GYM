@@ -319,7 +319,7 @@ function InnerApp() {
       <>
         <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 font-sans antialiased" id="app-wrapper-socio">
           <RoleSwitcher />
-          <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
+          <div className="flex-1 p-3 sm:p-6 max-w-7xl mx-auto w-full">
             <ErrorBoundary section="el Panel del Socio">
               <SocioPanel />
             </ErrorBoundary>
@@ -481,12 +481,12 @@ function InnerApp() {
         <RoleSwitcher />
 
         {/* GEOMETRIC THEMED SUB-HEADER (Matching the clean header element) */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-row items-center justify-between gap-3 shadow-xs" id="sub-header-container">
-          <div>
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-row items-center justify-between gap-3 shadow-xs" id="sub-header-container">
+          <div className="min-w-0 flex-1">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
               Entorno Seguro
             </span>
-            <span className="font-display text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight" id="current-tab-label-header">
+            <span className="font-display text-base sm:text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight truncate" id="current-tab-label-header">
               {currentTab.desc}
             </span>
           </div>
@@ -586,7 +586,7 @@ function InnerApp() {
         </header>
 
         {/* Main View Area */}
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto">
           <ErrorBoundary key={activeTab} section={currentTab.label}>
             {renderActiveTabContent()}
           </ErrorBoundary>
@@ -690,7 +690,7 @@ interface ToastContainerProps {
 
 function ToastContainer({ toasts, onClose }: ToastContainerProps) {
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none" id="toasts-wrapper-overlay">
+    <div className="fixed bottom-4 right-3 sm:bottom-6 sm:right-6 z-[9999] flex flex-col gap-2 sm:gap-3 max-w-[calc(100vw-1.5rem)] sm:max-w-sm w-full pointer-events-none" id="toasts-wrapper-overlay">
       {toasts.map(toast => (
         <ToastItem key={toast.id} toast={toast} onClose={onClose} />
       ))}
