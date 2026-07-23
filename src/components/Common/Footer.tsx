@@ -1,15 +1,14 @@
 // src/components/Common/Footer.tsx
 import React from 'react';
 import { MapPin } from 'lucide-react';
+import logoKaha from '../../assets/logokaha.png';
 
 export const Footer: React.FC = () => {
   return (
     <footer className="mt-12 pt-6 pb-20 lg:pb-8 border-t border-slate-200 text-slate-500 font-sans text-xs" id="kaha-site-footer">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-3 text-slate-700 font-medium text-center sm:text-left">
-          <div className="w-8 h-8 rounded-xl bg-lime-300 flex items-center justify-center text-zinc-900 shrink-0 font-bold shadow-xs">
-            <MapPin className="w-4 h-4 text-zinc-900" />
-          </div>
+          <img src={logoKaha} alt="KAHA GYM Logo" className="w-8 h-8 rounded-xl object-contain shrink-0 shadow-xs" />
           <div>
             <span className="font-bold text-slate-900 block leading-tight">KAHA GYM — Sede Principal</span>
             <span className="text-[11px] text-slate-500 font-mono">Dirección: Ramón L. Falcón 5330, CABA</span>

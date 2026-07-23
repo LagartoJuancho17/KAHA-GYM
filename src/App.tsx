@@ -17,6 +17,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { SocioRegistrationForm } from './components/Auth/SocioRegistrationForm';
 import { AuthorizeClientModal } from './components/Clientes/AuthorizeClientModal';
 import { Footer } from './components/Common/Footer';
+import logoKaha from './assets/logokaha.png';
 
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
@@ -343,7 +344,7 @@ function InnerApp() {
       {/* MOBILE HEADER BAR */}
       <div className="lg:hidden bg-white text-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-200 z-50 sticky top-0 shadow-xs">
         <div className="flex items-center gap-2">
-          <img src="/logokaha.png" alt="KAHA GYM" className="w-8 h-8 rounded-xl object-contain shrink-0" />
+          <img src={logoKaha} alt="KAHA GYM" className="w-8 h-8 rounded-xl object-contain shrink-0" />
           <h1 className="font-display text-zinc-900 font-bold tracking-tight text-sm">
             KAHA GYM <span className="text-[10px] text-zinc-400 font-semibold block -mt-1 uppercase tracking-widest">
               {rolActivo === 'PROFESOR' ? 'Panel Profesores' : 'Administración'}
@@ -371,7 +372,7 @@ function InnerApp() {
           {/* Logo / Brand */}
           <div className="mb-2 hidden lg:block">
             <div className="flex items-center gap-3">
-              <img src="/logokaha.png" alt="KAHA GYM" className="w-9 h-9 rounded-xl object-contain shrink-0" />
+              <img src={logoKaha} alt="KAHA GYM" className="w-9 h-9 rounded-xl object-contain shrink-0" />
               <div>
                 <h1 className="font-display text-zinc-900 text-base font-bold tracking-tight leading-none" id="sidebar-logo-heading">
                   KAHA GYM
