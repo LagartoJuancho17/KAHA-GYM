@@ -249,13 +249,13 @@ function InnerApp() {
   }
 
   const ALL_TAB_ITEMS = [
-    { id: 'DASHBOARD' as TabID, label: 'Dashboard', icon: LayoutDashboard, desc: 'Panel de Control General', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'DASHBOARD' as TabID, label: 'Dashboard', icon: LayoutDashboard, desc: 'Panel de Control General', roles: ['ADMIN'] },
     { id: 'CLIENTES' as TabID, label: 'Socios', icon: Users, desc: 'Gestión Integral de Socios', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'PLANES' as TabID, label: 'Planes', icon: Dribbble, desc: 'Control de Membresías y Planes', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'TURNOS' as TabID, label: 'Cupos y Turnos', icon: CalendarRange, desc: 'Grilla de Horarios y Reservas', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
-    { id: 'PAGOS' as TabID, label: 'Pagos e Ingresos', icon: Landmark, desc: 'Libro Contable y Facturación', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'PAGOS' as TabID, label: 'Pagos e Ingresos', icon: Landmark, desc: 'Libro Contable y Facturación', roles: ['ADMIN'] },
     { id: 'NOVEDADES' as TabID, label: 'Novedades', icon: Megaphone, desc: 'Gestión de Comunicados y Novedades', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
-    { id: 'MOROSIDAD' as TabID, label: 'Control de Mora', icon: ShieldAlert, desc: 'Seguimiento de Deudas', roles: ['ADMIN', 'OPERADOR'] },
+    { id: 'MOROSIDAD' as TabID, label: 'Control de Mora', icon: ShieldAlert, desc: 'Seguimiento de Deudas', roles: ['ADMIN'] },
     { id: 'PROYECCIONES' as TabID, label: 'Previsiones', icon: LineChart, desc: 'Proyecciones Financieras', roles: ['ADMIN'] },
     { id: 'AUDITORIA' as TabID, label: 'Auditoría DB', icon: ShieldCheck, desc: 'Registro de Operaciones de Base', roles: ['ADMIN'] },
   ];
