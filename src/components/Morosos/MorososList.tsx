@@ -2,7 +2,7 @@
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Receipt } from 'lucide-react';
+import { Receipt, UserCheck } from 'lucide-react';
 
 interface MorososListProps {
   deudoresCount: number;
@@ -21,7 +21,7 @@ export const MorososList: React.FC<MorososListProps> = ({
   setFiltroMora,
   onFastClearClick
 }) => {
-  const { planes } = useGym();
+  const { planes, altaCliente } = useGym();
 
   return (
     <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs text-xs font-sans">
@@ -107,14 +107,25 @@ export const MorososList: React.FC<MorososListProps> = ({
                       ${c.deuda_acumulada.toLocaleString('es-AR')}
                     </td>
                     <td className="p-4 text-center">
-                      <button
-                        onClick={() => onFastClearClick(c)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-xs transition-colors border-none cursor-pointer"
-                        id={`btn-cobro-rapido-${c.id}`}
-                      >
-                        <Receipt className="w-3.5 h-3.5 text-white" />
-                        Registrar Cobro
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => altaCliente(c.id)}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-xs transition-colors border-none cursor-pointer"
+                          title="Dar de Alta (Reactivar Socio en el Sistema)"
+                          id={`btn-alta-moroso-${c.id}`}
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Dar de Alta</span>
+                        </button>
+                        <button
+                          onClick={() => onFastClearClick(c)}
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-xs transition-colors border-none cursor-pointer"
+                          id={`btn-cobro-rapido-${c.id}`}
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-white" />
+                          <span>Registrar Cobro</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

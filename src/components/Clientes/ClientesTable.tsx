@@ -90,15 +90,15 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                 if (c.autorizado === false) {
                   badgeClass = 'bg-amber-100 text-amber-900 border-amber-200 animate-pulse';
                   estadoLabel = 'Pendiente';
+                } else if (c.estado === 'MOROSO' || (!c.activo && c.deuda_acumulada > 0)) {
+                  badgeClass = 'bg-rose-100 text-rose-800 border-rose-200 font-bold';
+                  estadoLabel = 'Moroso (Baja)';
                 } else if (!c.activo || c.estado === 'INACTIVO') {
                   badgeClass = 'bg-zinc-100 text-zinc-600 border-zinc-200';
                   estadoLabel = 'Inactivo';
                 } else if (c.estado === 'CON_DEUDA') {
                   badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
                   estadoLabel = 'Con Deuda';
-                } else if (c.estado === 'MOROSO') {
-                  badgeClass = 'bg-red-50 text-red-600 border-red-100';
-                  estadoLabel = 'Moroso';
                 }
 
                 return (

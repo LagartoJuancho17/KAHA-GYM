@@ -176,9 +176,65 @@ function InnerApp() {
     return <GoogleSignIn />;
   }
 
-  // Check if Google-logged-in user is a SOCIO and is pending authorization
-  const socioAsociado = clientes.find(c => c.activo && c.email.toLowerCase().trim() === googleUser.email.toLowerCase().trim());
-  const esPendiente = googleUser.role === 'SOCIO' && socioAsociado && socioAsociado.autorizado === false;
+  // Check if Google-logged-in user is a SOCIO
+  const socioAsociado = clientes.find(c => c.email.toLowerCase().trim() === googleUser.email.toLowerCase().trim());
+  const esMorosoODadoDeBaja = googleUser.role === 'SOCIO' && socioAsociado && (!socioAsociado.activo || socioAsociado.estado === 'MOROSO');
+  const esPendiente = googleUser.role === 'SOCIO' && socioAsociado && socioAsociado.autorizado === false && socioAsociado.activo;
+
+  if (esMorosoODadoDeBaja) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-xs select-none relative" id="moroso-baja-wrapper">
+        <div className="bg-white border border-rose-200 shadow-2xl rounded-3xl p-8 max-w-md w-full text-center relative overflow-hidden animate-fade-in">
+          <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-rose-500 via-red-600 to-rose-700" />
+          
+          <div className="mb-6 flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mb-4 shadow-sm animate-pulse">
+              <ShieldAlert className="w-8 h-8 text-rose-600" />
+            </div>
+            <span className="px-3 py-1 bg-rose-100 text-rose-800 rounded-full font-bold text-[10px] uppercase tracking-wider mb-2">
+              Tag: Moroso · Dado de Baja
+            </span>
+            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Cuenta Inactiva por Morosidad</h2>
+            <p className="text-slate-500 text-xs mt-1 leading-relaxed">
+              Pasados los 10 días del principio de mes sin registrar el abono de tu membresía, tu cuenta fue dada de baja del sistema automáticamente.
+            </p>
+          </div>
+
+          <div className="bg-rose-50/60 border border-rose-100 rounded-2xl p-4 mb-6 text-left space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500 font-medium">Socio:</span>
+              <span className="font-bold text-slate-900">{socioAsociado?.nombre} {socioAsociado?.apellido}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500 font-medium">Deuda Pendiente:</span>
+              <span className="font-mono font-bold text-rose-600">${socioAsociado?.deuda_acumulada.toLocaleString('es-AR')}</span>
+            </div>
+            <div className="pt-2 border-t border-rose-200/60 text-[10.5px] text-rose-800 leading-snug">
+              ℹ️ Un <strong>Administrador</strong> debe darte de Alta nuevamente en el sistema una vez regularizada tu cuenta.
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <a
+              href={`https://wa.me/541178402722?text=${encodeURIComponent(`Hola KAHA GYM, soy el socio ${socioAsociado?.nombre} ${socioAsociado?.apellido}. Mi cuenta figura inactiva por morosidad y me gustaría regularizar mi saldo para darme de Alta nuevamente.`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              Contactar a Administración por WhatsApp
+            </a>
+
+            <button 
+              onClick={signOutGoogle}
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition-all cursor-pointer"
+            >
+              Cerrar Sesión Google
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (esPendiente) {
     return (
