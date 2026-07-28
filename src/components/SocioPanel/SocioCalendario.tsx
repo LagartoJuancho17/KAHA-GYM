@@ -373,6 +373,12 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                       const misReservasEnTurno = (socio.reservas_individuales || []).filter(r => r.turno_id === turno.id && isDateInSelectedWeek(r.fecha));
                       const holdsMyIndividual = misReservasEnTurno.length > 0;
 
+                      const datesInSelectedWeek = getAvailableDatesForTurn(turno.dia).filter(isDateInSelectedWeek);
+                      const slotDateStr = datesInSelectedWeek[0];
+                      const slotDateFormatted = slotDateStr
+                        ? new Date(slotDateStr + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+                        : null;
+
                       return (
                         <div 
                           key={turno.id}
@@ -396,7 +402,14 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                 <Calendar className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
                               </div>
                               <div>
-                                <p className="text-sm sm:text-base font-black text-slate-800 tracking-tight">{turno.hora.slice(0, 5)} hs</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-sm sm:text-base font-black text-slate-800 tracking-tight">{turno.hora.slice(0, 5)} hs</p>
+                                  {slotDateFormatted && (
+                                    <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100/80 border border-emerald-300 px-1.5 py-0.2 rounded font-mono capitalize">
+                                      {slotDateFormatted}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-[9px] sm:text-[10px] text-slate-500 mt-0.5 sm:mt-1 font-medium leading-tight">
                                   Fijos: {turno.asignados_ids.length}
                                 </p>
@@ -426,10 +439,20 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
 
                           {/* Expandable Booking dates view */}
                           {bookingTurnId === turno.id && (
-                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2 animate-fade-in">
-                              <p className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-wider">Fechas Disponibles:</p>
+                            <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-2 mt-2 animate-fade-in shadow-2xs">
+                              <div className="flex items-center justify-between border-b border-emerald-200/80 pb-1.5 mb-1">
+                                <span className="text-[10px] font-mono font-extrabold text-emerald-900 uppercase tracking-wider flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 text-emerald-600" />
+                                  Fecha a reservar:
+                                </span>
+                                {slotDateStr && (
+                                  <span className="text-[10px] font-extrabold text-emerald-950 bg-white border border-emerald-300 px-2 py-0.5 rounded-md font-sans capitalize shadow-3xs">
+                                    {new Date(slotDateStr + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                  </span>
+                                )}
+                              </div>
                               <div className="grid grid-cols-1 gap-2">
-                                {getAvailableDatesForTurn(turno.dia).filter(isDateInSelectedWeek).map(dateStr => {
+                                {datesInSelectedWeek.map(dateStr => {
                                   const occupiedCount = getOccupiedCountOnDate(turno.id, dateStr);
                                   const isFullOnDate = occupiedCount >= turno.cupo_maximo;
                                   const inWaitlist = (waitlistReservas || []).some(
@@ -454,15 +477,16 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                                      });
 
                                   const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
+                                    weekday: 'long',
                                     day: 'numeric',
-                                    month: 'short'
+                                    month: 'long'
                                   });
 
                                   return (
-                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 text-xs">
+                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-emerald-200/80 text-xs shadow-3xs">
                                       <div>
-                                        <span className="font-bold text-slate-700">{dateFormatted}</span>
-                                        <span className="text-[9px] text-slate-500 font-mono ml-2">({occupiedCount} ocupados)</span>
+                                        <span className="font-bold text-slate-800 capitalize">{dateFormatted}</span>
+                                        <span className="text-[9px] text-slate-500 font-mono ml-2">({occupiedCount}/{turno.cupo_maximo} ocupados)</span>
                                       </div>
 
                                       {miReservaIndividualEnFecha ? (

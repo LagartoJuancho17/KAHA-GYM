@@ -210,7 +210,12 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
               <Clock className="w-4 h-4 text-emerald-400" />
               Control Tiempo Real: {selectedSlot.id.split('-')[0]} — {selectedSlot.id.split('-')[1]} hs
             </h3>
-            <p className="text-[10px] text-zinc-400 mt-0.5">Fecha de la clase: {selectedSlot.date}</p>
+            <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1">
+              <span>Fecha de la clase:</span>
+              <strong className="text-emerald-400 font-mono capitalize">
+                {new Date(selectedSlot.date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} ({selectedSlot.date})
+              </strong>
+            </p>
           </div>
           <button
             onClick={onClose}
