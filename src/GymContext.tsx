@@ -1004,9 +1004,15 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedClientes = clientes.map(c => {
       if (c.id === clienteId) {
+        const canceledKeys = new Set(clases.map(cl => `${cl.turno_id}_${cl.fecha}`));
+        const filteredReservas = (c.reservas_individuales || []).filter(
+          r => !canceledKeys.has(`${r.turno_id}_${r.fecha}`)
+        );
+
         return {
           ...c,
           exencion_cobro: opciones?.esBajaTemporal ? (opciones.exencionCobro || 'SUSPENDIDO') : c.exencion_cobro,
+          reservas_individuales: filteredReservas,
           clases_suspendidas: [...(c.clases_suspendidas || []), ...nuevasSuspensiones]
         };
       }

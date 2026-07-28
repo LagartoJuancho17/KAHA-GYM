@@ -37,15 +37,17 @@ export const BajaClasesModal: React.FC<BajaClasesModalProps> = ({
     return opts;
   }, []);
 
-  // Calculate all class dates for the selected client's turnos_fijos in selectedMonth
+  // Calculate all class dates (fijos & variables) for the selected client in selectedMonth
   const clasesDelMes = useMemo(() => {
-    if (!cliente || cliente.turnos_fijos.length === 0) return [];
+    if (!cliente) return [];
 
     const daysMap = { 'DOMINGO': 0, 'LUNES': 1, 'MARTES': 2, 'MIERCOLES': 3, 'JUEVES': 4, 'VIERNES': 5, 'SABADO': 6 };
     const [year, month] = selectedMonth.split('-').map(Number);
-    const dates: { turno_id: string; diaNombre: string; hora: string; fecha: string; yaSuspendida: boolean }[] = [];
+    const dates: { turno_id: string; diaNombre: string; hora: string; fecha: string; yaSuspendida: boolean; tipo: 'FIJO' | 'VARIABLE' }[] = [];
+    const addedKeys = new Set<string>();
 
-    cliente.turnos_fijos.forEach(tfId => {
+    // 1. Turnos Fijos
+    (cliente.turnos_fijos || []).forEach(tfId => {
       const t = turnos.find(turno => turno.id === tfId);
       if (!t) return;
 
@@ -58,23 +60,47 @@ export const BajaClasesModal: React.FC<BajaClasesModalProps> = ({
           const mm = String(date.getMonth() + 1).padStart(2, '0');
           const dd = String(date.getDate()).padStart(2, '0');
           const fechaStr = `${yyyy}-${mm}-${dd}`;
+          const key = `${tfId}_${fechaStr}`;
 
           const yaSuspendida = (cliente.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === fechaStr);
 
+          addedKeys.add(key);
           dates.push({
             turno_id: tfId,
             diaNombre: t.dia,
             hora: t.hora,
             fecha: fechaStr,
-            yaSuspendida
+            yaSuspendida,
+            tipo: 'FIJO'
           });
         }
         date.setDate(date.getDate() + 1);
       }
     });
 
-    // Sort by date chronologically
-    return dates.sort((a, b) => a.fecha.localeCompare(b.fecha));
+    // 2. Turnos Variables / Reservas Individuales
+    (cliente.reservas_individuales || []).forEach(r => {
+      if (r.fecha.startsWith(selectedMonth)) {
+        const key = `${r.turno_id}_${r.fecha}`;
+        if (!addedKeys.has(key)) {
+          const t = turnos.find(turno => turno.id === r.turno_id);
+          const yaSuspendida = (cliente.clases_suspendidas || []).some(s => s.turno_id === r.turno_id && s.fecha === r.fecha);
+          
+          addedKeys.add(key);
+          dates.push({
+            turno_id: r.turno_id,
+            diaNombre: t ? t.dia : 'RESERVA',
+            hora: t ? t.hora : '00:00',
+            fecha: r.fecha,
+            yaSuspendida,
+            tipo: 'VARIABLE'
+          });
+        }
+      }
+    });
+
+    // Sort by date and time chronologically
+    return dates.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora));
   }, [cliente, selectedMonth, turnos]);
 
   // Auto-select non-suspended classes when month or client changes
@@ -257,7 +283,12 @@ export const BajaClasesModal: React.FC<BajaClasesModalProps> = ({
                           className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer"
                         />
                         <div>
-                          <span className="font-bold text-slate-900 capitalize block text-xs">{dateFormatted}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-900 capitalize block text-xs">{dateFormatted}</span>
+                            <span className={`text-[8px] font-extrabold font-mono px-1 py-0.2 rounded border ${c.tipo === 'FIJO' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                              {c.tipo}
+                            </span>
+                          </div>
                           <span className="text-[10px] text-slate-500 font-mono">{c.hora} hs</span>
                         </div>
                       </div>
