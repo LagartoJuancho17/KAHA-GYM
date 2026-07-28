@@ -1967,108 +1967,79 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const localRecs = [...recuperos];
-    const localClientes = [...clientes];
-
-    const DAYS_NAMES = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-
-    // Loop through dates
-    const current = new Date(start);
-    let inasistenciasRegistradas = 0;
-
     const nuevasSuspensiones: { turno_id: string; fecha: string; reintegrado: boolean; creado_at: string }[] = [];
     const removedReservaIds = new Set<string>();
+    let inasistenciasRegistradas = 0;
 
-    while (current <= end) {
-      const yyyy = current.getFullYear();
-      const mm = String(current.getMonth() + 1).padStart(2, '0');
-      const dd = String(current.getDate()).padStart(2, '0');
-      const dateStr = `${yyyy}-${mm}-${dd}`;
-      const dayName = DAYS_NAMES[current.getDay()];
+    // Helper: generate recovery ticket
+    const addRecupero = (turnoId: string, dateStr: string, idx: number) => {
+      const expDate = new Date(dateStr + 'T00:00:00');
+      expDate.setDate(expDate.getDate() + 30);
+      const expDateStr = expDate.toISOString().slice(0, 10);
+      localRecs.push({
+        id: `rec-${Date.now()}-${idx}`,
+        cliente_id: clienteId,
+        cliente_nombre: `${cliente.nombre} ${cliente.apellido}`,
+        turno_original_id: turnoId,
+        fecha_inasistencia: dateStr,
+        turno_recupero_id: 'PENDIENTE_DEFINICION',
+        fecha_recupero: '',
+        estado: 'PENDIENTE',
+        fecha_limite: expDateStr
+      });
+    };
 
-      // 1. Check fixed turns for this day of week
-      (cliente.turnos_fijos || []).forEach(tfId => {
-        const turn = turnos.find(t => t.id === tfId);
-        if (turn && turn.dia === dayName) {
-          const alreadySuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr) ||
-                                    nuevasSuspensiones.some(s => s.turno_id === tfId && s.fecha === dateStr);
+    // Day-of-week index map
+    const daysMap: Record<string, number> = {
+      DOMINGO: 0, LUNES: 1, MARTES: 2, MIERCOLES: 3, JUEVES: 4, VIERNES: 5, SABADO: 6
+    };
+
+    // --- 1. TURNOS FIJOS ---
+    // For each fixed shift, iterate all dates in range that match its weekday
+    (cliente.turnos_fijos || []).forEach(tfId => {
+      const turno = turnos.find(t => t.id === tfId);
+      if (!turno) return;
+      const targetDow = daysMap[turno.dia];
+      if (targetDow === undefined) return;
+
+      const cur = new Date(start);
+      while (cur <= end) {
+        if (cur.getDay() === targetDow) {
+          const dateStr = cur.toISOString().slice(0, 10);
+          const alreadySuspended =
+            (cliente.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr) ||
+            nuevasSuspensiones.some(s => s.turno_id === tfId && s.fecha === dateStr);
 
           if (!alreadySuspended) {
-            nuevasSuspensiones.push({
-              turno_id: tfId,
-              fecha: dateStr,
-              reintegrado: true,
-              creado_at: new Date().toISOString()
-            });
-
-            const expDate = new Date(current);
-            expDate.setDate(expDate.getDate() + 30);
-            const expY = expDate.getFullYear();
-            const expM = String(expDate.getMonth() + 1).padStart(2, '0');
-            const expD = String(expDate.getDate()).padStart(2, '0');
-            const expDateStr = `${expY}-${expM}-${expD}`;
-
-            localRecs.push({
-              id: `rec-${Date.now()}-${inasistenciasRegistradas}`,
-              cliente_id: clienteId,
-              cliente_nombre: `${cliente.nombre} ${cliente.apellido}`,
-              turno_original_id: tfId,
-              fecha_inasistencia: dateStr,
-              turno_recupero_id: 'PENDIENTE_DEFINICION',
-              fecha_recupero: '',
-              estado: 'PENDIENTE',
-              fecha_limite: expDateStr
-            });
-
+            nuevasSuspensiones.push({ turno_id: tfId, fecha: dateStr, reintegrado: true, creado_at: new Date().toISOString() });
+            addRecupero(tfId, dateStr, inasistenciasRegistradas);
             inasistenciasRegistradas++;
           }
         }
-      });
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
 
-      // 2. Check variable/individual reservations on this exact date
-      (cliente.reservas_individuales || []).forEach(res => {
-        if (res.fecha === dateStr && !removedReservaIds.has(res.id)) {
-          removedReservaIds.add(res.id);
+    // --- 2. TURNOS VARIABLES (reservas individuales) ---
+    (cliente.reservas_individuales || []).forEach(res => {
+      const resDate = new Date(res.fecha + 'T00:00:00');
+      if (resDate >= start && resDate <= end && !removedReservaIds.has(res.id)) {
+        removedReservaIds.add(res.id);
 
-          const alreadySuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === res.turno_id && s.fecha === dateStr) ||
-                                    nuevasSuspensiones.some(s => s.turno_id === res.turno_id && s.fecha === dateStr);
+        const alreadySuspended =
+          (cliente.clases_suspendidas || []).some(s => s.turno_id === res.turno_id && s.fecha === res.fecha) ||
+          nuevasSuspensiones.some(s => s.turno_id === res.turno_id && s.fecha === res.fecha);
 
-          if (!alreadySuspended) {
-            nuevasSuspensiones.push({
-              turno_id: res.turno_id,
-              fecha: dateStr,
-              reintegrado: true,
-              creado_at: new Date().toISOString()
-            });
-
-            const expDate = new Date(current);
-            expDate.setDate(expDate.getDate() + 30);
-            const expY = expDate.getFullYear();
-            const expM = String(expDate.getMonth() + 1).padStart(2, '0');
-            const expD = String(expDate.getDate()).padStart(2, '0');
-            const expDateStr = `${expY}-${expM}-${expD}`;
-
-            localRecs.push({
-              id: `rec-${Date.now()}-${inasistenciasRegistradas}`,
-              cliente_id: clienteId,
-              cliente_nombre: `${cliente.nombre} ${cliente.apellido}`,
-              turno_original_id: res.turno_id,
-              fecha_inasistencia: dateStr,
-              turno_recupero_id: 'PENDIENTE_DEFINICION',
-              fecha_recupero: '',
-              estado: 'PENDIENTE',
-              fecha_limite: expDateStr
-            });
-
-            inasistenciasRegistradas++;
-          }
+        if (!alreadySuspended) {
+          nuevasSuspensiones.push({ turno_id: res.turno_id, fecha: res.fecha, reintegrado: true, creado_at: new Date().toISOString() });
+          addRecupero(res.turno_id, res.fecha, inasistenciasRegistradas);
+          inasistenciasRegistradas++;
         }
-      });
-
-      current.setDate(current.getDate() + 1);
-    }
+      }
+    });
 
     if (inasistenciasRegistradas > 0) {
-      const updatedClientes = localClientes.map(c => {
+      const updatedClientes = clientes.map(c => {
         if (c.id === clienteId) {
           const filteredReservas = (c.reservas_individuales || []).filter(r => !removedReservaIds.has(r.id));
           return {
@@ -2081,17 +2052,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       saveState(updatedClientes, planes, historialPrecios, turnos, pagos, localRecs, auditLogs, novedades);
-      addAuditLog('CLIENTE_REGISTRO_VACACIONES', { 
-        cliente: `${cliente.nombre} ${cliente.apellido}`, 
-        desde: fechaInicio, 
-        hasta: fechaFin, 
-        dias_afectados: inasistenciasRegistradas 
+      addAuditLog('CLIENTE_REGISTRO_VACACIONES', {
+        cliente: `${cliente.nombre} ${cliente.apellido}`,
+        desde: fechaInicio,
+        hasta: fechaFin,
+        dias_afectados: inasistenciasRegistradas
       });
 
-      return { success: true, message: `Vacaciones / Viaje registrado. Se dieron de baja ${inasistenciasRegistradas} clases (fijas y variables) y se habilitaron sus respectivos cupones de recupero.` };
+      return { success: true, message: `Vacaciones / Viaje registrado. Se dieron de baja ${inasistenciasRegistradas} clase${inasistenciasRegistradas !== 1 ? 's' : ''} (fijas y/o variables) y se generaron sus cupones de recupero.` };
     }
 
-    return { success: false, message: 'No se encontraron clases fijas ni reservas de cupos asignadas para este socio en el rango de fechas seleccionado.' };
+    return { success: false, message: 'No se encontraron clases fijas ni reservas de cupos para este socio en el rango de fechas seleccionado.' };
   };
 
   // TRANSFERENCIAS EN REVISIÓN
