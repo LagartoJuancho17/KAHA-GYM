@@ -63,7 +63,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   };
 
   const handleCopyAlias = () => {
-    navigator.clipboard.writeText('kahafitweb');
+    navigator.clipboard.writeText('kaha.fitness.center');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
