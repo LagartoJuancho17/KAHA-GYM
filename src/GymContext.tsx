@@ -2038,8 +2038,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // Track which (turnoId, fecha) combos from variable reservations need waitlist processing
+    const cancelledVariableSlots: { turnoId: string; fecha: string }[] = [];
+
     if (inasistenciasRegistradas > 0) {
-      const updatedClientes = clientes.map(c => {
+      let updatedClientes = clientes.map(c => {
         if (c.id === clienteId) {
           const filteredReservas = (c.reservas_individuales || []).filter(r => !removedReservaIds.has(r.id));
           return {
@@ -2051,7 +2054,33 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return c;
       });
 
+      // Collect cancelled variable slots for waitlist processing
+      (cliente.reservas_individuales || []).forEach(res => {
+        if (removedReservaIds.has(res.id)) {
+          cancelledVariableSlots.push({ turnoId: res.turno_id, fecha: res.fecha });
+        }
+      });
+
+      // Process waitlist promotions for each freed variable slot
+      for (const slot of cancelledVariableSlots) {
+        updatedClientes = procesarPromocionListaEspera(slot.turnoId, slot.fecha, updatedClientes);
+      }
+
       saveState(updatedClientes, planes, historialPrecios, turnos, pagos, localRecs, auditLogs, novedades);
+
+      // Sync updated client to Supabase
+      if (supabase) {
+        const targetClient = updatedClientes.find(c => c.id === clienteId);
+        if (targetClient) {
+          supabase.from('clientes').update({
+            reservas_individuales: targetClient.reservas_individuales || [],
+            clases_suspendidas: targetClient.clases_suspendidas || []
+          }).eq('id', clienteId).then(({ error }) => {
+            if (error) console.error('Error al sincronizar vacaciones en Supabase:', error);
+          });
+        }
+      }
+
       addAuditLog('CLIENTE_REGISTRO_VACACIONES', {
         cliente: `${cliente.nombre} ${cliente.apellido}`,
         desde: fechaInicio,
