@@ -918,17 +918,25 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveState(updated);
 
     if (supabase) {
-      const payload: any = { ...updates };
-      delete payload.id;
-      delete payload.turnos_fijos;
-      delete payload.reservas_individuales;
-      delete payload.clases_suspendidas;
+      const allowedColumns = [
+        'nombre', 'apellido', 'email', 'telefono', 'tipo', 'estado',
+        'plan_id', 'activo', 'deuda_acumulada', 'ultimo_mes_pagado',
+        'exencion_cobro', 'autorizado'
+      ];
+      const payload: any = {};
+      Object.keys(updates).forEach(key => {
+        if (allowedColumns.includes(key)) {
+          payload[key] = (updates as any)[key];
+        }
+      });
       if (payload.plan_id) {
         payload.plan_id = payload.plan_id === 'p-none' ? '00000000-0000-0000-0000-000000000000' : payload.plan_id;
       }
-      supabase.from('clientes').update(payload).eq('id', id).then(({ error }) => {
-        if (error) console.error("Error al actualizar cliente en Supabase:", error);
-      });
+      if (Object.keys(payload).length > 0) {
+        supabase.from('clientes').update(payload).eq('id', id).then(({ error }) => {
+          if (error) console.error("Error al actualizar cliente en Supabase:", error);
+        });
+      }
     }
 
     addAuditLog('CLIENTE_MODIFICADO', { id, cambiados: Object.keys(updates), nota: extraLog });

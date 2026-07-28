@@ -43,6 +43,20 @@ export const SocioPanel: React.FC = () => {
     return planes.find(p => p.id === socio.plan_id) || null;
   }, [planes, socio]);
 
+  const hasDebt = useMemo(() => {
+    if (!socio) return false;
+    return socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
+  }, [socio]);
+
+  const canPayAdvance = useMemo(() => {
+    if (!socio || hasDebt) return false;
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return (lastDay - now.getDate()) < 5;
+  }, [socio, hasDebt]);
+
+  const canPay = hasDebt || canPayAdvance;
+
   if (loading) {
     return (
       <div className="min-h-[400px] flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-3xl" id="socio-panel-loading">
@@ -217,7 +231,7 @@ export const SocioPanel: React.FC = () => {
                 </div>
               </div>
 
-              {(socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO') && (
+              {canPay && (
                 <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-col gap-2">
                   <button
                     onClick={() => setShowPaymentChoiceModal(true)}
@@ -229,7 +243,13 @@ export const SocioPanel: React.FC = () => {
                     ) : (
                       <CreditCard className="w-4 h-4" />
                     )}
-                    <span>{isPaying ? 'Procesando Pago...' : 'Pagar Deuda Pendiente (Mercado Pago / Transferencia)'}</span>
+                    <span>
+                      {isPaying 
+                        ? 'Procesando Pago...' 
+                        : hasDebt 
+                        ? 'Pagar Deuda Pendiente (Mercado Pago / Transferencia)' 
+                        : 'Pagar por Adelantado - Próximo Mes (Mercado Pago / Transferencia)'}
+                    </span>
                   </button>
                   {paymentError && (
                     <p className="text-[10px] text-rose-600 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">

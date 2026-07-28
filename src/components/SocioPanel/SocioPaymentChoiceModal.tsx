@@ -24,9 +24,18 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   const [copied, setCopied] = useState(false);
   const [simulatedSuccessData, setSimulatedSuccessData] = useState<{ clientName: string; amount: number; method: string } | null>(null);
 
-  const montoBase = socio.deuda_acumulada;
+  const now = new Date();
+  const hasDebt = socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
+  const planSocio = planes.find(p => p.id === socio.plan_id);
+
+  const montoBase = hasDebt ? socio.deuda_acumulada : (planSocio ? planSocio.precio : 0);
   const amountMP = Math.round(montoBase * 1.10); // 10% surcharge
   const feeMP = Math.round(montoBase * 0.10);
+
+  const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const targetMonthStr = hasDebt 
+    ? (socio.ultimo_mes_pagado || now.toISOString().slice(0, 7))
+    : `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
   const handlePagarMercadoPago = async () => {
     setIsPaying(true);
@@ -63,7 +72,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   };
 
   const handleCopyAlias = () => {
-    navigator.clipboard.writeText('kaha.fitness.center');
+    navigator.clipboard.writeText('kahafitweb');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -86,7 +95,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
       cliente_nombre_completo: `${socio.nombre} ${socio.apellido}`,
       monto: amountMP,
       medio_pago: 'MERCADO_PAGO',
-      mes_correspondiente: new Date().toISOString().slice(0, 7),
+      mes_correspondiente: targetMonthStr,
       hash_transaccion: simulatedHash,
       registrado_por: socio.email
     }, socio.email);
