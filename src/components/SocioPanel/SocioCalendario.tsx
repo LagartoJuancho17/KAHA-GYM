@@ -178,42 +178,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
         </div>
       </div>
 
-      {/* MULTI-DAY SELECTION BANNER & SUMMARY */}
-      <div className="mb-6 p-4 bg-sky-50/80 border border-sky-200 rounded-2xl space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-sky-600 text-white font-black text-[10px] flex items-center justify-center font-mono">
-              {socio.turnos_fijos.length}
-            </span>
-            <h4 className="font-bold text-sky-950 text-xs uppercase tracking-wider font-mono">
-              Selección Multi-Día de tu Plan ({socio.turnos_fijos.length} de {planSocio?.dias_por_semana || 5} días elegidos por semana)
-            </h4>
-          </div>
-          <span className="text-[10px] font-mono font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded-lg border border-sky-200">
-            {planSocio?.nombre || 'Plan Estándar'}
-          </span>
-        </div>
 
-        <p className="text-[11px] text-sky-900 font-sans leading-relaxed">
-          Cada día que seleccionas de la grilla reserva automáticamente tu lugar fijo para todas las semanas del mes.
-        </p>
-
-        {socio.turnos_fijos.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1 border-t border-sky-200/60">
-            <span className="text-[10px] text-sky-700 font-bold self-center font-mono">Días Semanales Confirmados:</span>
-            {socio.turnos_fijos.map((tfId, idx) => {
-              const turn = turnos.find(t => t.id === tfId);
-              if (!turn) return null;
-              return (
-                <span key={tfId} className="text-[10px] font-mono font-bold text-sky-900 bg-white border border-sky-300 px-2.5 py-1 rounded-xl shadow-2xs flex items-center gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-[9px] flex items-center justify-center font-black">{idx + 1}</span>
-                  {turn.dia} {turn.hora.slice(0, 5)} hs
-                </span>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* SUMMARY BOX */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8 p-5 bg-slate-50 border border-slate-200 rounded-2xl text-xs">
