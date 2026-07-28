@@ -47,11 +47,11 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   const rtData = getCellRealtimeData(selectedSlot.id, selectedSlot.date);
   const isFull = rtData.total >= rtData.cupo;
   
-  // Candidates: active, don't have this as fijo, don't have booking on this date
+  // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date
   const candidateClients = clientes.filter(c => {
     return c.activo && 
       !c.turnos_fijos.includes(selectedSlot.id) && 
-      !(c.reservas_individuales || []).some(r => r.fecha === selectedSlot.date);
+      !(c.reservas_individuales || []).some(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date);
   });
 
   const handleAddRealtimeVariable = (e: React.FormEvent) => {

@@ -1568,24 +1568,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: `El turno ya está completo para esa fecha (${totalOccupied}/${turno.cupo_maximo}).` };
     }
 
-    // Check duplicate: cannot have two bookings on the same date
-    const hasBookingOnDate = (cliente.reservas_individuales || []).some(r => r.fecha === fecha) || 
-                             (cliente.turnos_fijos.some(tfId => {
-                               const tfTurn = turnos.find(t => t.id === tfId);
-                               if (!tfTurn) return false;
-                               const dateObj = new Date(fecha + 'T00:00:00');
-                               const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-                               const dateDayName = days[dateObj.getDay()];
-                               if (tfTurn.dia === dateDayName) {
-                                 // Check if they suspended it for this date
-                                 const isSuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === fecha);
-                                 return !isSuspended;
-                               }
-                               return false;
-                             }));
+    // Check duplicate: cannot book the EXACT SAME shift twice on the same date
+    const alreadyBookedThisShiftOnDate = (cliente.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === fecha) || 
+                                         (cliente.turnos_fijos.some(tfId => {
+                                           if (tfId !== turnoId) return false;
+                                           const isSuspended = (cliente.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === fecha);
+                                           return !isSuspended;
+                                         }));
 
-    if (hasBookingOnDate) {
-      return { success: false, message: `Ya tienes una sesión programada para el día ${fecha}.` };
+    if (alreadyBookedThisShiftOnDate) {
+      return { success: false, message: `Ya tienes este turno reservado para el día ${fecha}.` };
     }
 
     const nuevaReserva: ReservaIndividual = {

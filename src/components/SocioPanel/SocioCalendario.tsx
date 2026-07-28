@@ -520,20 +520,20 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
 
                   const miReservaIndividualEnFecha = (socio.reservas_individuales || []).find(r => r.turno_id === selectedBookingTurno.id && r.fecha === dateStr);
 
-                  const hasBooking = !!miReservaIndividualEnFecha ||
-                                     (socio.reservas_individuales || []).some(r => r.fecha === dateStr) ||
-                                     socio.turnos_fijos.some(tfId => {
-                                       const tfTurn = turnos.find(t => t.id === tfId);
-                                       if (!tfTurn) return false;
-                                       const dateObj = new Date(dateStr + 'T00:00:00');
-                                       const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-                                       const dateDayName = days[dateObj.getDay()];
-                                       if (tfTurn.dia === dateDayName) {
-                                         const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr);
-                                         return !isSuspended;
-                                       }
-                                       return false;
-                                     });
+                  const hasOtherBookingOnDate = (socio.reservas_individuales || []).some(r => r.fecha === dateStr && r.turno_id !== selectedBookingTurno.id) ||
+                                                socio.turnos_fijos.some(tfId => {
+                                                  if (tfId === selectedBookingTurno.id) return false;
+                                                  const tfTurn = turnos.find(t => t.id === tfId);
+                                                  if (!tfTurn) return false;
+                                                  const dateObj = new Date(dateStr + 'T00:00:00');
+                                                  const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+                                                  const dateDayName = days[dateObj.getDay()];
+                                                  if (tfTurn.dia === dateDayName) {
+                                                    const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr);
+                                                    return !isSuspended;
+                                                  }
+                                                  return false;
+                                                });
 
                   const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
                     weekday: 'long',
@@ -581,67 +581,74 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                             <X className="w-3.5 h-3.5" /> Cancelar Reserva
                           </button>
                         </div>
-                      ) : hasBooking ? (
-                        <div className="pt-2 border-t border-slate-100">
-                          <span className="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl block text-center">
-                            Ya posees una clase programada este día
-                          </span>
-                        </div>
-                      ) : isFullOnDate ? (
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                          <span className="text-[10px] text-slate-500 italic">Sin cupos disponibles.</span>
-                          {inWaitlist ? (
-                            <button
-                              onClick={() => {
-                                const res = removerListaEsperaReserva(socio.id, selectedBookingTurno.id, dateStr);
-                                if (res.success) {
-                                  setSuccessMessage(res.message);
-                                  setTimeout(() => setSuccessMessage(null), 3500);
-                                } else {
-                                  setErrorMessage(res.message);
-                                  setTimeout(() => setErrorMessage(null), 3500);
-                                }
-                              }}
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer border border-slate-300"
-                            >
-                              Salir de Lista de Espera
-                            </button>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {hasOtherBookingOnDate && (
+                            <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                                ⚡ Ya tienes clase este dia
+                              </span>
+                              <span className="text-[9px] text-amber-700 font-semibold font-mono">Doble Turno</span>
+                            </div>
+                          )}
+
+                          {isFullOnDate ? (
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <span className="text-[10px] text-slate-500 italic">Sin cupos disponibles.</span>
+                              {inWaitlist ? (
+                                <button
+                                  onClick={() => {
+                                    const res = removerListaEsperaReserva(socio.id, selectedBookingTurno.id, dateStr);
+                                    if (res.success) {
+                                      setSuccessMessage(res.message);
+                                      setTimeout(() => setSuccessMessage(null), 3500);
+                                    } else {
+                                      setErrorMessage(res.message);
+                                      setTimeout(() => setErrorMessage(null), 3500);
+                                    }
+                                  }}
+                                  className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer border border-slate-300"
+                                >
+                                  Salir de Lista de Espera
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    const res = agregarListaEsperaReserva(socio.id, selectedBookingTurno.id, dateStr);
+                                    if (res.success) {
+                                      setSuccessMessage(res.message);
+                                      setTimeout(() => setSuccessMessage(null), 3500);
+                                    } else {
+                                      setErrorMessage(res.message);
+                                      setTimeout(() => setErrorMessage(null), 3500);
+                                    }
+                                  }}
+                                  className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer border border-amber-600 shadow-xs"
+                                >
+                                  Anotarse en Espera
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             <button
                               onClick={() => {
-                                const res = agregarListaEsperaReserva(socio.id, selectedBookingTurno.id, dateStr);
+                                const res = crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
                                 if (res.success) {
                                   setSuccessMessage(res.message);
+                                  setBookingTurnId(null);
                                   setTimeout(() => setSuccessMessage(null), 3500);
                                 } else {
                                   setErrorMessage(res.message);
-                                  setTimeout(() => setErrorMessage(null), 3500);
+                                  setTimeout(() => setErrorMessage(null), 3550);
                                 }
                               }}
-                              className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer border border-amber-600 shadow-xs"
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-4 rounded-xl text-xs transition-all cursor-pointer shadow-md border border-emerald-700 flex items-center justify-center gap-2 active:scale-98"
                             >
-                              Anotarse en Espera
+                              <Check className="w-4 h-4" />
+                              <span>{hasOtherBookingOnDate ? 'Confirmar Doble Turno' : 'Confirmar Reserva de Cupo'}</span>
                             </button>
                           )}
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            const res = crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
-                            if (res.success) {
-                              setSuccessMessage(res.message);
-                              setBookingTurnId(null);
-                              setTimeout(() => setSuccessMessage(null), 3500);
-                            } else {
-                              setErrorMessage(res.message);
-                              setTimeout(() => setErrorMessage(null), 3550);
-                            }
-                          }}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-4 rounded-xl text-xs transition-all cursor-pointer shadow-md border border-emerald-700 flex items-center justify-center gap-2 active:scale-98"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>Confirmar Reserva de Cupo</span>
-                        </button>
                       )}
                     </div>
                   );
