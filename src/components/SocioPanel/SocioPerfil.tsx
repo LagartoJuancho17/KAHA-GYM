@@ -260,27 +260,25 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                 </div>
               </div>
 
-              {socio.deuda_acumulada > 0 && (
-                <div className="pt-2 flex flex-col gap-2">
-                  <button
-                    onClick={() => setShowPaymentChoiceModal(true)}
-                    disabled={isPaying}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs border-none disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isPaying ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CreditCard className="w-4 h-4" />
-                    )}
-                    <span>{isPaying ? 'Procesando Pago...' : 'Pagar Cuota (Mercado Pago / Transferencia)'}</span>
-                  </button>
-                  {paymentError && (
-                    <p className="text-[10px] text-rose-700 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">
-                      {paymentError}
-                    </p>
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  onClick={() => setShowPaymentChoiceModal(true)}
+                  disabled={isPaying}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer shadow-xs border-none disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isPaying ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CreditCard className="w-4 h-4" />
                   )}
-                </div>
-              )}
+                  <span>{isPaying ? 'Procesando Pago...' : socio.deuda_acumulada > 0 ? 'Pagar Deuda Pendiente (Mercado Pago / Transferencia)' : 'Pagar Cuota Mensual (Mercado Pago / Transferencia)'}</span>
+                </button>
+                {paymentError && (
+                  <p className="text-[10px] text-rose-700 font-semibold mt-1 text-center bg-rose-50 border border-rose-100 p-1.5 rounded-lg">
+                    {paymentError}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -19,13 +19,15 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   isPaying,
   setIsPaying
 }) => {
-  const { solicitarPagoTransferencia, registrarPago } = useGym();
+  const { planes, solicitarPagoTransferencia, registrarPago } = useGym();
   const [activeTab, setActiveTab] = useState<'MERCADO_PAGO' | 'TRANSFERENCIA'>('TRANSFERENCIA');
   const [copied, setCopied] = useState(false);
   const [simulatedSuccessData, setSimulatedSuccessData] = useState<{ clientName: string; amount: number; method: string } | null>(null);
 
-  const amountMP = socio.deuda_acumulada * 1.10; // 10% surcharge
-  const feeMP = socio.deuda_acumulada * 0.10;
+  const planSocio = planes.find(p => p.id === socio.plan_id);
+  const montoBase = socio.deuda_acumulada > 0 ? socio.deuda_acumulada : (planSocio ? planSocio.precio : 0);
+  const amountMP = Math.round(montoBase * 1.10); // 10% surcharge
+  const feeMP = Math.round(montoBase * 0.10);
 
   const handlePagarMercadoPago = async () => {
     setIsPaying(true);
@@ -72,7 +74,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
     if (res.success) {
       setSimulatedSuccessData({
         clientName: `${socio.nombre} ${socio.apellido}`,
-        amount: socio.deuda_acumulada,
+        amount: montoBase,
         method: 'REVISION'
       });
     }
@@ -152,7 +154,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
                   <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4.5 space-y-2.5">
                     <div className="flex justify-between items-center text-xs text-slate-500">
                       <span>Monto base:</span>
-                      <span className="font-semibold text-slate-700 font-mono">${socio.deuda_acumulada.toLocaleString('es-AR')} ARS</span>
+                      <span className="font-semibold text-slate-700 font-mono">${montoBase.toLocaleString('es-AR')} ARS</span>
                     </div>
                     <div className="flex justify-between items-center text-xs text-amber-600">
                       <span>Recargo Mercado Pago (10%):</span>
@@ -190,7 +192,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
                   <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4.5 space-y-2.5">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold text-slate-800">Monto Neto a transferir:</span>
-                      <span className="text-xl font-black text-emerald-700 font-mono">${socio.deuda_acumulada.toLocaleString('es-AR')} ARS</span>
+                      <span className="text-xl font-black text-emerald-700 font-mono">${montoBase.toLocaleString('es-AR')} ARS</span>
                     </div>
                     <div className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md inline-block">
                       ✓ Sin cargos extra (0% Recargo)
