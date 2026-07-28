@@ -24,8 +24,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   const [copied, setCopied] = useState(false);
   const [simulatedSuccessData, setSimulatedSuccessData] = useState<{ clientName: string; amount: number; method: string } | null>(null);
 
-  const planSocio = planes.find(p => p.id === socio.plan_id);
-  const montoBase = socio.deuda_acumulada > 0 ? socio.deuda_acumulada : (planSocio ? planSocio.precio : 0);
+  const montoBase = socio.deuda_acumulada;
   const amountMP = Math.round(montoBase * 1.10); // 10% surcharge
   const feeMP = Math.round(montoBase * 0.10);
 
