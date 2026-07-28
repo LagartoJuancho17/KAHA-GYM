@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { CalendarDays, Plus, Calendar, X, Clock, CalendarClock, Info, Phone, ExternalLink, Check } from 'lucide-react';
+import { CalendarDays, Plus, Calendar, X, Clock, CalendarClock, Info, Phone, ExternalLink, Check, User } from 'lucide-react';
 
 interface SocioReservasProps {
   socio: Cliente;
@@ -127,6 +127,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
       diaNombre: string;
       hora: string;
       fecha: string;
+      profesor?: string;
       isSuspended: boolean;
       suspendedInfo?: any;
       originalReserva?: any;
@@ -149,6 +150,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
           diaNombre: turn.dia,
           hora: turn.hora,
           fecha: date,
+          profesor: turn.profesor || '',
           isSuspended: !!susp,
           suspendedInfo: susp
         });
@@ -172,6 +174,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
         diaNombre: turn.dia,
         hora: turn.hora,
         fecha: r.fecha,
+        profesor: turn.profesor || '',
         isSuspended: false,
         originalReserva: r
       });
@@ -353,6 +356,10 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                         </p>
                         <p className={`text-[9px] text-slate-500 font-mono mt-0.5 ${sesion.isSuspended ? 'line-through' : ''}`}>
                           {sesion.hora.slice(0, 5)} hs
+                        </p>
+                        <p className="text-[9px] text-slate-600 font-sans mt-1 font-semibold flex items-center gap-1">
+                          <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                          <span>Profe: <strong className="text-slate-800 font-bold">{sesion.profesor || 'Por asignar'}</strong></span>
                         </p>
                       </div>
                       <span className={`text-[7px] font-bold tracking-wider px-1.5 py-0.5 rounded font-mono border self-start ${

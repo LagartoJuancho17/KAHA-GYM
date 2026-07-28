@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { ChevronLeft, ChevronRight, Info, Calendar, RefreshCw, X, Clock, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Calendar, RefreshCw, X, Clock, MessageCircle, Check } from 'lucide-react';
 
 interface SocioCalendarioProps {
   socio: Cliente;
@@ -32,6 +32,16 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   const paidMonth = useMemo(() => {
     return socio.ultimo_mes_pagado || new Date().toISOString().slice(0, 7);
   }, [socio]);
+
+  const selectedBookingTurno = useMemo(() => {
+    if (!bookingTurnId) return null;
+    return turnos.find(t => t.id === bookingTurnId) || null;
+  }, [bookingTurnId, turnos]);
+
+  const selectedReprogramTurno = useMemo(() => {
+    if (!reprogramTurnId) return null;
+    return turnos.find(t => t.id === reprogramTurnId) || null;
+  }, [reprogramTurnId, turnos]);
 
   const getWeekRange = (offset: number) => {
     const today = new Date();
@@ -109,12 +119,16 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   const getOccupiedCountOnDate = (turnoId: string, dateStr: string) => {
     const turn = turnos.find(t => t.id === turnoId);
     if (!turn) return 0;
-    const fijosCount = turn.asignados_ids.length;
+    const fijos = (turn.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
+    const suspendidosCount = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turn.id && s.fecha === dateStr)).length;
+    const fijosActivosCount = Math.max(0, fijos.length - suspendidosCount);
+
     const individualCount = clientes.reduce((acc, c) => {
       const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === dateStr);
       return acc + bookingsOnDate.length;
     }, 0);
-    return fijosCount + individualCount;
+
+    return fijosActivosCount + individualCount;
   };
 
   const turnosDelDia = useMemo(() => {
@@ -291,10 +305,11 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                       const holdsMyIndividual = misReservasEnTurno.length > 0;
 
                       const datesInSelectedWeek = getAvailableDatesForTurn(turno.dia).filter(isDateInSelectedWeek);
-                      const slotDateStr = datesInSelectedWeek[0];
+                      const slotDateStr = datesInSelectedWeek[0] || '';
                       const slotDateFormatted = slotDateStr
                         ? new Date(slotDateStr + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
                         : null;
+                      const realtimeOccupancyCount = slotDateStr ? getOccupiedCountOnDate(turno.id, slotDateStr) : turno.asignados_ids.length;
 
                       return (
                         <div 
@@ -327,8 +342,12 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[9px] sm:text-[10px] text-slate-500 mt-0.5 sm:mt-1 font-medium leading-tight">
-                                  Fijos: {turno.asignados_ids.length}
+                                <p className="text-[9.5px] text-slate-600 font-mono font-semibold mt-0.5 sm:mt-1 leading-tight">
+                                  Ocupación: <span className="font-bold text-slate-900 font-sans">{realtimeOccupancyCount} / {turno.cupo_maximo}</span>
+                                </p>
+                                <p className="text-[9.5px] text-slate-600 font-sans mt-0.5 font-semibold flex items-center gap-1">
+                                  <span className="text-slate-400 font-normal">Profe:</span>
+                                  <strong className="text-slate-800 font-bold">{turno.profesor || 'Por asignar'}</strong>
                                 </p>
                                 {holdsMyIndividual && (
                                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -354,195 +373,17 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                             )}
                           </div>
 
-                          {/* Expandable Booking dates view */}
-                          {bookingTurnId === turno.id && (
-                            <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-2 mt-2 animate-fade-in shadow-2xs">
-                              <div className="flex items-center justify-between border-b border-emerald-200/80 pb-1.5 mb-1">
-                                <span className="text-[10px] font-mono font-extrabold text-emerald-900 uppercase tracking-wider flex items-center gap-1">
-                                  <Calendar className="w-3 h-3 text-emerald-600" />
-                                  Fecha a reservar:
-                                </span>
-                                {slotDateStr && (
-                                  <span className="text-[10px] font-extrabold text-emerald-950 bg-white border border-emerald-300 px-2 py-0.5 rounded-md font-sans capitalize shadow-3xs">
-                                    {new Date(slotDateStr + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-1 gap-2">
-                                {datesInSelectedWeek.map(dateStr => {
-                                  const occupiedCount = getOccupiedCountOnDate(turno.id, dateStr);
-                                  const isFullOnDate = occupiedCount >= turno.cupo_maximo;
-                                  const inWaitlist = (waitlistReservas || []).some(
-                                    w => w.cliente_id === socio.id && w.turno_id === turno.id && w.fecha === dateStr
-                                  );
-                                  
-                                  const miReservaIndividualEnFecha = (socio.reservas_individuales || []).find(r => r.turno_id === turno.id && r.fecha === dateStr);
-
-                                  const hasBooking = !!miReservaIndividualEnFecha ||
-                                                     (socio.reservas_individuales || []).some(r => r.fecha === dateStr) ||
-                                                     socio.turnos_fijos.some(tfId => {
-                                                       const tfTurn = turnos.find(t => t.id === tfId);
-                                                       if (!tfTurn) return false;
-                                                       const dateObj = new Date(dateStr + 'T00:00:00');
-                                                       const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-                                                       const dateDayName = days[dateObj.getDay()];
-                                                       if (tfTurn.dia === dateDayName) {
-                                                         const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr);
-                                                         return !isSuspended;
-                                                       }
-                                                       return false;
-                                                     });
-
-                                  const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long'
-                                  });
-
-                                  return (
-                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-emerald-200/80 text-xs shadow-3xs">
-                                      <div>
-                                        <span className="font-bold text-slate-800 capitalize">{dateFormatted}</span>
-                                        <span className="text-[9px] text-slate-500 font-mono ml-2">({occupiedCount}/{turno.cupo_maximo} ocupados)</span>
-                                      </div>
-
-                                      {miReservaIndividualEnFecha ? (
-                                        <button
-                                          onClick={() => {
-                                            if (window.confirm(`¿Confirmas cancelar la reserva del ${dateFormatted} a las ${turno.hora.slice(0, 5)} hs?`)) {
-                                              const res = cancelarReservaIndividual(socio.id, miReservaIndividualEnFecha.id);
-                                              if (res.success) {
-                                                setSuccessMessage(res.message);
-                                                setTimeout(() => setSuccessMessage(null), 4000);
-                                              } else {
-                                                setErrorMessage(res.message);
-                                                setTimeout(() => setErrorMessage(null), 4000);
-                                              }
-                                            }
-                                          }}
-                                          className="text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100 px-2 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1"
-                                        >
-                                          <X className="w-3 h-3" /> Cancelar
-                                        </button>
-                                      ) : hasBooking ? (
-                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-sans">Ya tienes clase</span>
-                                      ) : isFullOnDate ? (
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded shrink-0">Lleno</span>
-                                          {inWaitlist ? (
-                                            <button
-                                              onClick={() => {
-                                                const res = removerListaEsperaReserva(socio.id, turno.id, dateStr);
-                                                if (res.success) {
-                                                  setSuccessMessage(res.message);
-                                                  setTimeout(() => setSuccessMessage(null), 3500);
-                                                } else {
-                                                  setErrorMessage(res.message);
-                                                  setTimeout(() => setErrorMessage(null), 3500);
-                                                }
-                                              }}
-                                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-slate-300 shadow-3xs"
-                                            >
-                                              Salir de Espera
-                                            </button>
-                                          ) : (
-                                            <button
-                                              onClick={() => {
-                                                const res = agregarListaEsperaReserva(socio.id, turno.id, dateStr);
-                                                if (res.success) {
-                                                  setSuccessMessage(res.message);
-                                                  setTimeout(() => setSuccessMessage(null), 3500);
-                                                } else {
-                                                  setErrorMessage(res.message);
-                                                  setTimeout(() => setErrorMessage(null), 3500);
-                                                }
-                                              }}
-                                              className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs border border-amber-600"
-                                            >
-                                              Anotarse en Espera
-                                            </button>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <button
-                                          onClick={() => {
-                                            const res = crearReservaIndividual(socio.id, turno.id, dateStr);
-                                            if (res.success) {
-                                              setSuccessMessage(res.message);
-                                              setTimeout(() => setSuccessMessage(null), 3500);
-                                              setBookingTurnId(null);
-                                            } else {
-                                              setErrorMessage(res.message);
-                                              setTimeout(() => setErrorMessage(null), 3550);
-                                            }
-                                          }}
-                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs border border-emerald-700"
-                                        >
-                                          Confirmar
-                                        </button>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Expandable Reprogram fixed date view */}
-                          {reprogramTurnId === turno.id && (
-                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2 animate-fade-in">
-                              <p className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-wider">Escoge qué sesión reprogramar:</p>
-                              <div className="grid grid-cols-1 gap-2">
-                                {getDatesOfWeekdayInMonth(turno.dia, paidMonth).map(dateStr => {
-                                  const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === dateStr);
-                                  const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
-                                    day: 'numeric',
-                                    month: 'short'
-                                  });
-
-                                  return (
-                                    <div key={dateStr} className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100 text-xs">
-                                      <span className="font-bold text-slate-700">{dateFormatted}</span>
-
-                                      {isSuspended ? (
-                                        <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded">Suspendida</span>
-                                      ) : (
-                                        <button
-                                          onClick={() => {
-                                            if (window.confirm(`¿Confirmas suspender la sesión fija del ${dateFormatted} para reprogramarla?`)) {
-                                              const res = suspenderClaseFija(socio.id, turno.id, dateStr);
-                                              if (res.success) {
-                                                setSuccessMessage(res.message);
-                                                setTimeout(() => setSuccessMessage(null), 4000);
-                                                setReprogramTurnId(null);
-                                              } else {
-                                                setErrorMessage(res.message);
-                                                setTimeout(() => setErrorMessage(null), 4000);
-                                              }
-                                            }
-                                          }}
-                                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1 rounded-lg text-[9px] transition-all cursor-pointer shadow-3xs border-none"
-                                        >
-                                          Suspender
-                                        </button>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
+                          {/* Action Button Footer */}
                           <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between text-xs mt-1">
                             <div className="shrink-0 mr-1.5">
                               <span className={`inline-block w-2 h-2 rounded-full ${holdsMyFijo ? 'bg-sky-400 animate-pulse' : holdsMyIndividual ? 'bg-emerald-400' : 'bg-slate-200'}`}></span>
                             </div>
 
                             <div className="flex-1 text-right">
-                              {holdsMyFijo && (
+                              {holdsMyFijo ? (
                                 <button
                                   onClick={() => {
-                                    setReprogramTurnId(reprogramTurnId === turno.id ? null : turno.id);
+                                    setReprogramTurnId(turno.id);
                                     setBookingTurnId(null);
                                   }}
                                   className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 font-sans w-full"
@@ -550,21 +391,15 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                   <RefreshCw className="w-3.5 h-3.5" />
                                   <span className="truncate">Reprogramar</span>
                                 </button>
-                              )}
-
-                              {!holdsMyFijo && (
+                              ) : (
                                 <button
                                   onClick={() => {
-                                    setBookingTurnId(bookingTurnId === turno.id ? null : turno.id);
+                                    setBookingTurnId(turno.id);
                                     setReprogramTurnId(null);
                                   }}
-                                  className={`px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer font-sans border-none w-full text-center ${
-                                    bookingTurnId === turno.id
-                                      ? 'bg-slate-200 text-slate-700 border border-slate-300'
-                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                  }`}
+                                  className="px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer font-sans border-none w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
                                 >
-                                  <span className="truncate">{bookingTurnId === turno.id ? 'CERRAR' : 'RESERVAR'}</span>
+                                  <span className="truncate">RESERVAR</span>
                                 </button>
                               )}
                             </div>
@@ -638,6 +473,282 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
           <p className="text-[11px] text-sky-800 font-medium leading-relaxed font-sans">
             ¡Tienes todos tus cupos mensuales asignados de forma fija! Si deseas asistir en otro horario, puedes <strong>reprogramar</strong> tus sesiones haciendo click en "Reprogramar clase" en tus días fijos o desde el listado de sesiones en la pantalla de Inicio.
           </p>
+        </div>
+      )}
+
+      {/* MODAL RESERVA INDIVIDUAL DE CUPO */}
+      {selectedBookingTurno && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs animate-fade-in" id="booking-modal-overlay">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden relative animate-scale-up max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-slate-900 text-white p-5 flex justify-between items-start shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">Reserva de Cupo</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black tracking-tight mt-1 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>{selectedBookingTurno.dia} — {selectedBookingTurno.hora.slice(0, 5)} hs</span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-1 font-medium flex items-center gap-1">
+                  <span>Profesor a cargo:</span>
+                  <strong className="text-emerald-400 font-bold">{selectedBookingTurno.profesor || 'Por asignar'}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setBookingTurnId(null)}
+                className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors cursor-pointer border-none shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 space-y-3">
+                <span className="text-[10px] font-mono font-bold text-emerald-900 uppercase tracking-wider block">
+                  Fecha Seleccionada en la Semana:
+                </span>
+
+                {getAvailableDatesForTurn(selectedBookingTurno.dia).filter(isDateInSelectedWeek).map(dateStr => {
+                  const occupiedCount = getOccupiedCountOnDate(selectedBookingTurno.id, dateStr);
+                  const isFullOnDate = occupiedCount >= selectedBookingTurno.cupo_maximo;
+                  const inWaitlist = (waitlistReservas || []).some(
+                    w => w.cliente_id === socio.id && w.turno_id === selectedBookingTurno.id && w.fecha === dateStr
+                  );
+
+                  const miReservaIndividualEnFecha = (socio.reservas_individuales || []).find(r => r.turno_id === selectedBookingTurno.id && r.fecha === dateStr);
+
+                  const hasBooking = !!miReservaIndividualEnFecha ||
+                                     (socio.reservas_individuales || []).some(r => r.fecha === dateStr) ||
+                                     socio.turnos_fijos.some(tfId => {
+                                       const tfTurn = turnos.find(t => t.id === tfId);
+                                       if (!tfTurn) return false;
+                                       const dateObj = new Date(dateStr + 'T00:00:00');
+                                       const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+                                       const dateDayName = days[dateObj.getDay()];
+                                       if (tfTurn.dia === dateDayName) {
+                                         const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === tfId && s.fecha === dateStr);
+                                         return !isSuspended;
+                                       }
+                                       return false;
+                                     });
+
+                  const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                  });
+
+                  return (
+                    <div key={dateStr} className="bg-white p-3.5 rounded-2xl border border-emerald-200 space-y-3 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-black text-slate-900 text-sm capitalize">{dateFormatted}</p>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                            Ocupación: <strong className="text-slate-800">{occupiedCount}</strong> de {selectedBookingTurno.cupo_maximo} cupos
+                          </p>
+                        </div>
+                        {isFullOnDate && !miReservaIndividualEnFecha && (
+                          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-lg">
+                            Lleno
+                          </span>
+                        )}
+                      </div>
+
+                      {miReservaIndividualEnFecha ? (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg">
+                            ✓ Ya tienes reserva activa
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`¿Confirmas cancelar la reserva del ${dateFormatted}?`)) {
+                                const res = cancelarReservaIndividual(socio.id, miReservaIndividualEnFecha.id);
+                                if (res.success) {
+                                  setSuccessMessage(res.message);
+                                  setBookingTurnId(null);
+                                  setTimeout(() => setSuccessMessage(null), 4000);
+                                } else {
+                                  setErrorMessage(res.message);
+                                  setTimeout(() => setErrorMessage(null), 4000);
+                                }
+                              }
+                            }}
+                            className="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <X className="w-3.5 h-3.5" /> Cancelar Reserva
+                          </button>
+                        </div>
+                      ) : hasBooking ? (
+                        <div className="pt-2 border-t border-slate-100">
+                          <span className="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl block text-center">
+                            Ya posees una clase programada este día
+                          </span>
+                        </div>
+                      ) : isFullOnDate ? (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-500 italic">Sin cupos disponibles.</span>
+                          {inWaitlist ? (
+                            <button
+                              onClick={() => {
+                                const res = removerListaEsperaReserva(socio.id, selectedBookingTurno.id, dateStr);
+                                if (res.success) {
+                                  setSuccessMessage(res.message);
+                                  setTimeout(() => setSuccessMessage(null), 3500);
+                                } else {
+                                  setErrorMessage(res.message);
+                                  setTimeout(() => setErrorMessage(null), 3500);
+                                }
+                              }}
+                              className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer border border-slate-300"
+                            >
+                              Salir de Lista de Espera
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                const res = agregarListaEsperaReserva(socio.id, selectedBookingTurno.id, dateStr);
+                                if (res.success) {
+                                  setSuccessMessage(res.message);
+                                  setTimeout(() => setSuccessMessage(null), 3500);
+                                } else {
+                                  setErrorMessage(res.message);
+                                  setTimeout(() => setErrorMessage(null), 3500);
+                                }
+                              }}
+                              className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer border border-amber-600 shadow-xs"
+                            >
+                              Anotarse en Espera
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            const res = crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
+                            if (res.success) {
+                              setSuccessMessage(res.message);
+                              setBookingTurnId(null);
+                              setTimeout(() => setSuccessMessage(null), 3500);
+                            } else {
+                              setErrorMessage(res.message);
+                              setTimeout(() => setErrorMessage(null), 3550);
+                            }
+                          }}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-4 rounded-xl text-xs transition-all cursor-pointer shadow-md border border-emerald-700 flex items-center justify-center gap-2 active:scale-98"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>Confirmar Reserva de Cupo</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-end shrink-0">
+              <button
+                onClick={() => setBookingTurnId(null)}
+                className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer border-none"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REPROGRAMAR CLASE FIJA */}
+      {selectedReprogramTurno && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs animate-fade-in" id="reprogram-modal-overlay">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden relative animate-scale-up max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-sky-900 text-white p-5 flex justify-between items-start shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-sky-300 animate-spin-slow" />
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-sky-300">Reprogramar Sesión</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black tracking-tight mt-1">
+                  {selectedReprogramTurno.dia} — {selectedReprogramTurno.hora.slice(0, 5)} hs
+                </h3>
+                <p className="text-xs text-sky-200 mt-1 font-medium">
+                  Selecciona la fecha que deseas suspender para liberar tu cupo.
+                </p>
+              </div>
+              <button
+                onClick={() => setReprogramTurnId(null)}
+                className="text-sky-300 hover:text-white bg-sky-800 p-2 rounded-xl transition-colors cursor-pointer border-none shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-3 overflow-y-auto">
+              <p className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+                Sesiones de este mes ({paidMonth}):
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {getDatesOfWeekdayInMonth(selectedReprogramTurno.dia, paidMonth).map(dateStr => {
+                  const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === selectedReprogramTurno.id && s.fecha === dateStr);
+                  const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                  });
+
+                  return (
+                    <div key={dateStr} className="flex justify-between items-center bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+                      <div>
+                        <span className="font-bold text-slate-800 capitalize block">{dateFormatted}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">Turno Fijo Asignado</span>
+                      </div>
+
+                      {isSuspended ? (
+                        <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
+                          Clase Suspended
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`¿Confirmas suspender la sesión fija del ${dateFormatted} para reprogramarla?`)) {
+                              const res = suspenderClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
+                              if (res.success) {
+                                setSuccessMessage(res.message);
+                                setReprogramTurnId(null);
+                                setTimeout(() => setSuccessMessage(null), 4000);
+                              } else {
+                                setErrorMessage(res.message);
+                                setTimeout(() => setErrorMessage(null), 4000);
+                              }
+                            }
+                          }}
+                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none"
+                        >
+                          Suspender
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-end shrink-0">
+              <button
+                onClick={() => setReprogramTurnId(null)}
+                className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer border-none"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
