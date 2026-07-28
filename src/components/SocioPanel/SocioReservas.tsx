@@ -118,7 +118,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     return Math.max(0, totalMonthlySlots - usedSlots);
   }, [totalMonthlySlots, usedSlots]);
 
-  // Unified sessions list
+  // Unified sessions list (excluding past dates, including next month)
   const sesionesDelMes = useMemo(() => {
     interface SesionInfo {
       id: string;
@@ -129,43 +129,59 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
       fecha: string;
       profesor?: string;
       isSuspended: boolean;
+      isNextMonth: boolean;
       suspendedInfo?: any;
       originalReserva?: any;
     }
 
     let list: SesionInfo[] = [];
+    const hoyStr = new Date().toISOString().slice(0, 10);
 
-    // 1. Fixed days
-    socio.turnos_fijos.forEach(tfId => {
-      const turn = turnos.find(t => t.id === tfId);
-      if (!turn) return;
-      
-      const dates = getDatesOfWeekdayInMonth(turn.dia, paidMonth);
-      dates.forEach(date => {
-        const susp = (socio.clases_suspendidas || []).find(s => s.turno_id === tfId && s.fecha === date);
-        list.push({
-          id: `fixed-${tfId}-${date}`,
-          tipo: 'FIJO',
-          turnoId: tfId,
-          diaNombre: turn.dia,
-          hora: turn.hora,
-          fecha: date,
-          profesor: turn.profesor || '',
-          isSuspended: !!susp,
-          suspendedInfo: susp
+    // Calculate next month YYYY-MM
+    const [yearNum, monthNum] = paidMonth.split('-').map(Number);
+    const nextMonthDate = new Date(yearNum, monthNum, 1);
+    const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+    const processMonthFixed = (monthStr: string, isNext: boolean) => {
+      socio.turnos_fijos.forEach(tfId => {
+        const turn = turnos.find(t => t.id === tfId);
+        if (!turn) return;
+
+        const dates = getDatesOfWeekdayInMonth(turn.dia, monthStr);
+        dates.forEach(date => {
+          if (date < hoyStr) return; // Exclude past dates
+
+          const susp = (socio.clases_suspendidas || []).find(s => s.turno_id === tfId && s.fecha === date);
+          list.push({
+            id: `fixed-${tfId}-${date}`,
+            tipo: 'FIJO',
+            turnoId: tfId,
+            diaNombre: turn.dia,
+            hora: turn.hora,
+            fecha: date,
+            profesor: turn.profesor || '',
+            isSuspended: !!susp,
+            isNextMonth: isNext,
+            suspendedInfo: susp
+          });
         });
       });
-    });
+    };
 
-    // 2. Individual bookings
+    // 1. Fixed days for current month (>= hoyStr)
+    processMonthFixed(paidMonth, false);
+
+    // 2. Fixed days for next month (>= hoyStr)
+    processMonthFixed(nextMonthStr, true);
+
+    // 3. Individual bookings (>= hoyStr)
     (socio.reservas_individuales || []).forEach(r => {
-      const hoyStr = new Date().toISOString().slice(0, 10);
-      const belongsToMonth = isDateInPaidMonth(r.fecha);
-      const isFuture = r.fecha >= hoyStr;
-      if (!belongsToMonth && !isFuture) return;
+      if (r.fecha < hoyStr) return; // Exclude past dates
 
       const turn = turnos.find(t => t.id === r.turno_id);
       if (!turn) return;
+
+      const isNext = r.fecha.startsWith(nextMonthStr) || !isDateInPaidMonth(r.fecha);
 
       list.push({
         id: `indiv-${r.id}`,
@@ -176,17 +192,23 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
         fecha: r.fecha,
         profesor: turn.profesor || '',
         isSuspended: false,
+        isNextMonth: isNext,
         originalReserva: r
       });
     });
 
-    list.sort((a, b) => {
+    // Deduplicate by ID
+    const uniqueMap = new Map<string, SesionInfo>();
+    list.forEach(item => uniqueMap.set(item.id, item));
+    const result = Array.from(uniqueMap.values());
+
+    result.sort((a, b) => {
       const dateDiff = a.fecha.localeCompare(b.fecha);
       if (dateDiff !== 0) return dateDiff;
       return a.hora.localeCompare(b.hora);
     });
 
-    return list;
+    return result;
   }, [socio, turnos, paidMonth]);
 
   const misWaitlists = useMemo(() => {
@@ -327,15 +349,15 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                     key={sesion.id}
                     className={`flex-none flex flex-col justify-between gap-2.5 p-3 sm:p-4 rounded-2xl border transition-all relative overflow-hidden ${
                       sesion.isSuspended
-                        ? 'bg-slate-50 border-slate-200 opacity-60'
-                        : sesion.tipo === 'FIJO'
-                          ? 'bg-sky-50/50 border-sky-200'
-                          : 'bg-emerald-50/50 border-emerald-200'
+                        ? 'bg-rose-50/90 border-rose-300 shadow-2xs'
+                        : sesion.isNextMonth
+                          ? 'bg-slate-100/90 border-slate-300 shadow-2xs'
+                          : 'bg-emerald-50/90 border-emerald-300 shadow-2xs'
                     }`}
                     style={{
                       /* 2 visible on mobile, 4 on desktop (accounting for gap) */
                       width: 'calc(50% - 6px)',
-                      minWidth: '140px',
+                      minWidth: '145px',
                       maxWidth: '220px',
                       scrollSnapAlign: 'start',
                     }}
@@ -343,35 +365,51 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                     <div className="flex flex-col gap-1.5">
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
                         sesion.isSuspended
-                          ? 'bg-slate-100 text-slate-400 border-slate-200'
-                          : sesion.tipo === 'FIJO'
-                            ? 'bg-sky-100 text-sky-700 border-sky-200'
-                            : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                          ? 'bg-rose-100 text-rose-700 border-rose-200'
+                          : sesion.isNextMonth
+                            ? 'bg-slate-200 text-slate-600 border-slate-300'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-200'
                       }`}>
                         <Calendar className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <p className={`text-[11px] font-black text-slate-800 leading-tight capitalize ${sesion.isSuspended ? 'line-through text-slate-400' : ''}`}>
+                        <p className={`text-[11px] font-black leading-tight capitalize ${
+                          sesion.isSuspended
+                            ? 'line-through text-rose-950'
+                            : sesion.isNextMonth
+                              ? 'text-slate-800'
+                              : 'text-emerald-950'
+                        }`}>
                           {dateFormatted}
                         </p>
-                        <p className={`text-[9px] text-slate-500 font-mono mt-0.5 ${sesion.isSuspended ? 'line-through' : ''}`}>
+                        <p className={`text-[9px] font-mono mt-0.5 ${
+                          sesion.isSuspended
+                            ? 'line-through text-rose-600'
+                            : sesion.isNextMonth
+                              ? 'text-slate-600'
+                              : 'text-emerald-700'
+                        }`}>
                           {sesion.hora.slice(0, 5)} hs
                         </p>
-                        <p className="text-[9px] text-slate-600 font-sans mt-1 font-semibold flex items-center gap-1">
-                          <User className="w-2.5 h-2.5 text-slate-400 shrink-0" />
-                          <span>Profe: <strong className="text-slate-800 font-bold">{sesion.profesor || 'Por asignar'}</strong></span>
+                        <p className={`text-[9px] font-sans mt-1 font-semibold flex items-center gap-1 ${
+                          sesion.isSuspended ? 'text-rose-700' : sesion.isNextMonth ? 'text-slate-600' : 'text-emerald-800'
+                        }`}>
+                          <User className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                          <span>Profe: <strong>{sesion.profesor || 'Por asignar'}</strong></span>
                         </p>
                       </div>
-                      <span className={`text-[7px] font-bold tracking-wider px-1.5 py-0.5 rounded font-mono border self-start ${
+                      <span className={`text-[7px] font-extrabold tracking-wider px-1.5 py-0.5 rounded font-mono border self-start ${
                         sesion.isSuspended
-                          ? (sesion.suspendedInfo?.reintegrado ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200')
-                          : sesion.tipo === 'FIJO'
-                            ? 'bg-sky-50 text-sky-800 border-sky-200'
-                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          ? 'bg-rose-100 text-rose-900 border-rose-300'
+                          : sesion.isNextMonth
+                            ? 'bg-slate-200 text-slate-800 border-slate-300'
+                            : 'bg-emerald-100 text-emerald-900 border-emerald-300'
                       }`}>
                         {sesion.isSuspended
-                          ? (sesion.suspendedInfo?.reintegrado ? 'SUSPENDIDA' : 'SIN REINTEGRO')
-                          : sesion.tipo === 'FIJO' ? 'FIJO' : 'INDIVIDUAL'}
+                          ? 'SUSPENDIDA'
+                          : sesion.isNextMonth
+                            ? 'AÚN PENDIENTE DE PAGO'
+                            : `VIGENTE (${sesion.tipo})`}
                       </span>
                     </div>
 
