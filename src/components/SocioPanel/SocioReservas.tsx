@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { CalendarDays, Plus, Calendar, X, Clock, CalendarClock, Info, Phone, ExternalLink, Check, User } from 'lucide-react';
+import { CalendarDays, Plus, Calendar, X, Clock, CalendarClock, Info, Phone, ExternalLink, Check, User, RefreshCw } from 'lucide-react';
 
 interface SocioReservasProps {
   socio: Cliente;
