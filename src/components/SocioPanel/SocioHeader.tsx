@@ -141,7 +141,13 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
             className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 px-3 py-2 rounded-xl transition-all cursor-pointer shadow-xs text-left"
             id="socio-active-user-btn"
           >
-            {googleUser?.picture ? (
+            {socio.foto_url ? (
+              <img 
+                src={socio.foto_url} 
+                alt={socio.nombre} 
+                className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0"
+              />
+            ) : googleUser?.picture ? (
               <img 
                 src={googleUser.picture} 
                 alt={socio.nombre} 
@@ -167,8 +173,12 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
           {isDropdownOpen && (
             <div className="absolute right-0 mt-2.5 w-60 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 space-y-3.5 animate-scale-in z-50">
               <div className="flex items-start gap-2.5 pb-2.5 border-b border-slate-100">
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 font-bold text-xs flex items-center justify-center border border-emerald-100">
-                  {socio.nombre[0]}
+                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 font-bold text-xs flex items-center justify-center border border-emerald-100 shrink-0 overflow-hidden">
+                  {socio.foto_url ? (
+                    <img src={socio.foto_url} alt={socio.nombre} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{socio.nombre[0]}</span>
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-slate-900 text-xs truncate">{socio.nombre} {socio.apellido}</p>

@@ -1877,6 +1877,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Esta sesión no está suspendida para esta fecha.' };
     }
 
+    const turno = turnos.find(t => t.id === turnoId);
+    if (turno) {
+      const fijos = (turno.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
+      const suspendidosCount = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha)).length;
+      const fijosActivosCount = Math.max(0, fijos.length - suspendidosCount);
+      const individualCount = clientes.reduce((acc, c) => {
+        const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha);
+        return acc + bookingsOnDate.length;
+      }, 0);
+      const occupiedCount = fijosActivosCount + individualCount;
+
+      if (occupiedCount >= turno.cupo_maximo) {
+        return { success: false, message: `El turno se encuentra completo para retomar en esta fecha (${occupiedCount}/${turno.cupo_maximo}).` };
+      }
+    }
+
     const updatedClientes = clientes.map(c => {
       if (c.id === clienteId) {
         const clasesSuspendidas = (c.clases_suspendidas || []).filter(

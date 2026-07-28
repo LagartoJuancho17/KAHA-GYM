@@ -17,7 +17,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
 }) => {
   const {
     turnos, clientes, planes, waitlistReservas,
-    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, agregarListaEsperaReserva, removerListaEsperaReserva
+    crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija, agregarListaEsperaReserva, removerListaEsperaReserva
   } = useGym();
 
   const [weekOffset, setWeekOffset] = useState<number>(0);
@@ -202,10 +202,13 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
         <div className="flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-2xl max-w-xl mx-auto" id="socio-week-navigation">
           <button
             onClick={() => {
-              setWeekOffset(prev => prev - 1);
-              setBookingTurnId(null);
+              if (weekOffset > 0) {
+                setWeekOffset(prev => prev - 1);
+                setBookingTurnId(null);
+              }
             }}
-            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+            disabled={weekOffset <= 0}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
           >
             <ChevronLeft className="w-4 h-4" />
             Semana Anterior
@@ -218,10 +221,13 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
           </div>
           <button
             onClick={() => {
-              setWeekOffset(prev => prev + 1);
-              setBookingTurnId(null);
+              if (weekOffset < 12) {
+                setWeekOffset(prev => prev + 1);
+                setBookingTurnId(null);
+              }
             }}
-            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+            disabled={weekOffset >= 12}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
           >
             Semana Siguiente
             <ChevronRight className="w-4 h-4" />
@@ -518,6 +524,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                     w => w.cliente_id === socio.id && w.turno_id === selectedBookingTurno.id && w.fecha === dateStr
                   );
 
+                  const isSuspendedOnDate = (socio.clases_suspendidas || []).some(s => s.turno_id === selectedBookingTurno.id && s.fecha === dateStr);
                   const miReservaIndividualEnFecha = (socio.reservas_individuales || []).find(r => r.turno_id === selectedBookingTurno.id && r.fecha === dateStr);
 
                   const hasOtherBookingOnDate = (socio.reservas_individuales || []).some(r => r.fecha === dateStr && r.turno_id !== selectedBookingTurno.id) ||
@@ -557,7 +564,30 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                         )}
                       </div>
 
-                      {miReservaIndividualEnFecha ? (
+                      {isSuspendedOnDate ? (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg">
+                            Clase Suspendida
+                          </span>
+                          <button
+                            onClick={() => {
+                              const res = revertirSuspensionClaseFija(socio.id, selectedBookingTurno.id, dateStr);
+                              if (res.success) {
+                                setSuccessMessage(res.message);
+                                setBookingTurnId(null);
+                                setTimeout(() => setSuccessMessage(null), 4000);
+                              } else {
+                                setErrorMessage(res.message);
+                                setTimeout(() => setErrorMessage(null), 4000);
+                              }
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Retomar
+                          </button>
+                        </div>
+                      ) : miReservaIndividualEnFecha ? (
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg">
                             ✓ Ya tienes reserva activa
@@ -717,9 +747,29 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                       </div>
 
                       {isSuspended ? (
-                        <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
-                          Clase Suspended
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg">
+                            Clase Suspendida
+                          </span>
+                          <button
+                            onClick={() => {
+                              const res = revertirSuspensionClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
+                              if (res.success) {
+                                setSuccessMessage(res.message);
+                                setReprogramTurnId(null);
+                                setTimeout(() => setSuccessMessage(null), 4000);
+                              } else {
+                                setErrorMessage(res.message);
+                                setTimeout(() => setErrorMessage(null), 4000);
+                              }
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none flex items-center gap-1.5"
+                            title="Volver a inscribirte en este turno si hay cupos disponibles"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Retomar
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => {

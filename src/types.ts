@@ -44,6 +44,7 @@ export interface Cliente {
   precio_personalizado?: number;  // Si está definido, reemplaza plan.precio para este socio
   dias_personalizados?: number;   // Si está definido, reemplaza plan.dias_por_semana para este socio
   nota_plan_personalizado?: string; // Descripción/motivo del plan especial
+  foto_url?: string; // URL o DataURL en base64 de la foto de perfil del socio
 }
 
 export interface Plan {

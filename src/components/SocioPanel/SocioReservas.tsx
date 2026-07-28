@@ -19,7 +19,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
 }) => {
   const { 
     turnos, clientes, planes, recuperos, waitlistReservas,
-    suspenderClaseFija, cancelarReservaIndividual, removerListaEsperaReserva,
+    suspenderClaseFija, revertirSuspensionClaseFija, cancelarReservaIndividual, removerListaEsperaReserva,
     programarRecuperoPendiente
   } = useGym();
 
@@ -413,7 +413,26 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                       </span>
                     </div>
 
-                    {!sesion.isSuspended && (
+                    {sesion.isSuspended ? (
+                      <div className="pt-2 border-t border-rose-200/80">
+                        <button
+                          onClick={() => {
+                            const res = revertirSuspensionClaseFija(socio.id, sesion.turnoId, sesion.fecha);
+                            if (res.success) {
+                              setSuccessMessage(res.message);
+                              setTimeout(() => setSuccessMessage(null), 4000);
+                            } else {
+                              setErrorMessage(res.message);
+                              setTimeout(() => setErrorMessage(null), 4000);
+                            }
+                          }}
+                          className="text-[9px] font-bold text-emerald-800 bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300 px-2 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 w-full justify-center shadow-xs"
+                          title="Volver a inscribirte en este turno si hay cupos disponibles"
+                        >
+                          <RefreshCw className="w-3 h-3 text-emerald-700" /> Retomar
+                        </button>
+                      </div>
+                    ) : (
                       <div className="pt-2 border-t border-slate-100/80">
                         {sesion.tipo === 'FIJO' ? (
                           <button

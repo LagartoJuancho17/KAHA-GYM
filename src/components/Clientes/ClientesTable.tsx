@@ -49,7 +49,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
   onStartAuthorization,
   onOpenBajaClases
 }) => {
-  const { planes, autorizarCliente, bajaLogicaCliente, altaCliente } = useGym();
+  const { planes, turnos, autorizarCliente, bajaLogicaCliente, altaCliente } = useGym();
 
   const totalPaginas = Math.ceil(clientesFiltrados.length / filasPorPagina) || 1;
   
@@ -65,8 +65,8 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
           <thead>
             <tr className="bg-zinc-50 text-zinc-500 font-sans font-medium uppercase tracking-wider border-b border-zinc-200">
               <th className="p-4">Socio</th>
-              <th className="p-4">Email / Celular</th>
-              <th className="p-4">Días Asignados</th>
+              <th className="p-4">Celular</th>
+              <th className="p-4">Días Fijos Asignados</th>
               <th className="p-4">Plan sugerido</th>
               <th className="p-4">Deuda</th>
               <th className="p-4">Último Mes Pago</th>
@@ -114,16 +114,12 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                             <span className={`px-2 py-0.5 text-[9px] rounded-full font-bold border ${badgeClass}`}>
                               {estadoLabel}
                             </span>
-                            <span className="text-[10px] font-mono text-zinc-600 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded font-bold">
-                              {c.codigo_socio || c.id}
-                            </span>
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
-                      <div className="text-zinc-600 font-medium">{c.email}</div>
-                      <div className="text-zinc-400 text-[10px] flex items-center gap-1.5 mt-0.5">
+                      <div className="text-zinc-700 font-semibold text-xs flex items-center gap-1.5">
                         <span>{c.telefono || 'Sin celular'}</span>
                         {c.telefono && (
                           <a
@@ -142,16 +138,31 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                       </div>
                     </td>
                     <td className="p-4">
-                      <button
-                        onClick={() => onManageTurnos(c)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/65 transition-colors flex items-center gap-1 cursor-pointer"
-                        title="Click para gestionar turnos fijos asignados"
-                      >
-                        <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>
-                          {c.turnos_fijos.length} / {plan?.dias_por_semana || 5}
-                        </span>
-                      </button>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => onManageTurnos(c)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/65 transition-colors flex items-center gap-1.5 cursor-pointer w-fit"
+                          title="Click para gestionar turnos fijos asignados"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>
+                            {c.turnos_fijos.length} / {plan?.dias_por_semana || 5} días
+                          </span>
+                        </button>
+                        {c.turnos_fijos.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5 max-w-[200px]">
+                            {c.turnos_fijos.map(tfId => {
+                              const t = turnos.find(turno => turno.id === tfId);
+                              if (!t) return null;
+                              return (
+                                <span key={tfId} className="text-[9.5px] font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shadow-3xs">
+                                  {t.dia.slice(0, 3)} {t.hora.slice(0, 5)}hs
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
                       <span className="font-semibold text-zinc-800">{plan ? plan.nombre : 'Plan Genérico'}</span>
@@ -256,7 +267,19 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                               </button>
                             )}
 
-                            {/* BAJA CLASES POR AUSENCIA / MES */}
+                            {/* ASIGNAR TURNOS */}
+                            <button
+                              onClick={() => {
+                                setOpenRowMenuId(null);
+                                onManageTurnos(c);
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-800 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+                            >
+                              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                              Asignar Turnos
+                            </button>
+
+                            {/* BAJA CLASES POR AUSENCIA / VACACIONES / VIAJE */}
                             <button
                               onClick={() => {
                                 setOpenRowMenuId(null);
@@ -265,7 +288,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                               className="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-700 font-medium flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
                             >
                               <CalendarX className="w-3.5 h-3.5 text-rose-500" />
-                              Baja Clases / Mes
+                              Ausencia / Vacaciones / Viaje
                             </button>
 
                             {/* ELIMINAR PERMANENTE */}

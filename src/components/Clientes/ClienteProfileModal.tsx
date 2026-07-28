@@ -67,7 +67,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
             </div>
             <div>
               <h3 className="text-xl font-bold tracking-tight">{selectedCliente.nombre} {selectedCliente.apellido}</h3>
-              <p className="text-zinc-400 text-xs">Socio registrado el {new Date(selectedCliente.creado_at).toLocaleDateString()}</p>
+              <p className="text-zinc-400 text-xs">Socio registrado el {new Date(selectedCliente.creado_at).toLocaleDateString('es-AR')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -343,7 +343,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                     <div key={pay.id} className="flex justify-between items-center p-2 hover:bg-zinc-50 rounded-lg border border-zinc-100">
                       <div>
                         <span className="font-semibold text-zinc-900 block">Mes correspondiente: {pay.mes_correspondiente}</span>
-                        <span className="text-zinc-400 text-[10px]">Medio: {pay.medio_pago} | {new Date(pay.fecha_pago).toLocaleDateString()}</span>
+                        <span className="text-zinc-400 text-[10px]">Medio: {pay.medio_pago} | {new Date(pay.fecha_pago).toLocaleDateString('es-AR')}</span>
                       </div>
                       <div className="text-right">
                         <span className="font-mono font-bold text-emerald-600 block">${pay.monto.toLocaleString('es-AR')}</span>

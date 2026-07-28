@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Mail, User, Phone, Check, MapPin, CreditCard, Info, Loader2 } from 'lucide-react';
+import { Mail, User, Phone, Check, MapPin, CreditCard, Info, Loader2, Camera } from 'lucide-react';
 
 interface SocioPerfilProps {
   socio: Cliente;
@@ -22,9 +22,11 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
   const { planes } = useGym();
   const [phoneInput, setPhoneInput] = useState('');
   const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [fotoUrl, setFotoUrl] = useState<string | undefined>(socio.foto_url);
 
   useEffect(() => {
     setPhoneInput(socio.telefono || '');
+    setFotoUrl(socio.foto_url);
   }, [socio]);
 
   const planSocio = useMemo(() => {
@@ -36,6 +38,26 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
     socio.telefono = phoneInput; // Update ref locally
     setSuccessMessage("Información de contacto guardada!");
     setTimeout(() => setSuccessMessage(null), 2550);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen no debe superar los 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setFotoUrl(result);
+      socio.foto_url = result;
+      setSuccessMessage("¡Foto de perfil actualizada exitosamente!");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -54,8 +76,23 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
         <div className="px-6 lg:px-8 pb-8 pt-0 relative" id="socio-profile-offset-header">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 -mt-10 relative z-10 border-b border-slate-100 pb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4.5">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white font-black text-2xl flex items-center justify-center shadow-md border-4 border-white shrink-0">
-                {socio.nombre[0]}
+              <div className="relative group shrink-0">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white font-black text-2xl flex items-center justify-center shadow-md border-4 border-white overflow-hidden">
+                  {fotoUrl ? (
+                    <img src={fotoUrl} alt={`${socio.nombre} ${socio.apellido}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{socio.nombre[0]}</span>
+                  )}
+                </div>
+                <label className="absolute -bottom-1 -right-1 bg-slate-900 hover:bg-emerald-600 text-white p-1.5 rounded-full border-2 border-white cursor-pointer shadow-md transition-all group-hover:scale-110 flex items-center justify-center" title="Cambiar foto de perfil">
+                  <Camera className="w-3.5 h-3.5" />
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handlePhotoUpload} 
+                    className="hidden" 
+                  />
+                </label>
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -73,14 +110,6 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
                   <span>{socio.email}</span>
                 </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5 self-start sm:self-auto sm:text-right">
-              <span className="text-slate-400 text-[10px] uppercase font-mono tracking-widest font-extrabold block">Vía de Acceso</span>
-              <div className="text-emerald-700 bg-emerald-50/75 border border-emerald-100 px-3 py-1.5 rounded-xl font-bold text-[11px] inline-flex items-center gap-1.5 shadow-3xs">
-                <User className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Google OAuth 2.0 Direct</span>
               </div>
             </div>
           </div>

@@ -4,7 +4,8 @@ import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { 
   Users, AlertCircle, Plus, Trash2, Calendar, Check, Clock, 
-  ArrowRight, ShieldCheck, ListOrdered, Sparkles, RefreshCw, AlertTriangle, X
+  ArrowRight, ShieldCheck, ListOrdered, Sparkles, RefreshCw, AlertTriangle, X,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 import { TurnoDetailsModal } from './TurnoDetailsModal';
@@ -19,6 +20,7 @@ export const TurnosGrid: React.FC = () => {
   } = useGym();
 
   const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('GRILLA');
+  const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(0);
   
   // Real-time week helper notifications
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export const TurnosGrid: React.FC = () => {
   const [reprogramSuccess, setReprogramSuccess] = useState('');
   const [reprogramError, setReprogramError] = useState('');
 
-  // Helper to calculate the current week's dates
+  // Helper to calculate the current/selected week's dates
   const weekDates = useMemo(() => {
     const today = new Date();
     const currentDay = today.getDay();
@@ -76,7 +78,7 @@ export const TurnosGrid: React.FC = () => {
 
     const mondayDiff = currentDay === 0 ? -6 : 1 - currentDay;
     const mondayDate = new Date(today);
-    mondayDate.setDate(today.getDate() + mondayDiff);
+    mondayDate.setDate(today.getDate() + mondayDiff + (realtimeWeekOffset * 7));
 
     for (let i = 1; i <= 5; i++) {
       const date = new Date(mondayDate);
@@ -87,7 +89,7 @@ export const TurnosGrid: React.FC = () => {
       datesMap[DAYS[i]] = `${yyyy}-${mm}-${dd}`;
     }
     return datesMap;
-  }, []);
+  }, [realtimeWeekOffset]);
 
   // List of Weekdays
   const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const;
@@ -412,6 +414,39 @@ export const TurnosGrid: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* NAVEGACIÓN SEMANAL ADMIN/PROFESORES */}
+            <div className="flex justify-between items-center bg-slate-950/90 p-3 rounded-xl border border-slate-800 mt-4 max-w-xl mx-auto">
+              <button
+                onClick={() => setRealtimeWeekOffset(prev => prev - 1)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-all flex items-center gap-1 cursor-pointer border border-slate-700"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Semana Anterior
+              </button>
+              <div className="text-center">
+                <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block font-mono">Semana Visualizada</span>
+                <span className="text-xs font-bold text-white">
+                  {(() => {
+                    const monday = new Date();
+                    const currentDay = monday.getDay();
+                    const diff = currentDay === 0 ? -6 : 1 - currentDay;
+                    monday.setDate(monday.getDate() + diff + (realtimeWeekOffset * 7));
+                    const friday = new Date(monday);
+                    friday.setDate(monday.getDate() + 4);
+                    const opt: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+                    return `${monday.toLocaleDateString('es-AR', opt)} al ${friday.toLocaleDateString('es-AR', opt)}`;
+                  })()}
+                </span>
+              </div>
+              <button
+                onClick={() => setRealtimeWeekOffset(prev => prev + 1)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-all flex items-center gap-1 cursor-pointer border border-slate-700"
+              >
+                Semana Siguiente
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {realtimeError && (
@@ -437,7 +472,7 @@ export const TurnosGrid: React.FC = () => {
                     <th className="p-3 border-r border-slate-800 w-16">Hora</th>
                     {DIAS.map(d => {
                       const dateStr = weekDates[d];
-                      const displayDate = dateStr ? `${dateStr.split('-')[2]}/${dateStr.split('-')[1]}` : '';
+                      const displayDate = dateStr ? `${dateStr.split('-')[2]}/${dateStr.split('-')[1]}/${dateStr.split('-')[0]}` : '';
                       return (
                         <th key={d} className="p-3 border-r border-slate-800">
                           <div>{d === 'MIERCOLES' ? 'MIÉRCOLES' : d}</div>

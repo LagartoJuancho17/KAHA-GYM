@@ -144,9 +144,9 @@ export const BajaClasesModal: React.FC<BajaClasesModalProps> = ({
               <CalendarX className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-white tracking-tight">Dar de Baja Clases / Ausencia de Mes</h3>
+              <h3 className="font-bold text-sm text-white tracking-tight">Aviso de Ausencia / Vacaciones / Viaje</h3>
               <p className="text-[11px] text-slate-400 font-mono">
-                Socio: <strong className="text-white">{cliente.apellido}, {cliente.nombre}</strong> {cliente.codigo_socio && `(${cliente.codigo_socio})`}
+                Socio: <strong className="text-white">{cliente.apellido}, {cliente.nombre}</strong>
               </p>
             </div>
           </div>

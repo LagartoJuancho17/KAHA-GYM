@@ -146,7 +146,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         nombre: r.cliente_nombre,
         tipo: 'RECUPERO',
         presente: r.estado === 'COMPLETADO',
-        info: `Recupera falta del ${r.fecha_inasistencia}`,
+        info: `Recupera falta del ${(() => { const parts = r.fecha_inasistencia.split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : r.fecha_inasistencia; })()}`,
         key: `rec-${r.id}`
       });
     });
@@ -213,7 +213,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1">
               <span>Fecha de la clase:</span>
               <strong className="text-emerald-400 font-mono capitalize">
-                {new Date(selectedSlot.date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} ({selectedSlot.date})
+                {new Date(selectedSlot.date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} ({(() => { const p = selectedSlot.date.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : selectedSlot.date; })()})
               </strong>
             </p>
           </div>
