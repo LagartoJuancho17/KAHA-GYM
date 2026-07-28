@@ -72,7 +72,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   };
 
   const handleCopyAlias = () => {
-    navigator.clipboard.writeText('kahafitweb');
+    navigator.clipboard.writeText('kaha.fitness.center');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -214,7 +214,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
                     <div className="flex flex-col gap-1">
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block font-mono">Alias Bancario</span>
                       <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-2.5 pl-3.5">
-                        <span className="font-mono text-sm font-extrabold text-slate-800 select-all">kahafitweb</span>
+                        <span className="font-mono text-sm font-extrabold text-slate-800 select-all">kaha.fitness.center</span>
                         <button
                           onClick={handleCopyAlias}
                           className={`ml-2 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-tight flex items-center gap-1.5 transition-all shadow-3xs border-none cursor-pointer ${
