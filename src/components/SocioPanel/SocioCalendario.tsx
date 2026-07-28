@@ -571,14 +571,34 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                           </span>
                           <button
                             onClick={() => {
-                              const res = revertirSuspensionClaseFija(socio.id, selectedBookingTurno.id, dateStr);
-                              if (res.success) {
-                                setSuccessMessage(res.message);
-                                setBookingTurnId(null);
-                                setTimeout(() => setSuccessMessage(null), 4000);
+                              const isFijoTurn = socio.turnos_fijos.includes(selectedBookingTurno.id);
+
+                              if (isFijoTurn) {
+                                // Turno fijo: solo revertir la suspensión (el cupo ya está asegurado)
+                                const res = revertirSuspensionClaseFija(socio.id, selectedBookingTurno.id, dateStr);
+                                if (res.success) {
+                                  setSuccessMessage('✅ Reserva restablecida. Volvés a tener tu lugar en este turno.');
+                                  setBookingTurnId(null);
+                                  setTimeout(() => setSuccessMessage(null), 4000);
+                                } else {
+                                  setErrorMessage(res.message);
+                                  setTimeout(() => setErrorMessage(null), 4000);
+                                }
                               } else {
-                                setErrorMessage(res.message);
-                                setTimeout(() => setErrorMessage(null), 4000);
+                                // Turno variable: revertir suspensión + crear reserva confirmada
+                                const revRes = revertirSuspensionClaseFija(socio.id, selectedBookingTurno.id, dateStr);
+                                if (!revRes.success) {
+                                  // Si no había suspensión registrada, igual intentamos crear la reserva
+                                }
+                                const res = crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
+                                if (res.success) {
+                                  setSuccessMessage('✅ Reserva confirmada. Tu lugar está asegurado.');
+                                  setBookingTurnId(null);
+                                  setTimeout(() => setSuccessMessage(null), 4000);
+                                } else {
+                                  setErrorMessage(res.message);
+                                  setTimeout(() => setErrorMessage(null), 4000);
+                                }
                               }
                             }}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none flex items-center gap-1.5"
