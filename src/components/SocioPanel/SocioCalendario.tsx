@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { ChevronLeft, ChevronRight, Info, Calendar, RefreshCw, X, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Calendar, RefreshCw, X, Clock, MessageCircle } from 'lucide-react';
 
 interface SocioCalendarioProps {
   socio: Cliente;
@@ -180,55 +180,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
 
 
 
-      {/* SUMMARY BOX */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8 p-5 bg-slate-50 border border-slate-200 rounded-2xl text-xs">
-        <div className="space-y-1.5">
-          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold">1. Cupos Disponibles por Asignar este Mes</p>
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
-            <p className="text-lg font-black text-slate-800">
-              {availableSlots} <span className="text-xs text-slate-500 font-medium">de {totalMonthlySlots} cupos totales</span>
-            </p>
-          </div>
-          <p className="text-[10px] text-slate-500 font-sans leading-normal">
-            Puedes asignarlos libremente a cualquier horario con cupo en la grilla inferior.
-          </p>
-        </div>
 
-        <div className="space-y-1.5">
-          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold">2. Días Fijos Asignados</p>
-          <div className="flex items-center gap-2">
-            <p className="text-base font-black text-slate-800">
-              {socio.turnos_fijos.length > 0 ? (
-                <span>{socio.turnos_fijos.length} días fijos semanales <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded">({socio.turnos_fijos.length * 4}/{totalMonthlySlots} cupos)</span></span>
-              ) : (
-                <span className="text-slate-400 italic text-xs font-medium">No posees horarios fijos semanales (Flex)</span>
-              )}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-1.5 mt-1.5">
-            {socio.turnos_fijos.map(tfId => {
-              const turn = turnos.find(t => t.id === tfId);
-              if (!turn) return null;
-              return (
-                <span key={tfId} className="text-[9px] font-mono font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-3xs">
-                  {turn.dia} {turn.hora.slice(0, 5)} hs
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ALL FIXED WARNING */}
-      {availableSlots === 0 && usedSlots === totalMonthlySlots && (
-        <div className="mb-8 p-4.5 bg-sky-50 border border-sky-100 rounded-2xl flex items-center gap-3">
-          <Info className="w-5 h-5 text-sky-600 shrink-0" />
-          <p className="text-[11px] text-sky-800 font-medium leading-relaxed font-sans">
-            ¡Tienes todos tus cupos mensuales asignados de forma fija! Si deseas asistir en otro horario, puedes <strong>reprogramar</strong> tus sesiones haciendo click en "Reprogramar clase" en tus días fijos o desde el listado de sesiones en la pantalla de Inicio.
-          </p>
-        </div>
-      )}
 
       {/* STICKY CONTAINER FOR WEEKLY NAVIGATION AND DAY TABS */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md -mx-6.5 px-6.5 lg:-mx-8 lg:px-8 pt-2 pb-5 border-b border-slate-100/85 space-y-4 mb-6 animate-fade-in" id="socio-sticky-header">
@@ -626,6 +578,68 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             })
         )}
       </div>
+
+      {/* SUMMARY BOX — POSITIONED BELOW THE CALENDAR GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8 p-5 bg-slate-50 border border-slate-200 rounded-2xl text-xs">
+        <div className="space-y-1.5">
+          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold">1. Cupos Disponibles por Asignar este Mes</p>
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+            <p className="text-lg font-black text-slate-800">
+              {availableSlots} <span className="text-xs text-slate-500 font-medium">de {totalMonthlySlots} cupos totales</span>
+            </p>
+          </div>
+          <p className="text-[10px] text-slate-500 font-sans leading-normal">
+            Puedes asignarlos libremente a cualquier horario con cupo en la grilla superior.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider font-extrabold">2. Días Fijos Asignados</p>
+          <div className="flex items-center gap-2">
+            <p className="text-base font-black text-slate-800">
+              {socio.turnos_fijos.length > 0 ? (
+                <span>{socio.turnos_fijos.length} días fijos semanales <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded">({socio.turnos_fijos.length * 4}/{totalMonthlySlots} cupos)</span></span>
+              ) : (
+                <span className="text-slate-400 italic text-xs font-medium">No posees horarios fijos semanales (Flex)</span>
+              )}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {socio.turnos_fijos.map(tfId => {
+              const turn = turnos.find(t => t.id === tfId);
+              if (!turn) return null;
+              return (
+                <span key={tfId} className="text-[9px] font-mono font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-lg shadow-3xs">
+                  {turn.dia} {turn.hora.slice(0, 5)} hs
+                </span>
+              );
+            })}
+          </div>
+
+          <div className="pt-2">
+            <a
+              href="https://wa.me/541178402722?text=Hola!%20Quisiera%20consultar%20para%20cambiar%20mis%20d%C3%ADas%20fijos."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-3.5 py-2 rounded-xl transition-all shadow-xs border border-emerald-700 cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-200 shrink-0" />
+              <span>¿Querés cambiar tus días fijos? Comunicarse al WhatsApp</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* ALL FIXED WARNING */}
+      {availableSlots === 0 && usedSlots === totalMonthlySlots && (
+        <div className="mt-4 p-4.5 bg-sky-50 border border-sky-100 rounded-2xl flex items-center gap-3">
+          <Info className="w-5 h-5 text-sky-600 shrink-0" />
+          <p className="text-[11px] text-sky-800 font-medium leading-relaxed font-sans">
+            ¡Tienes todos tus cupos mensuales asignados de forma fija! Si deseas asistir en otro horario, puedes <strong>reprogramar</strong> tus sesiones haciendo click en "Reprogramar clase" en tus días fijos o desde el listado de sesiones en la pantalla de Inicio.
+          </p>
+        </div>
+      )}
     </section>
   );
 };
