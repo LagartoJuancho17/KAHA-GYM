@@ -741,6 +741,39 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  /**
+   * Inserts new RecuperoTurno entries to Supabase.
+   * newRecs: only the newly created recuperos (not the full list).
+   * currentTurnos: the turnos array to resolve local IDs to db_uuids.
+   */
+  const syncRecuperosToSupabase = (newRecs: RecuperoTurno[], currentTurnos?: Turno[]) => {
+    if (!supabase || !newRecs.length) return;
+    const turnosList = currentTurnos || turnos;
+
+    const getDbUuid = (localId: string): string | null => {
+      if (!localId || localId === 'PENDIENTE_DEFINICION') return null;
+      const t = turnosList.find(t => t.id === localId);
+      return t?.db_uuid || null;
+    };
+
+    const rows = newRecs.map(r => ({
+      id: r.id,
+      cliente_id: r.cliente_id,
+      turno_original_id: getDbUuid(r.turno_original_id),
+      fecha_inasistencia: r.fecha_inasistencia,
+      turno_recupero_id: getDbUuid(r.turno_recupero_id),
+      fecha_recupero: r.fecha_recupero || null,
+      estado: r.estado,
+      fecha_limite: r.fecha_limite
+    })).filter(r => r.turno_original_id !== null); // skip if we can't resolve the turno UUID
+
+    if (rows.length === 0) return;
+
+    supabase.from('recupero_turnos').upsert(rows, { onConflict: 'id' }).then(({ error }) => {
+      if (error) console.error('Error al sincronizar recuperos en Supabase:', error);
+    });
+  };
+
   const addAuditLog = (accion: string, detalles: any, userEmail: string = rolActivo === 'ADMIN' ? 'admin@gimnasio.com.ar' : 'operador@gimnasio.com.ar') => {
     const newLog: AuditLog = {
       id: `log-${Date.now()}`,
@@ -970,6 +1003,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const nuevasSuspensiones: ClaseSuspendida[] = [];
     const localRecs = [...recuperos];
+    const newlyCreatedRecs: RecuperoTurno[] = [];
     let canceladasCount = 0;
 
     clases.forEach(({ turno_id, fecha }) => {
@@ -987,7 +1021,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         expDate.setDate(expDate.getDate() + 30);
         const expDateStr = expDate.toISOString().slice(0, 10);
 
-        localRecs.push({
+        const newRec: RecuperoTurno = {
           id: `rec-${Date.now()}-${canceladasCount}`,
           cliente_id: clienteId,
           cliente_nombre: `${cliente.nombre} ${cliente.apellido}`,
@@ -997,7 +1031,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           fecha_recupero: '',
           estado: 'PENDIENTE',
           fecha_limite: expDateStr
-        });
+        };
+        localRecs.push(newRec);
+        newlyCreatedRecs.push(newRec);
         canceladasCount++;
       }
     });
@@ -1020,6 +1056,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     saveState(updatedClientes, planes, historialPrecios, turnos, pagos, localRecs, auditLogs, novedades);
+    syncRecuperosToSupabase(newlyCreatedRecs);
+
+    // Sync updated client to Supabase
+    if (supabase) {
+      const targetClient = updatedClientes.find(c => c.id === clienteId);
+      if (targetClient) {
+        supabase.from('clientes').update({
+          reservas_individuales: targetClient.reservas_individuales || [],
+          clases_suspendidas: targetClient.clases_suspendidas || []
+        }).eq('id', clienteId).then(({ error }) => {
+          if (error) console.error('Error al sincronizar baja clases en Supabase:', error);
+        });
+      }
+    }
+
     addAuditLog('CLIENTE_BAJA_CLASES_MES', {
       cliente: `${cliente.nombre} ${cliente.apellido}`,
       clases_dadas_de_baja: canceladasCount,
@@ -1969,6 +2020,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const localRecs = [...recuperos];
     const nuevasSuspensiones: { turno_id: string; fecha: string; reintegrado: boolean; creado_at: string }[] = [];
     const removedReservaIds = new Set<string>();
+    const newlyCreatedRecs: RecuperoTurno[] = [];
     let inasistenciasRegistradas = 0;
 
     // Helper: generate recovery ticket
@@ -1976,7 +2028,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const expDate = new Date(dateStr + 'T00:00:00');
       expDate.setDate(expDate.getDate() + 30);
       const expDateStr = expDate.toISOString().slice(0, 10);
-      localRecs.push({
+      const rec: RecuperoTurno = {
         id: `rec-${Date.now()}-${idx}`,
         cliente_id: clienteId,
         cliente_nombre: `${cliente.nombre} ${cliente.apellido}`,
@@ -1986,7 +2038,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fecha_recupero: '',
         estado: 'PENDIENTE',
         fecha_limite: expDateStr
-      });
+      };
+      localRecs.push(rec);
+      newlyCreatedRecs.push(rec);
     };
 
     // Day-of-week index map
@@ -2067,6 +2121,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       saveState(updatedClientes, planes, historialPrecios, turnos, pagos, localRecs, auditLogs, novedades);
+      syncRecuperosToSupabase(newlyCreatedRecs);
 
       // Sync updated client to Supabase
       if (supabase) {
