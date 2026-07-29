@@ -57,7 +57,7 @@ export const ProyeccionesTab: React.FC = () => {
   }, [turnos]);
 
   return (
-    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto" id="proyecciones-analytics-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto overflow-x-hidden" id="proyecciones-analytics-tab-panel">
       
       {/* SECCIÓN CABECERA */}
       <div>
@@ -83,12 +83,12 @@ export const ProyeccionesTab: React.FC = () => {
         <div className="space-y-8 animate-fade-in text-xs font-sans">
           
           {/* ANALISIS CAPACIDAD INSTALADA VS VENDIDA */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* KPI BAR GRAPH */}
-            <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-xs space-y-4">
+            <div className="bg-white border border-zinc-200 p-4 sm:p-6 rounded-xl shadow-xs space-y-4">
               <div className="flex items-center gap-2">
-                <Scale className="w-5 h-5 text-zinc-500" />
-                <h3 className="font-sans font-bold text-sm text-zinc-900 uppercase tracking-wide">Capacidad Instalada vs Capacidad Vendida</h3>
+                <Scale className="w-5 h-5 text-zinc-500 shrink-0" />
+                <h3 className="font-sans font-bold text-sm text-zinc-900 uppercase tracking-wide leading-tight">Capacidad Instalada vs Capacidad Vendida</h3>
               </div>
 
               <p className="text-zinc-500 text-xs leading-normal">
@@ -157,13 +157,14 @@ export const ProyeccionesTab: React.FC = () => {
           </div>
 
           {/* DISTRIBUCIÓN ANALÍTICA DE INGRESOS POR PLANES */}
-          <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-xs space-y-4">
+          <div className="bg-white border border-zinc-200 p-4 sm:p-6 rounded-xl shadow-xs space-y-4">
             <h3 className="font-sans font-bold text-sm text-zinc-900 uppercase tracking-wide border-b border-zinc-100 pb-2 flex items-center gap-1.5">
-              <BarChart3 className="w-4 h-4 text-zinc-400" />
+              <BarChart3 className="w-4 h-4 text-zinc-400 shrink-0" />
               Distribución Comercial por Categoría de Plan Activo
             </h3>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="min-w-[400px] px-4 sm:px-0">
               <table className="w-full text-left text-xs font-sans">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 uppercase tracking-wider font-bold text-[10px]">
@@ -192,13 +193,14 @@ export const ProyeccionesTab: React.FC = () => {
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
 
           {/* INGRESO PROYECTADO SEGÚN INDICES DE COBRANZA / COMPORTAMIENTO (Próximos 3 meses) */}
-          <div className="bg-white border border-zinc-200 p-6 rounded-xl shadow-xs space-y-4">
+          <div className="bg-white border border-zinc-200 p-4 sm:p-6 rounded-xl shadow-xs space-y-4">
             <h3 className="font-sans font-bold text-sm text-zinc-900 uppercase tracking-wide border-b border-zinc-100 pb-2 flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
+              <TrendingUp className="w-4 h-4 text-emerald-500 shrink-0" />
               Proyección de Recaudación Financiera al 100%, 75% y 50% de Éxito de Cobro
             </h3>
             
@@ -206,7 +208,7 @@ export const ProyeccionesTab: React.FC = () => {
               Mapea el rendimiento económico esperado de la matrícula fija para el horizonte actual y próximos trimestres de acuerdo con el cumplimiento del pago mensual de los socios.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 pt-3 text-center">
               {meses.map((mes, idx) => {
                 // Supongamos un leve incremento simulado mensual por crecimiento orgánico de alumnos (+2% mes)
                 const tasaInflacionOrg = 1 + (idx * 0.02);

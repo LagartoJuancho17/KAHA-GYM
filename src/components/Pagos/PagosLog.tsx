@@ -249,11 +249,11 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto" id="pagos-log-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto overflow-x-hidden" id="pagos-log-tab-panel">
       {/* HEADER */}
       <div className="flex flex-col gap-3" id="pagos-header">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Finanzas &amp; Pagos</h2>
             <p className="text-zinc-500 font-sans text-sm font-medium">Ingresos, egresos y liquidación de profesores</p>
           </div>
@@ -279,22 +279,22 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       {activeSubTab === 'INGRESOS' && (
         <div className="space-y-6">
           {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5" id="comparative-financial-kpis">
-            <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
-              <div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5" id="comparative-financial-kpis">
+            <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-sans gap-2">
+              <div className="min-w-0">
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Facturado Mes</span>
-                <div className="text-2xl font-mono font-bold text-zinc-950 mt-1">${comparativaFinanciera.esteMes.toLocaleString('es-AR')}</div>
+                <div className="text-xl sm:text-2xl font-mono font-bold text-zinc-950 mt-1 truncate">${comparativaFinanciera.esteMes.toLocaleString('es-AR')}</div>
               </div>
-              <div className="p-2 ml-4 bg-zinc-100 text-zinc-900 rounded-lg"><DollarSign className="w-5 h-5" /></div>
+              <div className="p-2 bg-zinc-100 text-zinc-900 rounded-lg shrink-0 hidden sm:flex"><DollarSign className="w-5 h-5" /></div>
             </div>
-            <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
-              <div>
-                <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Mes Anterior ({comparativaFinanciera.mesAnteriorLabel})</span>
-                <div className="text-2xl font-mono font-bold text-zinc-500 mt-1">${comparativaFinanciera.mesAnterior.toLocaleString('es-AR')}</div>
+            <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-sans gap-2">
+              <div className="min-w-0">
+                <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block truncate">Mes Anterior ({comparativaFinanciera.mesAnteriorLabel})</span>
+                <div className="text-xl sm:text-2xl font-mono font-bold text-zinc-500 mt-1">${comparativaFinanciera.mesAnterior.toLocaleString('es-AR')}</div>
               </div>
-              <div className="p-2 ml-4 bg-zinc-50 text-zinc-400 rounded-lg"><DollarSign className="w-5 h-5" /></div>
+              <div className="p-2 bg-zinc-50 text-zinc-400 rounded-lg shrink-0 hidden sm:flex"><DollarSign className="w-5 h-5" /></div>
             </div>
-            <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
+            <div className="col-span-2 sm:col-span-1 bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-sans gap-2">
               <div>
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Evolución de Tendencia</span>
                 <div className="flex items-center gap-2 mt-1">
@@ -306,7 +306,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                   </span>
                 </div>
               </div>
-              <div className={`p-2 ml-4 rounded-lg ${comparativaFinanciera.diferencia >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+              <div className={`p-2 rounded-lg shrink-0 hidden sm:block ${comparativaFinanciera.diferencia >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
                 {comparativaFinanciera.diferencia >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
               </div>
             </div>
@@ -333,7 +333,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       {activeSubTab === 'EGRESOS' && (
         <div className="space-y-6">
           {/* KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5">
             <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
               <div>
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Total Egresos</span>
@@ -388,6 +388,8 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
           {/* TABLA GASTOS */}
           <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+            <div className="min-w-[480px]">
             <table className="w-full text-left text-xs font-sans">
               <thead>
                 <tr className="bg-zinc-50 text-zinc-500 font-semibold border-b border-zinc-200 uppercase tracking-wider text-[10px]">
@@ -437,6 +439,8 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 </tfoot>
               )}
             </table>
+            </div>
+            </div>
           </div>
         </div>
       )}

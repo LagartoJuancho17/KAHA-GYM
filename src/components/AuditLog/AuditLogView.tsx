@@ -37,7 +37,7 @@ export const AuditLogView: React.FC = () => {
   }, [sortedLogs, buscarLog]);
 
   return (
-    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto" id="audit-logs-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto overflow-x-hidden" id="audit-logs-tab-panel">
       
       {/* SECCIÓN CABECERA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -68,9 +68,11 @@ export const AuditLogView: React.FC = () => {
         </div>
       </div>
 
-      {/* LISTADO DE ACCIONES */}
+      {/* LISTADO DE ACCIONES — TABLA en desktop, CARDS en mobile */}
       <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
-        <div className="overflow-x-auto text-xs font-sans">
+
+        {/* DESKTOP TABLE */}
+        <div className="hidden sm:block overflow-x-auto text-xs font-sans">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-zinc-50 text-zinc-500 font-semibold border-b border-zinc-200 uppercase tracking-wider text-[10px]">
@@ -121,6 +123,41 @@ export const AuditLogView: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* MOBILE CARDS */}
+        <div className="sm:hidden divide-y divide-zinc-100 text-xs font-sans">
+          {filteredLogs.length === 0 ? (
+            <div className="p-8 text-center text-zinc-400 italic">No hay logs que coincidan.</div>
+          ) : (
+            filteredLogs.map(l => {
+              let badgeColor = 'bg-zinc-100 text-zinc-800 border-zinc-200';
+              if (l.accion.includes('PAGO')) badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-100';
+              else if (l.accion.includes('ELIMINAR') || l.accion.includes('MOROSO')) badgeColor = 'bg-red-50 text-red-700 border-red-100';
+              else if (l.accion.includes('CREAR') || l.accion.includes('NUEVO')) badgeColor = 'bg-blue-50 text-blue-800 border-blue-100';
+              else if (l.accion.includes('PRECIO') || l.accion.includes('CUPO_MODIFICADO')) badgeColor = 'bg-purple-50 text-purple-800 border-purple-100';
+
+              return (
+                <div key={l.id} className="p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`px-2 py-0.5 rounded border font-bold text-[9px] uppercase tracking-wide shrink-0 ${badgeColor}`}>
+                      {l.accion}
+                    </span>
+                    <span className="font-mono text-[10px] text-zinc-400 truncate text-right">{l.usuario_email}</span>
+                  </div>
+                  <div className="font-mono text-[10px] text-zinc-500">
+                    {new Date(l.creado_at).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}
+                  </div>
+                  {formatDetalles(l.detalles) && (
+                    <p className="text-zinc-600 text-[11px] leading-relaxed break-words">
+                      {formatDetalles(l.detalles)}
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
       </div>
 
     </div>

@@ -101,7 +101,7 @@ export const MorososControl: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto" id="morosos-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto overflow-x-hidden" id="morosos-tab-panel">
       
       {/* SECCIÓN CABECERA */}
       <div>
@@ -110,40 +110,40 @@ export const MorososControl: React.FC = () => {
       </div>
 
       {/* KPIS DE MOROSIDAD */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5" id="delinquency-kpis">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5" id="delinquency-kpis">
         {/* TOTAL MOROSOS CARD */}
-        <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between">
+        <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col justify-between">
           <div>
-            <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Morosos Críticos (Post-Plazo)</span>
-            <div className="text-3xl font-sans font-bold text-red-600 mt-1">{morososCount} socios</div>
-            <span className="text-[10px] text-zinc-400 font-sans mt-1 block">Alumnos sin pago luego de expirado el plazo</span>
+            <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans leading-tight">Morosos Críticos</span>
+            <div className="text-2xl sm:text-3xl font-sans font-bold text-red-600 mt-1">{morososCount} socios</div>
+            <span className="text-[10px] text-zinc-400 font-sans mt-1 block">Sin pago luego del plazo</span>
           </div>
-          <div className="p-3 ml-4 bg-red-50 text-red-600 rounded-lg">
-            <ShieldAlert className="w-6 h-6" />
+          <div className="p-2 mt-2 bg-red-50 text-red-600 rounded-lg w-fit hidden sm:block">
+            <ShieldAlert className="w-5 h-5" />
           </div>
         </div>
 
         {/* % MOROSIDAD */}
-        <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between">
+        <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col justify-between">
           <div>
-            <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Tasa de Incumplimiento</span>
-            <div className="text-3xl font-sans font-bold text-zinc-950 mt-1">{porcentajeMora}%</div>
+            <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans leading-tight">Tasa de Incumplimiento</span>
+            <div className="text-2xl sm:text-3xl font-sans font-bold text-zinc-950 mt-1">{porcentajeMora}%</div>
             <span className="text-[10px] text-zinc-400 font-sans mt-1 block">{deudoresCount} alumnos con deuda vencida</span>
           </div>
-          <div className="p-3 ml-4 bg-zinc-100 text-zinc-500 rounded-lg">
-            <AlertTriangle className="w-6 h-6" />
+          <div className="p-2 mt-2 bg-zinc-100 text-zinc-500 rounded-lg w-fit hidden sm:block">
+            <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
 
         {/* DEUDA TOTAL ACUMULADA */}
-        <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between">
+        <div className="col-span-2 md:col-span-1 bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col justify-between">
           <div>
-            <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Monto Total de Deuda Pendiente</span>
-            <div className="text-3xl font-mono font-bold text-amber-600 mt-1">${totalDeudaPendienteGimnasio.toLocaleString('es-AR')}</div>
-            <span className="text-[10px] text-zinc-400 font-sans mt-1 block">ARS que restan recaudar de la cartera activa</span>
+            <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans leading-tight">Monto Total de Deuda Pendiente</span>
+            <div className="text-2xl sm:text-3xl font-mono font-bold text-amber-600 mt-1">${totalDeudaPendienteGimnasio.toLocaleString('es-AR')}</div>
+            <span className="text-[10px] text-zinc-400 font-sans mt-1 block">ARS que restan recaudar</span>
           </div>
-          <div className="p-3 ml-4 bg-amber-50 text-amber-600 rounded-lg">
-            <DollarSign className="w-6 h-6" />
+          <div className="p-2 mt-2 bg-amber-50 text-amber-600 rounded-lg w-fit hidden sm:block">
+            <DollarSign className="w-5 h-5" />
           </div>
         </div>
       </div>

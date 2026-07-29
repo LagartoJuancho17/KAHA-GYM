@@ -67,7 +67,7 @@ export const PlanesPricing: React.FC = () => {
       )}
 
       {/* GRILLA DE PLANES */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {planes.map(plan => {
           // Contar clientes activos asignados a este plan
           const countActivosPlan = clientesActivos.filter(c => c.plan_id === plan.id).length;
@@ -77,16 +77,16 @@ export const PlanesPricing: React.FC = () => {
           return (
             <div 
               key={plan.id} 
-              className="bg-white border border-zinc-200 p-6 rounded-xl flex flex-col justify-between shadow-xs transition-hover hover:border-zinc-300 relative"
+              className="bg-white border border-zinc-200 p-5 rounded-xl flex flex-col justify-between shadow-xs transition-hover hover:border-zinc-300 relative"
               id={`plan-card-${plan.id}`}
             >
               {/* Contenido Superior */}
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-zinc-100 border border-zinc-200 text-zinc-800 font-sans">
+                <div className="flex justify-between items-center gap-2 min-w-0">
+                  <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-zinc-100 border border-zinc-200 text-zinc-800 font-sans shrink-0">
                     {plan.dias_por_semana} Días Semana
                   </span>
-                  <span className="text-[10px] text-zinc-400 font-mono">ID: {plan.id}</span>
+                  <span className="text-[10px] text-zinc-400 font-mono truncate min-w-0 text-right" title={plan.id}>ID: {plan.id.length > 12 ? `${plan.id.slice(0, 8)}…` : plan.id}</span>
                 </div>
 
                 <h3 className="text-lg font-sans font-bold text-zinc-900">{plan.nombre}</h3>

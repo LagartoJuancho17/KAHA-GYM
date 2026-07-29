@@ -37,10 +37,32 @@
 }
 
 /* Custom styles matching ANGYM Design Theme */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   background-color: #f4f4f2;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #18181b;
+}
+
+/* Prevent inner content from overflowing on mobile */
+* {
+  box-sizing: border-box;
+}
+
+/* Hide floating chat/support buttons on mobile */
+@media (max-width: 768px) {
+  /* Antigravity floating widget */
+  [class*="antigravity-widget"],
+  [id*="antigravity-widget"],
+  [class*="chat-widget"],
+  button[style*="position: fixed"][style*="bottom"],
+  div[style*="position: fixed"][style*="bottom: 1rem"][style*="right: 1rem"] {
+    display: none !important;
+  }
 }
 
 /* Tipografía display ANGYM en todos los títulos */
@@ -220,3 +242,26 @@ h1, h2, h3, h4 {
   animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ===== Mobile responsive fixes ===== */
+@media (max-width: 640px) {
+  /* Make KPI cards use a 2-column grid on mobile instead of 1 wide card */
+  .mobile-kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  /* Prevent table overflow — horizontally scrollable on mobile */
+  .mobile-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Text ellipsis for long IDs on mobile */
+  .mobile-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 80px;
+  }
+}

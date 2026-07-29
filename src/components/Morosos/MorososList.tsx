@@ -54,7 +54,8 @@ export const MorososList: React.FC<MorososListProps> = ({
       </div>
 
       {/* Listado */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-0">
+        <div className="min-w-[560px]">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-[#fbfcff] text-zinc-500 border-b border-zinc-200 font-semibold uppercase tracking-wider text-[10px]">
@@ -133,6 +134,7 @@ export const MorososList: React.FC<MorososListProps> = ({
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

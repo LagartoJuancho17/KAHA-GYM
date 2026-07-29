@@ -184,7 +184,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const mesNombre = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="space-y-8 p-3 sm:p-6 max-w-7xl mx-auto" id="dashboard-tab-panel">
+    <div className="space-y-8 p-3 sm:p-6 max-w-7xl mx-auto overflow-x-hidden" id="dashboard-tab-panel">
       {/* SECCIÓN BIENVENIDA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
