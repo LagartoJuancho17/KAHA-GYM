@@ -50,8 +50,8 @@ export const PagosTable: React.FC<PagosTableProps> = ({
   return (
     <div className="space-y-4">
       {/* FILTROS */}
-      <div className="bg-white border border-zinc-200 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between text-xs">
-        <div className="relative w-full md:w-80">
+      <div className="bg-white border border-zinc-200 p-3 sm:p-4 rounded-xl flex flex-col gap-3 text-xs">
+        <div className="relative w-full">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
           <input
             type="text"
@@ -62,16 +62,16 @@ export const PagosTable: React.FC<PagosTableProps> = ({
             id="payments-search-input"
           />
         </div>
-        <div className="flex gap-3 items-center flex-wrap">
+        <div className="flex gap-2 items-center flex-wrap">
           <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
             <span>Mes:</span>
-            <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold">
+            <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold max-w-[130px]">
               {MESES_OPCIONES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
             <span>Medio:</span>
-            <select value={filtroMedio} onChange={e => setFiltroMedio(e.target.value)} className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold">
+            <select value={filtroMedio} onChange={e => setFiltroMedio(e.target.value)} className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold max-w-[110px]">
               <option value="TODOS">Todos</option>
               <option value="EFECTIVO">Efectivo</option>
               <option value="TRANSFERENCIA">Transferencia</option>
@@ -101,6 +101,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
       {/* TABLA COBROS */}
       <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
+          <div className="min-w-[540px]">
           <table className="w-full text-left text-xs font-sans">
             <thead>
               <tr className="bg-zinc-50 text-zinc-500 font-semibold border-b border-zinc-200 uppercase tracking-wider text-[10px]">
@@ -146,6 +147,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

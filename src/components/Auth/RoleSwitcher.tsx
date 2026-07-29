@@ -21,24 +21,23 @@ export const RoleSwitcher: React.FC = () => {
   const rolColor = rolActivo === 'ADMIN' ? 'text-sky-700 bg-sky-50 border-sky-200' : rolActivo === 'OPERADOR' ? 'text-slate-700 bg-slate-100 border-slate-300' : 'text-emerald-700 bg-emerald-50 border-emerald-200';
 
   return (
-    <div className="bg-white text-slate-700 py-2 px-4 lg:px-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs" id="role-switcher-container">
+    <div className="bg-white text-slate-700 py-2 px-3 sm:px-4 lg:px-6 border-b border-slate-200 flex flex-row justify-between items-center gap-2 text-xs overflow-x-hidden" id="role-switcher-container">
       {/* Brand + rol activo indicator */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <img src={logoKaha} alt="KAHA GYM Logo" className="w-6.5 h-6.5 rounded-lg object-contain shrink-0" id="gym-logo-badge" />
-        <div className="min-w-0">
+      <div className="flex items-center gap-2 min-w-0 shrink">
+        <img src={logoKaha} alt="KAHA GYM Logo" className="w-6 h-6 rounded-lg object-contain shrink-0" id="gym-logo-badge" />
+        <div className="min-w-0 hidden sm:block">
           <span className="font-display font-bold text-zinc-900 text-xs tracking-tight">KAHA GYM</span>
           <span className="text-slate-400 mx-1.5">·</span>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${rolColor}`}>
             {rolLabel}
           </span>
         </div>
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border sm:hidden ${rolColor}`}>
+          {rolLabel}
+        </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {/* MODO SIMULACION label */}
-        <span className="text-[9px] text-slate-400 font-mono uppercase tracking-widest hidden sm:inline">Modo Simulación:</span>
-
-        {/* Roles Toggles */}
+      <div className="flex items-center gap-1.5 shrink-0">
         <div className="flex items-center bg-zinc-100 p-0.5 rounded-full border border-zinc-200 gap-0.5">
           <button
             onClick={() => { if (!isOperatorBound) setRolActivo('ADMIN'); }}

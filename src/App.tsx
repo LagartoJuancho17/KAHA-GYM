@@ -529,7 +529,7 @@ function InnerApp() {
       )}
 
       {/* RIGHT SIDE MAIN CONTAINER */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen" id="main-content-flow">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden" id="main-content-flow">
         
         {/* Floating Top Header: DB switcher & Roles */}
         <RoleSwitcher />
@@ -643,7 +643,7 @@ function InnerApp() {
         </header>
 
         {/* Main View Area */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto flex flex-col justify-between">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto overflow-x-hidden flex flex-col justify-between">
           <ErrorBoundary key={activeTab} section={currentTab.label}>
             {renderActiveTabContent()}
           </ErrorBoundary>
