@@ -148,7 +148,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   };
 
   return (
-    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto" id="clientes-crud-tab-panel">
+    <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto overflow-x-hidden" id="clientes-crud-tab-panel">
       
       {/* SECCIÓN TITULO Y METRICS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

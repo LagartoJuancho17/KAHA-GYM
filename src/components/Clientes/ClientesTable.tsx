@@ -61,6 +61,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
   return (
     <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
       <div className="overflow-x-auto">
+        <div className="min-w-[620px]">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-zinc-50 text-zinc-500 font-sans font-medium uppercase tracking-wider border-b border-zinc-200">
@@ -312,7 +313,9 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
             )}
           </tbody>
         </table>
+        </div>
       </div>
+
 
       {/* PAGINACIÓN CONTROLLER */}
       <div className="bg-zinc-50 px-4 py-3 border-t border-zinc-200 flex items-center justify-between text-xs font-sans text-zinc-500">
