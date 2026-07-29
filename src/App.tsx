@@ -419,8 +419,8 @@ function InnerApp() {
 
       {/* LEFT NAVIGATION SIDEBAR (GEOMETRIC CLEAN LIGHT BACKGROUND) */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-[260px] bg-white text-slate-600 p-6 flex flex-col justify-between border-r border-slate-200 transition-transform duration-300 transform
-        lg:translate-x-0 lg:static lg:h-screen lg:overflow-y-auto
+        fixed inset-y-0 left-0 z-40 w-[260px] bg-white text-slate-600 px-6 pb-6 pt-20 lg:pt-6 flex flex-col justify-between border-r border-slate-200 transition-transform duration-300 transform overflow-y-auto
+        lg:translate-x-0 lg:static lg:h-screen
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} id="app-sidebar-nav">
         
@@ -644,9 +644,11 @@ function InnerApp() {
 
         {/* Main View Area */}
         <main className="flex-1 p-3 pb-24 sm:p-6 lg:p-8 overflow-y-auto overflow-x-hidden flex flex-col justify-between">
-          <ErrorBoundary key={activeTab} section={currentTab.label}>
-            {renderActiveTabContent()}
-          </ErrorBoundary>
+          <div className="w-full min-w-0">
+            <ErrorBoundary key={activeTab} section={currentTab.label}>
+              {renderActiveTabContent()}
+            </ErrorBoundary>
+          </div>
 
           {/* FOOTER GENERAL */}
           <Footer />

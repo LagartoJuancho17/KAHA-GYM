@@ -91,7 +91,7 @@ export const NovedadFormModal: React.FC<NovedadFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs select-none animate-fade-in font-sans">
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4 animate-scale-up">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 animate-scale-up">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
