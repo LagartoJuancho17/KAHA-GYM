@@ -258,14 +258,14 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             <p className="text-zinc-500 font-sans text-sm font-medium">Ingresos, egresos y liquidación de profesores</p>
           </div>
 
-          {/* SUB-TABS */}
-          <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200 gap-1 w-full sm:w-auto">
-            {([['INGRESOS', 'Ingresos'], ['EGRESOS', 'Egresos'], ['LIQUIDACION', 'Liquid. Profes']] as [SubTab, string][]).map(([key, label]) => (
+          {/* SUB-TABS (Grid on mobile for 100% width distribution) */}
+          <div className="grid grid-cols-3 bg-zinc-100 p-1 rounded-xl border border-zinc-200 gap-1 w-full sm:w-auto">
+            {([['INGRESOS', 'Ingresos'], ['EGRESOS', 'Egresos'], ['LIQUIDACION', 'Liquidación']] as [SubTab, string][]).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setActiveSubTab(key)}
-                className={`flex-1 sm:flex-none px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none bg-transparent ${
-                  activeSubTab === key ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'
+                className={`py-2 px-1 text-center rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer border-none bg-transparent truncate ${
+                  activeSubTab === key ? 'bg-white text-zinc-950 shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-800'
                 }`}
               >
                 {label}
@@ -277,36 +277,38 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
       {/* SUB-TAB: INGRESOS Y CUOTAS */}
       {activeSubTab === 'INGRESOS' && (
-        <div className="space-y-6">
-          {/* KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5" id="comparative-financial-kpis">
-            <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-sans gap-2">
+        <div className="space-y-5">
+          {/* KPIs: 1 col on mobile, 3 cols on desktop */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5" id="comparative-financial-kpis">
+            <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex items-center justify-between text-xs font-sans">
               <div className="min-w-0">
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Facturado Mes</span>
-                <div className="text-xl sm:text-2xl font-mono font-bold text-zinc-950 mt-1 truncate">${comparativaFinanciera.esteMes.toLocaleString('es-AR')}</div>
+                <div className="text-2xl font-mono font-bold text-zinc-950 mt-1 truncate">${comparativaFinanciera.esteMes.toLocaleString('es-AR')}</div>
               </div>
-              <div className="p-2 bg-zinc-100 text-zinc-900 rounded-lg shrink-0 hidden sm:flex"><DollarSign className="w-5 h-5" /></div>
+              <div className="p-2.5 bg-zinc-100 text-zinc-900 rounded-lg shrink-0"><DollarSign className="w-5 h-5" /></div>
             </div>
-            <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-sans gap-2">
+
+            <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex items-center justify-between text-xs font-sans">
               <div className="min-w-0">
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block truncate">Mes Anterior ({comparativaFinanciera.mesAnteriorLabel})</span>
-                <div className="text-xl sm:text-2xl font-mono font-bold text-zinc-500 mt-1">${comparativaFinanciera.mesAnterior.toLocaleString('es-AR')}</div>
+                <div className="text-2xl font-mono font-bold text-zinc-500 mt-1 truncate">${comparativaFinanciera.mesAnterior.toLocaleString('es-AR')}</div>
               </div>
-              <div className="p-2 bg-zinc-50 text-zinc-400 rounded-lg shrink-0 hidden sm:flex"><DollarSign className="w-5 h-5" /></div>
+              <div className="p-2.5 bg-zinc-50 text-zinc-400 rounded-lg shrink-0"><DollarSign className="w-5 h-5" /></div>
             </div>
-            <div className="col-span-2 sm:col-span-1 bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-sans gap-2">
-              <div>
+
+            <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex items-center justify-between text-xs font-sans">
+              <div className="min-w-0">
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Evolución de Tendencia</span>
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-2xl font-mono font-bold block ${comparativaFinanciera.diferencia >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {comparativaFinanciera.porcent >= 0 ? '+' : ''}{comparativaFinanciera.porcent}%
                   </span>
-                  <span className="text-[10px] bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-mono text-zinc-500">
+                  <span className="text-[10px] bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-mono text-zinc-500 truncate">
                     ${comparativaFinanciera.diferencia.toLocaleString('es-AR')}
                   </span>
                 </div>
               </div>
-              <div className={`p-2 rounded-lg shrink-0 hidden sm:block ${comparativaFinanciera.diferencia >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+              <div className={`p-2.5 rounded-lg shrink-0 ${comparativaFinanciera.diferencia >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
                 {comparativaFinanciera.diferencia >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
               </div>
             </div>

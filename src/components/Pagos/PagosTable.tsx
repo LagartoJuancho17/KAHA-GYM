@@ -49,8 +49,9 @@ export const PagosTable: React.FC<PagosTableProps> = ({
 }) => {
   return (
     <div className="space-y-4">
-      {/* FILTROS */}
-      <div className="bg-white border border-zinc-200 p-3 sm:p-4 rounded-xl flex flex-col gap-3 text-xs">
+      {/* FILTROS Y ACCIONES */}
+      <div className="bg-white border border-zinc-200 p-3 sm:p-4 rounded-xl space-y-3 text-xs">
+        {/* Search */}
         <div className="relative w-full">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
           <input
@@ -62,39 +63,46 @@ export const PagosTable: React.FC<PagosTableProps> = ({
             id="payments-search-input"
           />
         </div>
-        <div className="flex gap-2 items-center flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
-            <span>Mes:</span>
-            <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold max-w-[130px]">
-              {MESES_OPCIONES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
+
+        {/* Selects & Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+              <span className="shrink-0">Mes:</span>
+              <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="w-full border border-zinc-200 rounded-md py-1.5 px-2 text-zinc-700 bg-white text-xs font-semibold">
+                {MESES_OPCIONES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+              <span className="shrink-0">Medio:</span>
+              <select value={filtroMedio} onChange={e => setFiltroMedio(e.target.value)} className="w-full border border-zinc-200 rounded-md py-1.5 px-2 text-zinc-700 bg-white text-xs font-semibold">
+                <option value="TODOS">Todos</option>
+                <option value="EFECTIVO">Efectivo</option>
+                <option value="TRANSFERENCIA">Transferencia</option>
+                <option value="MERCADO_PAGO">Mercado Pago</option>
+                <option value="UALA">Uala</option>
+                <option value="OTRO">Otro</option>
+              </select>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
-            <span>Medio:</span>
-            <select value={filtroMedio} onChange={e => setFiltroMedio(e.target.value)} className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold max-w-[110px]">
-              <option value="TODOS">Todos</option>
-              <option value="EFECTIVO">Efectivo</option>
-              <option value="TRANSFERENCIA">Transferencia</option>
-              <option value="MERCADO_PAGO">Mercado Pago</option>
-              <option value="UALA">Uala</option>
-              <option value="OTRO">Otro</option>
-            </select>
+
+          <div className="grid grid-cols-2 sm:flex gap-2">
+            <button
+              onClick={onAddPagoClick}
+              className="bg-black hover:bg-zinc-800 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
+              id="btn-register-payment-modal-trigger"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Cargar Pago</span>
+            </button>
+            <button
+              onClick={onConciliarCSVClick}
+              className="flex items-center justify-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200 px-3 py-2 rounded-lg text-xs font-semibold transition-all border-none cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Conciliar CSV</span>
+            </button>
           </div>
-          <button
-            onClick={onAddPagoClick}
-            className="bg-black hover:bg-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
-            id="btn-register-payment-modal-trigger"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Cargar Pago
-          </button>
-          <button
-            onClick={onConciliarCSVClick}
-            className="flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border-none cursor-pointer"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Conciliar CSV
-          </button>
         </div>
       </div>
 

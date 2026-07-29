@@ -535,14 +535,14 @@ function InnerApp() {
         <RoleSwitcher />
 
         {/* GEOMETRIC THEMED SUB-HEADER (Matching the clean header element) */}
-        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-row items-center justify-between gap-3 shadow-xs" id="sub-header-container">
-          <div className="min-w-0 flex-1 flex items-center gap-3">
+        <header className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-4 flex flex-row items-center justify-between gap-3 shadow-xs" id="sub-header-container">
+          <div className="min-w-0 flex-1 flex items-center gap-2.5">
             <img src={logoKaha} alt="KAHA GYM Logo" className="w-8 h-8 rounded-lg object-contain shrink-0 hidden sm:block shadow-2xs" />
             <div className="min-w-0">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
                 Entorno Seguro
               </span>
-              <span className="font-display text-base sm:text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight truncate" id="current-tab-label-header">
+              <span className="font-display text-sm sm:text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight truncate" id="current-tab-label-header">
                 {currentTab.desc}
               </span>
             </div>
@@ -573,7 +573,7 @@ function InnerApp() {
                 <div className="fixed inset-0 z-40" onClick={() => setShowNotificationsDropdown(false)}></div>
                 
                 {/* Dropdown Container */}
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 font-sans animate-scale-in max-h-[420px] overflow-y-auto" id="admin-notifications-dropdown">
+                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 font-sans animate-scale-in max-h-[420px] overflow-y-auto" id="admin-notifications-dropdown">
                   <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2">
                     <h4 className="text-xs font-bold text-slate-800">Alertas de Cobro ({notificaciones.filter(n => !n.leido).length} nuevas)</h4>
                     {notificaciones.length > 0 && (
@@ -643,7 +643,7 @@ function InnerApp() {
         </header>
 
         {/* Main View Area */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto overflow-x-hidden flex flex-col justify-between">
+        <main className="flex-1 p-3 pb-24 sm:p-6 lg:p-8 overflow-y-auto overflow-x-hidden flex flex-col justify-between">
           <ErrorBoundary key={activeTab} section={currentTab.label}>
             {renderActiveTabContent()}
           </ErrorBoundary>
