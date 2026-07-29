@@ -98,7 +98,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
     plan_id: 'p-3d',
     activo: true,
     deuda_acumulada: 0,
-    ultimo_mes_pagado: '2026-05',
+    ultimo_mes_pagado: '2026-07',
     turnos_fijos: ['LUNES-08:30', 'MIERCOLES-08:30', 'VIERNES-08:30'],
     creado_at: '2026-01-15T09:00:00Z'
   },
@@ -113,8 +113,8 @@ export const INITIAL_CLIENTES: Cliente[] = [
     estado: 'MOROSO',
     plan_id: 'p-2d',
     activo: true,
-    deuda_acumulada: 14000.00, // Debe el mes actual (mayo)
-    ultimo_mes_pagado: '2026-04',
+    deuda_acumulada: 65000.00, // Debe el mes actual (julio)
+    ultimo_mes_pagado: '2026-06',
     turnos_fijos: ['MARTES-19:00', 'JUEVES-19:00'],
     creado_at: '2026-02-01T18:30:00Z'
   },
@@ -130,7 +130,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
     plan_id: 'p-3d',
     activo: true,
     deuda_acumulada: 0,
-    ultimo_mes_pagado: '2026-05',
+    ultimo_mes_pagado: '2026-07',
     turnos_fijos: [],
     creado_at: '2026-02-14T11:00:00Z'
   },
@@ -142,11 +142,11 @@ export const INITIAL_CLIENTES: Cliente[] = [
     email: 'diaz.vale@gmail.com',
     telefono: '11-8976-5432',
     tipo: 'FIJO',
-    estado: 'CON_DEUDA',
+    estado: 'ACTIVO',
     plan_id: 'p-5d',
     activo: true,
-    deuda_acumulada: 24000.00, // Debe el mes anterior o actual
-    ultimo_mes_pagado: '2026-04',
+    deuda_acumulada: 0,
+    ultimo_mes_pagado: '2026-07',
     turnos_fijos: ['LUNES-18:00', 'MARTES-18:00', 'MIERCOLES-18:00', 'JUEVES-18:00', 'VIERNES-18:00'],
     creado_at: '2026-03-10T16:00:00Z'
   },
@@ -178,7 +178,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
     plan_id: 'p-3d',
     activo: true,
     deuda_acumulada: 0,
-    ultimo_mes_pagado: '2026-05',
+    ultimo_mes_pagado: '2026-07',
     turnos_fijos: ['LUNES-10:30', 'MIERCOLES-10:30', 'VIERNES-10:30'],
     creado_at: '2026-04-05T08:00:00Z'
   },
@@ -194,7 +194,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
     plan_id: 'p-4d',
     activo: true,
     deuda_acumulada: 0,
-    ultimo_mes_pagado: '2026-05',
+    ultimo_mes_pagado: '2026-07',
     turnos_fijos: ['MARTES-15:00', 'JUEVES-15:00', 'VIERNES-15:00'],
     creado_at: '2026-04-12T14:00:00Z'
   },
@@ -210,72 +210,266 @@ export const INITIAL_CLIENTES: Cliente[] = [
     plan_id: 'p-none',
     activo: true,
     deuda_acumulada: 0,
-    ultimo_mes_pagado: '2026-05',
+    ultimo_mes_pagado: '2026-07',
     turnos_fijos: [],
     creado_at: '2026-05-01T10:00:00Z'
   }
 ];
 
 export const INITIAL_PAGOS: Pago[] = [
+  // --- JULIO 2026 (MES ACTUAL) ---
   {
-    id: 'pay-1',
+    id: 'pay-jul-1',
     cliente_id: 'c-1',
     cliente_nombre_completo: 'Facundo Gómez',
-    monto: 18000.00,
-    fecha_pago: '2026-05-02T10:15:00Z',
+    monto: 85000.00,
+    fecha_pago: '2026-07-02T10:15:00Z',
     medio_pago: 'MERCADO_PAGO',
-    mes_correspondiente: '2026-05',
+    mes_correspondiente: '2026-07',
     hash_transaccion: 'MP-99881122',
     registrado_por: 'admin@gimnasio.com.ar',
-    creado_at: '2026-05-02T10:15:00Z'
+    creado_at: '2026-07-02T10:15:00Z'
   },
   {
-    id: 'pay-2',
+    id: 'pay-jul-2',
     cliente_id: 'c-3',
     cliente_nombre_completo: 'Mateo Rossi',
-    monto: 18000.00,
-    fecha_pago: '2026-05-03T16:40:00Z',
+    monto: 85000.00,
+    fecha_pago: '2026-07-03T16:40:00Z',
     medio_pago: 'TRANSFERENCIA',
-    mes_correspondiente: '2026-05',
+    mes_correspondiente: '2026-07',
     hash_transaccion: 'TX-88224511',
     registrado_por: 'operator@gimnasio.com.ar',
-    creado_at: '2026-05-03T16:40:00Z'
+    creado_at: '2026-07-03T16:40:00Z'
   },
   {
-    id: 'pay-3',
+    id: 'pay-jul-3',
+    cliente_id: 'c-4',
+    cliente_nombre_completo: 'Valentina Díaz',
+    monto: 135000.00,
+    fecha_pago: '2026-07-02T11:00:00Z',
+    medio_pago: 'TRANSFERENCIA',
+    mes_correspondiente: '2026-07',
+    hash_transaccion: 'TX-77341109',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-07-02T11:00:00Z'
+  },
+  {
+    id: 'pay-jul-4',
     cliente_id: 'c-6',
     cliente_nombre_completo: 'Catalina López',
-    monto: 18000.00,
-    fecha_pago: '2026-05-04T09:00:00Z',
+    monto: 85000.00,
+    fecha_pago: '2026-07-04T09:00:00Z',
     medio_pago: 'EFECTIVO',
-    mes_correspondiente: '2026-05',
+    mes_correspondiente: '2026-07',
     hash_transaccion: 'EF-33211',
     registrado_por: 'operator@gimnasio.com.ar',
-    creado_at: '2026-05-04T09:00:00Z'
+    creado_at: '2026-07-04T09:00:00Z'
   },
   {
-    id: 'pay-4',
+    id: 'pay-jul-5',
     cliente_id: 'c-7',
     cliente_nombre_completo: 'Bautista González',
-    monto: 21000.00,
-    fecha_pago: '2026-05-05T19:30:00Z',
+    monto: 115000.00,
+    fecha_pago: '2026-07-05T19:30:00Z',
     medio_pago: 'TRANSFERENCIA',
-    mes_correspondiente: '2026-05',
+    mes_correspondiente: '2026-07',
     hash_transaccion: 'TX-9038221',
     registrado_por: 'admin@gimnasio.com.ar',
-    creado_at: '2026-05-05T19:30:00Z'
+    creado_at: '2026-07-05T19:30:00Z'
+  },
+
+  // --- JUNIO 2026 (MES ANTERIOR) ---
+  {
+    id: 'pay-jun-1',
+    cliente_id: 'c-1',
+    cliente_nombre_completo: 'Facundo Gómez',
+    monto: 85000.00,
+    fecha_pago: '2026-06-02T10:00:00Z',
+    medio_pago: 'MERCADO_PAGO',
+    mes_correspondiente: '2026-06',
+    hash_transaccion: 'MP-88112233',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-06-02T10:00:00Z'
   },
   {
-    id: 'pay-5',
+    id: 'pay-jun-2',
     cliente_id: 'c-2',
     cliente_nombre_completo: 'Sofía Rodríguez',
-    monto: 14000.00,
-    fecha_pago: '2026-04-03T11:00:00Z',
-    medio_pago: 'MERCADO_PAGO',
-    mes_correspondiente: '2026-04',
-    hash_transaccion: 'MP-8839021a',
+    monto: 65000.00,
+    fecha_pago: '2026-06-05T11:30:00Z',
+    medio_pago: 'EFECTIVO',
+    mes_correspondiente: '2026-06',
+    hash_transaccion: 'EF-11992',
     registrado_por: 'operator@gimnasio.com.ar',
-    creado_at: '2026-04-03T11:00:00Z'
+    creado_at: '2026-06-05T11:30:00Z'
+  },
+  {
+    id: 'pay-jun-3',
+    cliente_id: 'c-3',
+    cliente_nombre_completo: 'Mateo Rossi',
+    monto: 85000.00,
+    fecha_pago: '2026-06-03T15:00:00Z',
+    medio_pago: 'TRANSFERENCIA',
+    mes_correspondiente: '2026-06',
+    hash_transaccion: 'TX-55443322',
+    registrado_por: 'operator@gimnasio.com.ar',
+    creado_at: '2026-06-03T15:00:00Z'
+  },
+  {
+    id: 'pay-jun-4',
+    cliente_id: 'c-4',
+    cliente_nombre_completo: 'Valentina Díaz',
+    monto: 135000.00,
+    fecha_pago: '2026-06-02T18:00:00Z',
+    medio_pago: 'TRANSFERENCIA',
+    mes_correspondiente: '2026-06',
+    hash_transaccion: 'TX-66778899',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-06-02T18:00:00Z'
+  },
+  {
+    id: 'pay-jun-5',
+    cliente_id: 'c-6',
+    cliente_nombre_completo: 'Catalina López',
+    monto: 85000.00,
+    fecha_pago: '2026-06-04T10:15:00Z',
+    medio_pago: 'MERCADO_PAGO',
+    mes_correspondiente: '2026-06',
+    hash_transaccion: 'MP-77221199',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-06-04T10:15:00Z'
+  },
+  {
+    id: 'pay-jun-6',
+    cliente_id: 'c-7',
+    cliente_nombre_completo: 'Bautista González',
+    monto: 115000.00,
+    fecha_pago: '2026-06-06T12:00:00Z',
+    medio_pago: 'TRANSFERENCIA',
+    mes_correspondiente: '2026-06',
+    hash_transaccion: 'TX-11223344',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-06-06T12:00:00Z'
+  },
+
+  // --- MAYO 2026 ---
+  {
+    id: 'pay-may-1',
+    cliente_id: 'c-1',
+    cliente_nombre_completo: 'Facundo Gómez',
+    monto: 85000.00,
+    fecha_pago: '2026-05-03T10:00:00Z',
+    medio_pago: 'MERCADO_PAGO',
+    mes_correspondiente: '2026-05',
+    hash_transaccion: 'MP-445566',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-05-03T10:00:00Z'
+  },
+  {
+    id: 'pay-may-2',
+    cliente_id: 'c-3',
+    cliente_nombre_completo: 'Mateo Rossi',
+    monto: 85000.00,
+    fecha_pago: '2026-05-04T14:00:00Z',
+    medio_pago: 'TRANSFERENCIA',
+    mes_correspondiente: '2026-05',
+    hash_transaccion: 'TX-332211',
+    registrado_por: 'operator@gimnasio.com.ar',
+    creado_at: '2026-05-04T14:00:00Z'
+  },
+  {
+    id: 'pay-may-3',
+    cliente_id: 'c-4',
+    cliente_nombre_completo: 'Valentina Díaz',
+    monto: 135000.00,
+    fecha_pago: '2026-05-02T09:00:00Z',
+    medio_pago: 'TRANSFERENCIA',
+    mes_correspondiente: '2026-05',
+    hash_transaccion: 'TX-998877',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-05-02T09:00:00Z'
+  },
+  {
+    id: 'pay-may-4',
+    cliente_id: 'c-6',
+    cliente_nombre_completo: 'Catalina López',
+    monto: 85000.00,
+    fecha_pago: '2026-05-05T11:00:00Z',
+    medio_pago: 'EFECTIVO',
+    mes_correspondiente: '2026-05',
+    hash_transaccion: 'EF-55443',
+    registrado_por: 'operator@gimnasio.com.ar',
+    creado_at: '2026-05-05T11:00:00Z'
+  },
+  {
+    id: 'pay-may-5',
+    cliente_id: 'c-7',
+    cliente_nombre_completo: 'Bautista González',
+    monto: 115000.00,
+    fecha_pago: '2026-05-06T16:00:00Z',
+    medio_pago: 'TRANSFERENCIA',
+    mes_correspondiente: '2026-05',
+    hash_transaccion: 'TX-118844',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-05-06T16:00:00Z'
+  }
+];
+
+export const INITIAL_GASTOS: any[] = [
+  {
+    id: 'gas-jul-1',
+    concepto: 'Alquiler Salón Principal',
+    monto: 150000.00,
+    categoria: 'ALQUILER',
+    fecha: '2026-07-05',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-07-05T10:00:00Z'
+  },
+  {
+    id: 'gas-jul-2',
+    concepto: 'Servicios Luz Edesur y Gas',
+    monto: 38000.00,
+    categoria: 'SERVICIOS',
+    fecha: '2026-07-10',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-07-10T11:00:00Z'
+  },
+  {
+    id: 'gas-jul-3',
+    concepto: 'Honorarios Profesores Julio',
+    monto: 130000.00,
+    categoria: 'PROFESORES',
+    fecha: '2026-07-28',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-07-28T18:00:00Z'
+  },
+  {
+    id: 'gas-jun-1',
+    concepto: 'Alquiler Salón Principal',
+    monto: 140000.00,
+    categoria: 'ALQUILER',
+    fecha: '2026-06-05',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-06-05T10:00:00Z'
+  },
+  {
+    id: 'gas-jun-2',
+    concepto: 'Servicios Luz e Internet',
+    monto: 32000.00,
+    categoria: 'SERVICIOS',
+    fecha: '2026-06-10',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-06-10T11:00:00Z'
+  },
+  {
+    id: 'gas-jun-3',
+    concepto: 'Honorarios Profesores Junio',
+    monto: 110000.00,
+    categoria: 'PROFESORES',
+    fecha: '2026-06-28',
+    registrado_por: 'admin@gimnasio.com.ar',
+    creado_at: '2026-06-28T18:00:00Z'
   }
 ];
 

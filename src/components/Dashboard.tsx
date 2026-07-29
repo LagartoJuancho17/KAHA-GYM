@@ -94,18 +94,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return meses;
   })();
 
-  // Datos históricos para gráficos
-  const ingresosHistoricos = ultimos6Meses.map((mes, idx) => {
-    const totalMes = pagos
+  // Datos históricos para gráficos (100% reales basados en registros de pago)
+  const ingresosHistoricos = ultimos6Meses.map((mes) => {
+    return pagos
       .filter(p => p.mes_correspondiente === mes)
       .reduce((sum, p) => sum + p.monto, 0);
-    if (totalMes > 0) return totalMes;
-    if (mes === mesActual && ingresosReales > 0) return ingresosReales;
-
-    // Baseline realista proporcional a los planes activos si no hay registros viejos en la DB
-    const baseEsperada = ingresosEsperados > 0 ? ingresosEsperados : 60000;
-    const factorSimulado = 0.75 + (idx * 0.05);
-    return Math.round(baseEsperada * factorSimulado);
   });
 
   const maxIngreso = Math.max(...ingresosHistoricos, 10000);

@@ -107,7 +107,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     const month = parseInt(mesCorriente.split('-')[1]);
     const prevMonthStr = month === 1 ? `${year - 1}-12` : `${year}-${(month - 1).toString().padStart(2, '0')}`;
     const ingresosEsteMes = pagos.filter(p => p.mes_correspondiente === mesCorriente).reduce((s, p) => s + p.monto, 0);
-    const ingresosMesAnterior = pagos.filter(p => p.mes_correspondiente === prevMonthStr).reduce((s, p) => s + p.monto, 0) || 57000;
+    const ingresosMesAnterior = pagos.filter(p => p.mes_correspondiente === prevMonthStr).reduce((s, p) => s + p.monto, 0);
     const variacionAbsoluta = ingresosEsteMes - ingresosMesAnterior;
     const variacionPorcentual = ingresosMesAnterior > 0 ? Math.round((variacionAbsoluta / ingresosMesAnterior) * 100) : 0;
     return { mesActualLabel: mesCorriente, mesAnteriorLabel: prevMonthStr, esteMes: ingresosEsteMes, mesAnterior: ingresosMesAnterior, diferencia: variacionAbsoluta, porcent: variacionPorcentual };

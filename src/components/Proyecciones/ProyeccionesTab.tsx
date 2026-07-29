@@ -6,7 +6,7 @@ import { Shield, BarChart3, TrendingUp, Sparkles, Scale, AlertOctagon, HelpCircl
 export const ProyeccionesTab: React.FC = () => {
   const { planes, clientes, turnos, rolActivo } = useGym();
 
-  const meses = ['Mayo (Act)', 'Junio (Proj)', 'Julio (Proj)', 'Agosto (Proj)'];
+  const meses = ['Julio (Mes Actual)', 'Agosto (Proyectado)', 'Septiembre (Proyectado)', 'Octubre (Proyectado)'];
 
   // Proyecciones de ingresos teóricos según el listado de planes
   // Contamos clientes activos actuales

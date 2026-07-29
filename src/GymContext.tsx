@@ -8,7 +8,7 @@ import {
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
-  INITIAL_CLIENTES, INITIAL_PAGOS, INITIAL_AUDIT_LOGS, INITIAL_RECUPEROS, INITIAL_NOVEDADES 
+  INITIAL_CLIENTES, INITIAL_PAGOS, INITIAL_AUDIT_LOGS, INITIAL_RECUPEROS, INITIAL_NOVEDADES, INITIAL_GASTOS
 } from './initialMockData';
 import { supabase } from './supabaseClient';
 
@@ -546,8 +546,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('gym_turnos', JSON.stringify(baseTurnos));
       }
 
-      if (localPagos) setPagos(JSON.parse(localPagos));
-      else {
+      if (localPagos) {
+        const parsed = JSON.parse(localPagos);
+        const hasJulData = parsed.some((p: any) => p.mes_correspondiente === '2026-07');
+        if (hasJulData) {
+          setPagos(parsed);
+        } else {
+          setPagos(INITIAL_PAGOS);
+          localStorage.setItem('gym_pagos', JSON.stringify(INITIAL_PAGOS));
+        }
+      } else {
         setPagos(INITIAL_PAGOS);
         localStorage.setItem('gym_pagos', JSON.stringify(INITIAL_PAGOS));
       }
@@ -576,17 +584,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('gym_notificaciones', JSON.stringify([]));
       }
 
-      if (localGastos) setGastos(JSON.parse(localGastos));
-      else {
-        const nowISO = new Date().toISOString();
-        const mesActual = nowISO.slice(0, 7);
-        const initGastos = [
-          { id: 'gas-1', concepto: 'Alquiler Salón Principal', monto: 85000, categoria: 'ALQUILER', fecha: `${mesActual}-01`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-01T10:00:00Z` },
-          { id: 'gas-2', concepto: 'Servicio de Luz Edesur', monto: 18400, categoria: 'SERVICIOS', fecha: `${mesActual}-10`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-10T12:00:00Z` },
-          { id: 'gas-3', concepto: 'Insumos Limpieza', monto: 7500, categoria: 'INSUMOS', fecha: `${mesActual}-15`, registrado_por: 'admin@gimnasio.com.ar', creado_at: `${mesActual}-15T15:00:00Z` }
-        ];
-        setGastos(initGastos as Gasto[]);
-        localStorage.setItem('gym_gastos', JSON.stringify(initGastos));
+      if (localGastos) {
+        const parsedG = JSON.parse(localGastos);
+        const hasJulG = parsedG.some((g: any) => g.fecha?.startsWith('2026-07'));
+        if (hasJulG) {
+          setGastos(parsedG);
+        } else {
+          setGastos(INITIAL_GASTOS as Gasto[]);
+          localStorage.setItem('gym_gastos', JSON.stringify(INITIAL_GASTOS));
+        }
+      } else {
+        setGastos(INITIAL_GASTOS as Gasto[]);
+        localStorage.setItem('gym_gastos', JSON.stringify(INITIAL_GASTOS));
       }
 
       if (localProfesores) setProfesores(JSON.parse(localProfesores));
