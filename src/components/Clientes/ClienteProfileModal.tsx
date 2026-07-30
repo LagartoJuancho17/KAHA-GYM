@@ -9,6 +9,7 @@ interface ClienteProfileModalProps {
   clienteId: string | null;
   onStartEdit: (cl: Cliente) => void;
   onDeleteClick: (cl: Cliente) => void;
+  onManageTurnos?: (cl: Cliente) => void;
 }
 
 const getWhatsAppLink = (phone: string) => {
@@ -44,7 +45,8 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   onClose,
   clienteId,
   onStartEdit,
-  onDeleteClick
+  onDeleteClick,
+  onManageTurnos
 }) => {
   const { clientes, planes, pagos, turnos } = useGym();
 
@@ -191,13 +193,27 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
 
           {/* Turnos asignados fijos */}
           <div className="border border-zinc-200 p-4 rounded-xl">
-            <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-3 font-sans border-b border-zinc-100 pb-2 flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-              Turnos Fijos Asignados
-              <span className="ml-auto bg-zinc-100 text-zinc-600 font-mono px-2 py-0.5 rounded-full text-[9px] font-bold">
-                {selectedCliente.tipo === 'FIJO' ? `${selectedCliente.turnos_fijos.length} turno${selectedCliente.turnos_fijos.length !== 1 ? 's' : ''}` : 'N/A'}
-              </span>
-            </h4>
+            <div className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-3 font-sans border-b border-zinc-100 pb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Turnos Fijos Asignados</span>
+                <span className="bg-zinc-100 text-zinc-600 font-mono px-2 py-0.5 rounded-full text-[9px] font-bold">
+                  {selectedCliente.tipo === 'FIJO' ? `${selectedCliente.turnos_fijos.length} turno${selectedCliente.turnos_fijos.length !== 1 ? 's' : ''}` : 'N/A'}
+                </span>
+              </div>
+              {onManageTurnos && (
+                <button
+                  onClick={() => {
+                    onManageTurnos(selectedCliente);
+                    onClose();
+                  }}
+                  className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Calendar className="w-3 h-3 text-emerald-600" />
+                  <span>Gestionar Turnos</span>
+                </button>
+              )}
+            </div>
             {selectedCliente.tipo === 'FLEXIBLE' ? (
               <p className="text-zinc-400 italic text-xs">Los socios FLEXIBLE no tienen turnos fijos. Asisten según cupos libres diarios.</p>
             ) : selectedCliente.turnos_fijos.length === 0 ? (

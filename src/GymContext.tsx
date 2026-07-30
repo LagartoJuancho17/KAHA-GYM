@@ -57,7 +57,7 @@ interface GymContextType {
   // Clientes Methods
   addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => { success: boolean; message: string; duplicate?: boolean };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
-  autorizarCliente: (id: string, planId?: string) => { success: boolean; message: string };
+  autorizarCliente: (id: string, planId?: string, tipo?: TipoCliente) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
   altaCliente: (id: string) => void;
   eliminarCliente: (id: string) => void;
@@ -1101,15 +1101,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const autorizarCliente = (id: string, planId?: string) => {
+  const autorizarCliente = (id: string, planId?: string, tipo?: TipoCliente) => {
     const matched = clientes.find(c => c.id === id);
     if (!matched) return { success: false, message: 'Cliente no encontrado.' };
     
     const finalPlanId = planId || matched.plan_id || 'p-none';
+    const finalTipo = tipo || 'FIJO';
 
     const updatedClientes = clientes.map(c => {
       if (c.id === id) {
-        return { ...c, autorizado: true, plan_id: finalPlanId };
+        return { ...c, autorizado: true, plan_id: finalPlanId, tipo: finalTipo };
       }
       return c;
     });
@@ -1119,7 +1120,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (supabase) {
       supabase.from('clientes').update({ 
         autorizado: true,
-        plan_id: finalPlanId === 'p-none' ? '00000000-0000-0000-0000-000000000000' : finalPlanId
+        plan_id: finalPlanId === 'p-none' ? '00000000-0000-0000-0000-000000000000' : finalPlanId,
+        tipo: finalTipo
       }).eq('id', id).then(({ error }) => {
         if (error) console.error("Error al autorizar cliente en Supabase:", error);
       });
@@ -1347,6 +1349,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (c.id === clienteId) {
         return { 
           ...c, 
+          tipo: 'FIJO' as TipoCliente,
           turnos_fijos: [...c.turnos_fijos, turnoId],
           turno_variable: c.turno_variable === turnoId ? undefined : c.turno_variable 
         };

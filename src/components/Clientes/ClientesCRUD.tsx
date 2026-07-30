@@ -312,6 +312,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         clienteId={selectedCliente?.id || null}
         onStartEdit={handleStartEdit}
         onDeleteClick={(c) => setClienteParaEliminar(c)}
+        onManageTurnos={(c) => setClientForTurnosModal(c)}
       />
 
       {/* FORM MODAL */}

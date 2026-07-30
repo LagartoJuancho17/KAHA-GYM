@@ -671,6 +671,7 @@ function InnerApp() {
           onAuthorized={() => {
             setAuthorizingClientId(null);
             if (clientToOpenTurnosAfterAuth) {
+              setActiveTab('CLIENTES');
               setOpenTurnosModalId(clientToOpenTurnosAfterAuth);
               setClientToOpenTurnosAfterAuth(null);
             }
