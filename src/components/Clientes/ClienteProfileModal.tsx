@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle } from 'lucide-react';
+import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard } from 'lucide-react';
 
 interface ClienteProfileModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface ClienteProfileModalProps {
   onStartEdit: (cl: Cliente) => void;
   onDeleteClick: (cl: Cliente) => void;
   onManageTurnos?: (cl: Cliente) => void;
+  onAssignPlan?: (cl: Cliente) => void;
 }
 
 const getWhatsAppLink = (phone: string) => {
@@ -46,7 +47,8 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   clienteId,
   onStartEdit,
   onDeleteClick,
-  onManageTurnos
+  onManageTurnos,
+  onAssignPlan
 }) => {
   const { clientes, planes, pagos, turnos } = useGym();
 
@@ -155,7 +157,21 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
 
           {/* Plan contratado */}
           <div className="border border-zinc-200 p-4 rounded-xl">
-            <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider mb-2 font-sans border-b border-zinc-100 pb-2">Plan Contratado</h4>
+            <div className="flex justify-between items-center mb-2 border-b border-zinc-100 pb-2">
+              <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-sans">Plan Contratado</h4>
+              {onAssignPlan && (
+                <button
+                  onClick={() => {
+                    onAssignPlan(selectedCliente);
+                    onClose();
+                  }}
+                  className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <CreditCard className="w-3 h-3 text-indigo-600" />
+                  <span>Asignar / Cambiar Plan</span>
+                </button>
+              )}
+            </div>
             <div className="flex justify-between items-center text-xs">
               <div>
                 <span className="font-semibold text-zinc-950 block">{plan?.nombre || 'Ninguno'}</span>

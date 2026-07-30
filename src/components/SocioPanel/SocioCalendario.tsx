@@ -21,7 +21,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   } = useGym();
 
   const [weekOffset, setWeekOffset] = useState<number>(0);
-  const [activeDays, setActiveDays] = useState<Set<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>>(new Set(['LUNES']));
+  const [activeDay, setActiveDay] = useState<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>('LUNES');
   const [bookingTurnId, setBookingTurnId] = useState<string | null>(null);
   const [reprogramTurnId, setReprogramTurnId] = useState<string | null>(null);
 
@@ -132,12 +132,10 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   };
 
   const turnosDelDia = useMemo(() => {
-    const DIAS_ORDER = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
-    const selected = activeDays.size > 0 ? activeDays : new Set(['LUNES']);
     return turnos
-      .filter(t => selected.has(t.dia as any))
-      .sort((a, b) => DIAS_ORDER.indexOf(a.dia) - DIAS_ORDER.indexOf(b.dia) || a.hora.localeCompare(b.hora));
-  }, [turnos, activeDays]);
+      .filter(t => t.dia === activeDay)
+      .sort((a, b) => a.hora.localeCompare(b.hora));
+  }, [turnos, activeDay]);
 
   const activeIndividualReservations = useMemo(() => {
     return (socio.reservas_individuales || []).filter(r => r.fecha.startsWith(paidMonth));
@@ -237,20 +235,12 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
         {/* DIAS CALENDARIO SELECTOR TAB BAR */}
         <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1 lg:max-w-xl mx-auto" id="socio-agenda-tabs">
           {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const).map(dia => {
-            const isActive = activeDays.has(dia);
+            const isActive = activeDay === dia;
             return (
               <button
                 key={dia}
                 onClick={() => {
-                  setActiveDays(prev => {
-                    const next = new Set(prev);
-                    if (next.has(dia)) {
-                      if (next.size > 1) next.delete(dia);
-                    } else {
-                      next.add(dia);
-                    }
-                    return next;
-                  });
+                  setActiveDay(dia);
                   setBookingTurnId(null);
                   setReprogramTurnId(null);
                 }}
@@ -272,40 +262,17 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
         </div>
       </div>
 
-      {activeDays.size > 1 && (
-        <div className="flex items-center justify-center mb-4">
-          <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-            {activeDays.size} días seleccionados — tocá un día para deseleccionarlo
-          </span>
-        </div>
-      )}
-
       {/* CONTENEDOR DE SLOTS */}
       <div className="space-y-8" id="socio-agenda-slots">
         {turnosDelDia.length === 0 ? (
           <div className="text-center py-12 bg-slate-50 border border-slate-100 rounded-2xl">
             <Info className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-slate-500 italic text-xs font-medium">No hay horarios configurados para los días seleccionados.</p>
+            <p className="text-slate-500 italic text-xs font-medium">No hay horarios configurados para el día seleccionado ({activeDay}).</p>
           </div>
         ) : (
-          (['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const)
-            .filter(dia => activeDays.has(dia))
-            .map(dia => {
-              const turnosDelDiaFiltrado = turnosDelDia.filter(t => t.dia === dia);
-              if (turnosDelDiaFiltrado.length === 0) return null;
-              return (
-                <div key={dia}>
-                  {activeDays.size > 1 && (
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="h-px flex-1 bg-slate-200"></div>
-                      <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest font-mono bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-                        {dia === 'MIERCOLES' ? 'Miércoles' : dia.charAt(0) + dia.slice(1).toLowerCase()}
-                      </span>
-                      <div className="h-px flex-1 bg-slate-200"></div>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                    {turnosDelDiaFiltrado.map(turno => {
+          <div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {turnosDelDia.map(turno => {
                       const holdsMyFijo = socio.turnos_fijos.includes(turno.id);
                       const misReservasEnTurno = (socio.reservas_individuales || []).filter(r => r.turno_id === turno.id && isDateInSelectedWeek(r.fecha));
                       const holdsMyIndividual = misReservasEnTurno.length > 0;
@@ -414,9 +381,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                       );
                     })}
                   </div>
-                </div>
-              );
-            })
+          </div>
         )}
       </div>
 

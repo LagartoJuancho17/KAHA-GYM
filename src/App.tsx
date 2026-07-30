@@ -678,6 +678,69 @@ function InnerApp() {
           }}
         />
       )}
+      {/* BARRA DE ACCESOS DIRECTOS FIJA INFERIOR (MOBILE/TABLET) */}
+      <nav
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/98 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center justify-around px-2"
+        id="admin-bottom-shortcuts-bar"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)', height: '64px' }}
+      >
+        {/* PANEL / DASHBOARD */}
+        <button
+          onClick={() => setActiveTab('DASHBOARD')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
+            activeTab === 'DASHBOARD' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+          }`}
+        >
+          <LayoutDashboard className={`w-5 h-5 ${activeTab === 'DASHBOARD' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+          <span className="text-[9px] uppercase tracking-wider font-sans">Panel</span>
+        </button>
+
+        {/* SOCIOS */}
+        <button
+          onClick={() => setActiveTab('CLIENTES')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent relative ${
+            activeTab === 'CLIENTES' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+          }`}
+        >
+          <Users className={`w-5 h-5 ${activeTab === 'CLIENTES' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+          <span className="text-[9px] uppercase tracking-wider font-sans">Socios</span>
+          {clientes.filter(c => c.activo && c.autorizado === false).length > 0 && (
+            <span className="absolute top-1 right-2.5 w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+          )}
+        </button>
+
+        {/* TURNOS */}
+        <button
+          onClick={() => setActiveTab('TURNOS')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
+            activeTab === 'TURNOS' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+          }`}
+        >
+          <CalendarRange className={`w-5 h-5 ${activeTab === 'TURNOS' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+          <span className="text-[9px] uppercase tracking-wider font-sans">Turnos</span>
+        </button>
+
+        {/* PAGOS */}
+        <button
+          onClick={() => setActiveTab('PAGOS')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
+            activeTab === 'PAGOS' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+          }`}
+        >
+          <CreditCard className={`w-5 h-5 ${activeTab === 'PAGOS' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+          <span className="text-[9px] uppercase tracking-wider font-sans">Pagos</span>
+        </button>
+
+        {/* MENÚ MÁS */}
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent text-zinc-500"
+        >
+          <Menu className="w-5 h-5 text-zinc-600" />
+          <span className="text-[9px] uppercase tracking-wider font-sans">Más</span>
+        </button>
+      </nav>
+
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );

@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Calendar, MoreVertical, Eye, Edit2, UserMinus, UserCheck, Trash2, Check, CalendarX } from 'lucide-react';
+import { Calendar, MoreVertical, Eye, Edit2, UserMinus, UserCheck, Trash2, Check, CalendarX, CreditCard } from 'lucide-react';
 
 interface ClientesTableProps {
   clientesFiltrados: Cliente[];
@@ -17,6 +17,7 @@ interface ClientesTableProps {
   filasPorPagina: number;
   onStartAuthorization?: (clientId: string) => void;
   onOpenBajaClases?: (c: Cliente) => void;
+  onAssignPlan?: (c: Cliente) => void;
 }
 
 const getWhatsAppLink = (phone: string) => {
@@ -47,7 +48,8 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
   setPagina,
   filasPorPagina,
   onStartAuthorization,
-  onOpenBajaClases
+  onOpenBajaClases,
+  onAssignPlan
 }) => {
   const { planes, turnos, autorizarCliente, bajaLogicaCliente, altaCliente } = useGym();
 
@@ -267,6 +269,18 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                                 Dar de Alta
                               </button>
                             )}
+
+                            {/* ASIGNAR / CAMBIAR PLAN */}
+                            <button
+                              onClick={() => {
+                                setOpenRowMenuId(null);
+                                if (onAssignPlan) onAssignPlan(c);
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-indigo-50 text-indigo-800 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+                            >
+                              <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+                              Asignar / Cambiar Plan
+                            </button>
 
                             {/* ASIGNAR TURNOS */}
                             <button

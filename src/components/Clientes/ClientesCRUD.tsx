@@ -13,6 +13,7 @@ import { ClienteDeleteModal } from './ClienteDeleteModal';
 import { ClienteTurnosModal } from './ClienteTurnosModal';
 import { ClienteCSVImportModal } from './ClienteCSVImportModal';
 import { BajaClasesModal } from './BajaClasesModal';
+import { ClientePlanAssignModal } from './ClientePlanAssignModal';
 
 interface ClientesCRUDProps {
   editingClienteId?: string | null;
@@ -51,6 +52,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
   const [clientForTurnosModal, setClientForTurnosModal] = useState<Cliente | null>(null);
   const [clientForBajaModal, setClientForBajaModal] = useState<Cliente | null>(null);
+  const [clientForPlanModal, setClientForPlanModal] = useState<Cliente | null>(null);
   
   // --- FILTROS DE TABLA ---
   const [buscar, setBuscar] = useState('');
@@ -303,6 +305,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         filasPorPagina={filasPorPagina}
         onStartAuthorization={onStartAuthorization}
         onOpenBajaClases={(c) => setClientForBajaModal(c)}
+        onAssignPlan={(c) => setClientForPlanModal(c)}
       />
 
       {/* DETAIL MODAL */}
@@ -313,6 +316,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         onStartEdit={handleStartEdit}
         onDeleteClick={(c) => setClienteParaEliminar(c)}
         onManageTurnos={(c) => setClientForTurnosModal(c)}
+        onAssignPlan={(c) => setClientForPlanModal(c)}
       />
 
       {/* FORM MODAL */}
@@ -356,6 +360,13 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         isOpen={!!clientForBajaModal}
         onClose={() => setClientForBajaModal(null)}
         cliente={clientForBajaModal}
+      />
+
+      {/* ASIGNACIÓN DE PLAN MODAL */}
+      <ClientePlanAssignModal 
+        isOpen={!!clientForPlanModal}
+        onClose={() => setClientForPlanModal(null)}
+        cliente={clientForPlanModal}
       />
 
     </div>
