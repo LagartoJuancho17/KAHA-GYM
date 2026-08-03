@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, AlertCircle, CheckCircle, Calendar, Plus, RefreshCw } from 'lucide-react';
+import { X, AlertCircle, CheckCircle, Calendar, Plus } from 'lucide-react';
 
 interface ClienteTurnosModalProps {
   isOpen: boolean;
@@ -17,7 +17,7 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
   onClose,
   cliente
 }) => {
-  const { clientes, planes, turnos, asignarClienteFijo, removerAsignacionFija, updateCliente } = useGym();
+  const { clientes, planes, turnos, asignarClienteFijo, removerAsignacionFija } = useGym();
   const [selectedTurnoToAssign, setSelectedTurnoToAssign] = useState<string>('');
   const [turnosModalError, setTurnosModalError] = useState<string>('');
   const [turnosModalSuccess, setTurnosModalSuccess] = useState<string>('');
@@ -64,14 +64,6 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
     }
   };
 
-  const handleToggleTipo = (nuevoTipo: 'FIJO' | 'FLEXIBLE') => {
-    setTurnosModalError('');
-    setTurnosModalSuccess('');
-    updateCliente(activeClient.id, { tipo: nuevoTipo });
-    setTurnosModalSuccess(`Modalidad cambiada a ${nuevoTipo} con éxito.`);
-    setTimeout(() => setTurnosModalSuccess(''), 2000);
-  };
-
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans" id="asignar-turnos-fijos-modal">
       <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-md overflow-hidden relative animate-scale-in">
@@ -106,35 +98,6 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
               <span>{turnosModalSuccess}</span>
             </div>
           )}
-
-          {/* Selector de Modalidad */}
-          <div className="flex items-center justify-between bg-zinc-100 p-2 rounded-xl text-xs border border-zinc-200/60">
-            <span className="font-bold text-zinc-700 pl-1 text-[11px]">Modalidad del Socio:</span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => handleToggleTipo('FIJO')}
-                className={`px-3 py-1 rounded-lg font-bold transition-all text-[11px] cursor-pointer ${
-                  activeClient.tipo === 'FIJO'
-                    ? 'bg-black text-white shadow-2xs'
-                    : 'bg-white text-zinc-600 hover:text-zinc-900 border border-zinc-200'
-                }`}
-              >
-                📅 Días Fijos
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleTipo('FLEXIBLE')}
-                className={`px-3 py-1 rounded-lg font-bold transition-all text-[11px] cursor-pointer ${
-                  activeClient.tipo === 'FLEXIBLE'
-                    ? 'bg-amber-500 text-white shadow-2xs'
-                    : 'bg-white text-zinc-600 hover:text-zinc-900 border border-zinc-200'
-                }`}
-              >
-                ⚡ Flexible
-              </button>
-            </div>
-          </div>
 
           {/* Plan stats */}
           <div className="bg-zinc-50 border border-zinc-200/80 p-3 rounded-xl text-[11px] text-zinc-600 space-y-1">
@@ -183,48 +146,33 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
           </div>
 
           {/* Reservar Nuevo Turno */}
-          {activeClient.tipo === 'FIJO' ? (
-            <div className="pt-3 border-t border-zinc-100 space-y-2">
-              <span className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Asignar Nuevo Horario Semanal</span>
-              <div className="flex gap-2">
-                <select
-                  value={selectedTurnoToAssign}
-                  onChange={(e) => setSelectedTurnoToAssign(e.target.value)}
-                  className="flex-1 p-2 border border-zinc-200 rounded-lg text-xs outline-hidden bg-white cursor-pointer"
-                >
-                  <option value="">-- Selecciona día y horario --</option>
-                  {turnosDisponibles.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.dia} - {t.hora.slice(0, 5)}hs ({t.asignados_ids.length}/{t.cupo_maximo} ocupados)
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleAssignTurno}
-                  className="bg-zinc-900 hover:bg-zinc-800 text-white px-3.5 py-2 rounded-lg font-bold flex items-center gap-1 cursor-pointer shrink-0 transition-colors border border-transparent shadow-2xs"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Asignar</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="pt-3 border-t border-zinc-100 space-y-3">
-              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-amber-900 text-[11px] leading-relaxed">
-                <p className="font-bold">Membresía FLEXIBLE activa</p>
-                <p className="text-amber-800 text-[10px] mt-0.5">
-                  El socio actualmente está configurado como Flexible. Para asignarle turnos semanales fijos, podés cambiar su modalidad a <strong>Días Fijos</strong>.
-                </p>
-              </div>
-              <button
-                onClick={() => handleToggleTipo('FIJO')}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-2xs border border-transparent"
+          <div className="pt-3 border-t border-zinc-100 space-y-2">
+            <span className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Asignar Nuevo Horario Semanal</span>
+            <p className="text-zinc-400 text-[10px] leading-snug">
+              Dejá los turnos sin asignar si el socio prefiere ubicarlos manualmente cada semana.
+            </p>
+            <div className="flex gap-2">
+              <select
+                value={selectedTurnoToAssign}
+                onChange={(e) => setSelectedTurnoToAssign(e.target.value)}
+                className="flex-1 p-2 border border-zinc-200 rounded-lg text-xs outline-hidden bg-white cursor-pointer"
               >
-                <RefreshCw className="w-4 h-4" />
-                Cambiar a modalidad Días Fijos y Asignar Turnos
+                <option value="">-- Selecciona día y horario --</option>
+                {turnosDisponibles.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.dia} - {t.hora.slice(0, 5)}hs ({t.asignados_ids.length}/{t.cupo_maximo} ocupados)
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssignTurno}
+                className="bg-zinc-900 hover:bg-zinc-800 text-white px-3.5 py-2 rounded-lg font-bold flex items-center gap-1 cursor-pointer shrink-0 transition-colors border border-transparent shadow-2xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Asignar</span>
               </button>
             </div>
-          )}
+          </div>
 
         </div>
       </div>

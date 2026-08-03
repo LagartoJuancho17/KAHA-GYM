@@ -114,7 +114,7 @@ export const ClienteCSVImportModal: React.FC<ClienteCSVImportModalProps> = ({
         apellido: row[mapping.apellido] || '',
         email: row[mapping.email] || '',
         telefono: mapping.telefono !== -1 ? row[mapping.telefono] : '',
-        tipo: mapping.tipo !== -1 ? row[mapping.tipo] : 'FLEXIBLE',
+        tipo: 'FIJO',
         plan_nombre: mapping.plan_nombre !== -1 ? row[mapping.plan_nombre] : planes[0]?.nombre
       });
     });
@@ -128,7 +128,7 @@ export const ClienteCSVImportModal: React.FC<ClienteCSVImportModalProps> = ({
         apellido: row[mapping.apellido] || '',
         email: row[mapping.email] || '',
         telefono: mapping.telefono !== -1 ? row[mapping.telefono] : '',
-        tipo: (mapping.tipo !== -1 ? (row[mapping.tipo]?.toUpperCase() === 'FIJO' ? 'FIJO' : 'FLEXIBLE') : 'FLEXIBLE') as TipoCliente,
+        tipo: 'FIJO' as TipoCliente,
         plan_nombre: mapping.plan_nombre !== -1 ? row[mapping.plan_nombre] : planes[0]?.nombre,
       };
     });
@@ -186,7 +186,6 @@ export const ClienteCSVImportModal: React.FC<ClienteCSVImportModalProps> = ({
                     { label: 'Apellido (Obligatorio)', field: 'apellido' as const },
                     { label: 'Email (Obligatorio)', field: 'email' as const },
                     { label: 'Teléfono', field: 'telefono' as const },
-                    { label: 'Tipo (Fijo/Flexible)', field: 'tipo' as const },
                     { label: 'Plan o Abono', field: 'plan_nombre' as const }
                   ].map(item => (
                     <div key={item.field} className="flex flex-col gap-1.5 p-2 bg-white rounded-lg border border-zinc-200">
@@ -249,7 +248,7 @@ export const ClienteCSVImportModal: React.FC<ClienteCSVImportModalProps> = ({
                               <td className="p-3">{row.telefono || '-'}</td>
                               <td className="p-3">
                                 <span className="px-2 py-0.5 rounded-sm font-bold bg-zinc-100 border border-zinc-200 text-[10px]">
-                                  {row.tipo?.toUpperCase() === 'FIJO' ? 'FIJO' : 'FLEXIBLE'}
+                                  FIJO
                                 </span>
                               </td>
                               <td className="p-3 font-medium text-emerald-700">{row.plan_nombre}</td>

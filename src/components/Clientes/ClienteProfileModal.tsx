@@ -214,7 +214,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                 <Calendar className="w-3.5 h-3.5 text-indigo-500" />
                 <span>Turnos Fijos Asignados</span>
                 <span className="bg-zinc-100 text-zinc-600 font-mono px-2 py-0.5 rounded-full text-[9px] font-bold">
-                  {selectedCliente.tipo === 'FIJO' ? `${selectedCliente.turnos_fijos.length} turno${selectedCliente.turnos_fijos.length !== 1 ? 's' : ''}` : 'N/A'}
+                  {`${selectedCliente.turnos_fijos.length} turno${selectedCliente.turnos_fijos.length !== 1 ? 's' : ''}`}
                 </span>
               </div>
               {onManageTurnos && (
@@ -230,10 +230,8 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                 </button>
               )}
             </div>
-            {selectedCliente.tipo === 'FLEXIBLE' ? (
-              <p className="text-zinc-400 italic text-xs">Los socios FLEXIBLE no tienen turnos fijos. Asisten según cupos libres diarios.</p>
-            ) : selectedCliente.turnos_fijos.length === 0 ? (
-              <p className="text-zinc-400 italic text-xs">Sin turnos fijos asignados. Podés reservarlos desde el panel de Turnos.</p>
+            {selectedCliente.turnos_fijos.length === 0 ? (
+              <p className="text-zinc-400 italic text-xs">Sin turnos fijos asignados. Podés reservarlos desde el panel de Turnos o dejarlos para ubicarlos manualmente.</p>
             ) : (
               <div className="space-y-2">
                 {selectedCliente.turnos_fijos.map(tId => {

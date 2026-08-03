@@ -1176,7 +1176,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const email = row.email?.trim();
       const nombre = row.nombre?.trim();
       const apellido = row.apellido?.trim();
-      const tCliente = (row.tipo?.toUpperCase() === 'FIJO' ? 'FIJO' : 'FLEXIBLE') as TipoCliente;
+      const tCliente = 'FIJO' as TipoCliente;
       
       const planId = planesMapeados[row.plan_nombre?.toLowerCase().trim()] || planes[0]?.id; // Default al primero si no machea
 
@@ -2731,7 +2731,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       apellido: apellido.trim(),
       email: email,
       telefono: telefono.trim() || '11-0000-0000',
-      tipo: 'FLEXIBLE',
+      tipo: 'FIJO',
       estado: 'ACTIVO',
       plan_id: 'p-none',
       activo: true,

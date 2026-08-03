@@ -25,7 +25,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
     apellido: '',
     email: '',
     telefono: '',
-    tipo: 'FLEXIBLE' as TipoCliente,
+    tipo: 'FIJO' as TipoCliente,
     plan_id: planes[0]?.id || '',
     exencion_cobro: 'NINGUNA' as 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO',
     deuda_acumulada: 0,
@@ -45,7 +45,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       apellido: '',
       email: '',
       telefono: '',
-      tipo: 'FLEXIBLE',
+      tipo: 'FIJO',
       plan_id: planes[0]?.id || '',
       exencion_cobro: 'NINGUNA',
       deuda_acumulada: 0,
@@ -351,20 +351,6 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* TIPO DE MEMBRESÍA */}
-          <div className="space-y-1">
-            <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Tipo de Membresía</label>
-            <select
-              value={clienteForm.tipo}
-              onChange={(e) => setClienteForm(prev => ({ ...prev, tipo: e.target.value as TipoCliente }))}
-              className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer"
-              id="form-tipo"
-            >
-              <option value="FLEXIBLE">Flexible (Cupos libres diarios)</option>
-              <option value="FIJO">Fijo (Horarios fijos reservados)</option>
-            </select>
-          </div>
 
           {/* EXENCIÓN DE COBRO */}
           <div className="space-y-1">

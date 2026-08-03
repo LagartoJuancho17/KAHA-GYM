@@ -73,7 +73,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         apellido: lastname,
         email: `invitado-${Date.now()}@kaha.com`,
         telefono: '11-0000-0000',
-        tipo: 'FLEXIBLE',
+        tipo: 'FIJO',
         plan_id: 'p-none',
         exencion_cobro: 'NINGUNA'
       });

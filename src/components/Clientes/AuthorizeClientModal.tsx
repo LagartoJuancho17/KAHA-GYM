@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useGym } from '../../GymContext';
-import { TipoCliente } from '../../types';
 import { Check, X, ShieldAlert, Sparkles, Calendar } from 'lucide-react';
 
 interface AuthorizeClientModalProps {
@@ -16,7 +15,6 @@ export const AuthorizeClientModal: React.FC<AuthorizeClientModalProps> = ({ clie
   const activePlans = planes.filter(p => p.id !== 'p-none'); // Filter out the fallback plan
   
   const [selectedPlanId, setSelectedPlanId] = useState<string>(activePlans[0]?.id || '');
-  const [selectedTipo, setSelectedTipo] = useState<TipoCliente>('FIJO');
   const [error, setError] = useState('');
 
   if (!client) return null;
@@ -27,7 +25,7 @@ export const AuthorizeClientModal: React.FC<AuthorizeClientModalProps> = ({ clie
       return;
     }
 
-    const res = autorizarCliente(clientId, selectedPlanId, selectedTipo);
+    const res = autorizarCliente(clientId, selectedPlanId, 'FIJO');
     if (res.success) {
       onAuthorized(selectedPlanId);
     } else {
@@ -46,7 +44,7 @@ export const AuthorizeClientModal: React.FC<AuthorizeClientModalProps> = ({ clie
               <ShieldAlert className="w-4 h-4 text-lime-400 animate-pulse" />
               Autorizar Nuevo Socio
             </h3>
-            <p className="text-[10px] text-zinc-400 mt-0.5">Asignación de plan de abono y modalidad</p>
+            <p className="text-[10px] text-zinc-400 mt-0.5">Asignación de plan de abono</p>
           </div>
           <button
             onClick={onClose}
@@ -112,40 +110,9 @@ export const AuthorizeClientModal: React.FC<AuthorizeClientModalProps> = ({ clie
             </div>
           </div>
 
-          {/* Modality selection */}
-          <div className="space-y-2">
-            <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-mono">Modalidad de Asistencia</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedTipo('FIJO')}
-                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                  selectedTipo === 'FIJO'
-                    ? 'bg-emerald-50 border-emerald-400 text-emerald-950 shadow-2xs font-bold'
-                    : 'bg-white border-zinc-200 text-zinc-600 font-medium'
-                }`}
-              >
-                <span className="block text-xs font-bold">📅 Días Fijos</span>
-                <span className="block text-[9px] text-zinc-500 mt-0.5 font-normal">Reserva días y horarios fijos semanales</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedTipo('FLEXIBLE')}
-                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                  selectedTipo === 'FLEXIBLE'
-                    ? 'bg-amber-50 border-amber-400 text-amber-950 shadow-2xs font-bold'
-                    : 'bg-white border-zinc-200 text-zinc-600 font-medium'
-                }`}
-              >
-                <span className="block text-xs font-bold">⚡ Flexible</span>
-                <span className="block text-[9px] text-zinc-500 mt-0.5 font-normal">Reserva día a día según cupo libre</span>
-              </button>
-            </div>
-          </div>
-
           <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl flex items-center gap-2 text-[10px] text-emerald-800 font-medium">
             <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Al autorizar, serás derivado directamente para asignarle sus horarios fijos.</span>
+            <span>Al autorizar, serás derivado para asignarle sus turnos fijos. Podés dejarlos pendientes y ubicarlos manualmente cuando quieras.</span>
           </div>
 
           {/* Error Message */}

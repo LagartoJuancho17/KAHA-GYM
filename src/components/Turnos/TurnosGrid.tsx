@@ -301,20 +301,20 @@ export const TurnosGrid: React.FC = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto select-none rounded-lg border border-zinc-200">
-              <table className="w-full text-center border-collapse text-xs table-fixed min-w-[700px]">
-                <thead>
-                  <tr className="bg-zinc-900 text-white font-sans font-bold uppercase tracking-wider text-[10px]">
-                    <th className="p-3 border-r border-zinc-800 w-16">Hora</th>
+            <div className="overflow-auto max-h-[70vh] min-h-[400px] select-none rounded-lg border border-zinc-200 relative">
+              <table className="w-full text-center border-separate border-spacing-0 text-xs table-fixed min-w-[700px]">
+                <thead className="sticky top-0 z-20 bg-zinc-900">
+                  <tr className="sticky top-0 z-20 bg-zinc-900 text-white font-sans font-bold uppercase tracking-wider text-[10px]">
+                    <th className="p-3 border-r border-b border-zinc-800 w-16 sticky left-0 z-30 bg-zinc-900" style={{boxShadow: '2px 2px 5px rgba(0,0,0,0.2)'}}>Hora</th>
                     {DIAS.map(d => (
-                      <th key={d} className="p-3 border-r border-zinc-800">{d}</th>
+                      <th key={d} className="p-3 border-r border-b border-zinc-800 bg-zinc-900" style={{boxShadow: '0 2px 5px rgba(0,0,0,0.2)'}}>{d}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
                   {HORAS.map(hora => (
                     <tr key={hora} className="hover:bg-zinc-50/50 transition-colors font-sans">
-                      <td className="p-3 bg-zinc-50 font-bold border-r border-zinc-200 text-zinc-700 font-mono text-center">
+                      <td className="p-3 bg-zinc-50 font-bold border-r border-b border-zinc-200 text-zinc-700 font-mono text-center sticky left-0 z-10" style={{boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)'}}>
                         {hora}
                       </td>
 
@@ -465,16 +465,16 @@ export const TurnosGrid: React.FC = () => {
 
           {/* Real-time week matrix */}
           <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="overflow-x-auto select-none rounded-lg border border-zinc-200">
-              <table className="w-full text-center border-collapse text-xs table-fixed min-w-[700px]">
-                <thead>
-                  <tr className="bg-slate-900 text-white font-sans font-bold uppercase tracking-wider text-[10px]">
-                    <th className="p-3 border-r border-slate-800 w-16">Hora</th>
+            <div className="overflow-auto max-h-[70vh] min-h-[400px] select-none rounded-lg border border-zinc-200 relative">
+              <table className="w-full text-center border-separate border-spacing-0 text-xs table-fixed min-w-[700px]">
+                <thead className="sticky top-0 z-20 bg-slate-900">
+                  <tr className="sticky top-0 z-20 bg-slate-900 text-white font-sans font-bold uppercase tracking-wider text-[10px]">
+                    <th className="p-3 border-r border-b border-slate-800 w-16 sticky left-0 z-30 bg-slate-900" style={{boxShadow: '2px 2px 5px rgba(0,0,0,0.2)'}}>Hora</th>
                     {DIAS.map(d => {
                       const dateStr = weekDates[d];
                       const displayDate = dateStr ? `${dateStr.split('-')[2]}/${dateStr.split('-')[1]}/${dateStr.split('-')[0]}` : '';
                       return (
-                        <th key={d} className="p-3 border-r border-slate-800">
+                        <th key={d} className="p-3 border-r border-b border-slate-800 bg-slate-900" style={{boxShadow: '0 2px 5px rgba(0,0,0,0.2)'}}>
                           <div>{d === 'MIERCOLES' ? 'MIÉRCOLES' : d}</div>
                           <div className="text-[9px] text-slate-400 font-mono font-normal mt-0.5">{displayDate}</div>
                         </th>
@@ -485,7 +485,7 @@ export const TurnosGrid: React.FC = () => {
                 <tbody className="divide-y divide-zinc-200">
                   {HORAS.map(hora => (
                     <tr key={hora} className="hover:bg-zinc-50/50 transition-colors font-sans">
-                      <td className="p-3 bg-zinc-50 font-bold border-r border-zinc-200 text-zinc-700 font-mono text-center">
+                      <td className="p-3 bg-zinc-50 font-bold border-r border-zinc-200 text-zinc-700 font-mono text-center sticky left-0 z-10" style={{boxShadow: '2px 0 4px -1px rgba(0,0,0,0.08)'}}>
                         {hora}
                       </td>
 
