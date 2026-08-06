@@ -350,33 +350,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return `${matched.dia}-${cleanHora}`;
       };
 
-      // Map relation data to local Client structure
+      // Map relation data to local Client structure — Supabase is the source of truth
       const clientList: Cliente[] = (clientesDb || []).map(c => {
-        const localClient = localClientes.find(lc => lc.id === c.id);
-        const fixedShiftsFromDb = (asignacionesDb || [])
+        const fixedShifts = (asignacionesDb || [])
           .filter(a => a.cliente_id === c.id)
           .map(a => getTurnoIdFromUuid(a.turno_id))
           .filter(id => id !== '');
-        
-        const turnosFijosCombinados = Array.from(new Set([...fixedShiftsFromDb, ...(localClient?.turnos_fijos || [])]));
-
-        // Auto-reparar en Supabase si el cliente tenía turnos en LocalStorage no registrados aún en Supabase
-        if (localClient && localClient.turnos_fijos && localClient.turnos_fijos.length > 0) {
-          const missingShifts = localClient.turnos_fijos.filter(tf => !fixedShiftsFromDb.includes(tf));
-          if (missingShifts.length > 0 && supabase) {
-            missingShifts.forEach(async (tfId) => {
-              const turnoUuid = await resolveTurnoUuid(tfId);
-              if (turnoUuid) {
-                supabase.from('asignaciones_turnos').insert({
-                  cliente_id: c.id,
-                  turno_id: turnoUuid
-                }).then(({ error }) => {
-                  if (error) console.error("Auto-sync turno fijo a Supabase error:", error);
-                });
-              }
-            });
-          }
-        }
 
         return {
           id: c.id,
@@ -391,7 +370,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           activo: c.activo,
           deuda_acumulada: Number(c.deuda_acumulada),
           ultimo_mes_pagado: c.ultimo_mes_pagado || '',
-          turnos_fijos: turnosFijosCombinados,
+          turnos_fijos: fixedShifts,
           exencion_cobro: (c.exencion_cobro || 'NINGUNA') as any,
           autorizado: c.autorizado ?? true,
           reservas_individuales: c.reservas_individuales || [],
