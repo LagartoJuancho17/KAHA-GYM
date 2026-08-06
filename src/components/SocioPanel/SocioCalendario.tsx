@@ -24,6 +24,9 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   const [activeDay, setActiveDay] = useState<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>('LUNES');
   const [bookingTurnId, setBookingTurnId] = useState<string | null>(null);
   const [reprogramTurnId, setReprogramTurnId] = useState<string | null>(null);
+  // Fix 1: Inline confirm state for Reprogramar (replaces window.confirm)
+  const [pendingSuspendDate, setPendingSuspendDate] = useState<string | null>(null);
+  const [suspendSuccessDate, setSuspendSuccessDate] = useState<string | null>(null);
 
   const planSocio = useMemo(() => {
     return planes.find(p => p.id === socio.plan_id) || null;
@@ -755,21 +758,46 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                             Retomar
                           </button>
                         </div>
+                      ) : pendingSuspendDate === dateStr ? (
+                        /* Inline confirm step */
+                        <div className="flex flex-col gap-2 items-end">
+                          <p className="text-[10px] text-amber-800 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg text-right">
+                            ¿Confirmar baja de esta sesión?
+                          </p>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => setPendingSuspendDate(null)}
+                              className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border border-slate-200 bg-white"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => {
+                                const res = suspenderClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
+                                setPendingSuspendDate(null);
+                                if (res.success) {
+                                  setSuspendSuccessDate(dateStr);
+                                } else {
+                                  setErrorMessage(res.message);
+                                  setTimeout(() => setErrorMessage(null), 4000);
+                                }
+                              }}
+                              className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] transition-all cursor-pointer shadow-xs border-none"
+                            >
+                              Confirmar baja
+                            </button>
+                          </div>
+                        </div>
+                      ) : suspendSuccessDate === dateStr ? (
+                        /* Success state for this date */
+                        <div className="flex flex-col gap-1.5 items-end">
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-right">
+                            ✅ ¡Baja registrada! Cupo libre para recupero.
+                          </span>
+                        </div>
                       ) : (
                         <button
-                          onClick={() => {
-                            if (window.confirm(`¿Confirmas suspender la sesión fija del ${dateFormatted} para reprogramarla?`)) {
-                              const res = suspenderClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
-                              if (res.success) {
-                                setSuccessMessage(res.message);
-                                setReprogramTurnId(null);
-                                setTimeout(() => setSuccessMessage(null), 4000);
-                              } else {
-                                setErrorMessage(res.message);
-                                setTimeout(() => setErrorMessage(null), 4000);
-                              }
-                            }
-                          }}
+                          onClick={() => setPendingSuspendDate(dateStr)}
                           className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none"
                         >
                           Suspender
@@ -782,9 +810,30 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-end shrink-0">
+            <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center shrink-0 gap-3">
+              {suspendSuccessDate ? (
+                <button
+                  onClick={() => {
+                    setSuspendSuccessDate(null);
+                    setReprogramTurnId(null);
+                    // Show success banner and redirect to full calendar to pick a new slot
+                    setSuccessMessage('✅ Clase dada de baja correctamente. Ahora tenés un cupo libre — elegí otro turno para recuperarla.');
+                    setTimeout(() => setSuccessMessage(null), 6000);
+                  }}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer border-none flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Elegir otro turno para recuperarla
+                </button>
+              ) : (
+                <div />
+              )}
               <button
-                onClick={() => setReprogramTurnId(null)}
+                onClick={() => {
+                  setSuspendSuccessDate(null);
+                  setPendingSuspendDate(null);
+                  setReprogramTurnId(null);
+                }}
                 className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer border-none"
               >
                 Cerrar

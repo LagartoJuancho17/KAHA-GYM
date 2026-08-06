@@ -55,7 +55,7 @@ interface GymContextType {
   removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
 
   // Clientes Methods
-  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => { success: boolean; message: string; duplicate?: boolean };
+  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
   autorizarCliente: (id: string, planId?: string, tipo?: TipoCliente) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
@@ -352,11 +352,32 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Map relation data to local Client structure
       const clientList: Cliente[] = (clientesDb || []).map(c => {
-        const fixedShifts = (asignacionesDb || [])
+        const localClient = localClientes.find(lc => lc.id === c.id);
+        const fixedShiftsFromDb = (asignacionesDb || [])
           .filter(a => a.cliente_id === c.id)
           .map(a => getTurnoIdFromUuid(a.turno_id))
           .filter(id => id !== '');
         
+        const turnosFijosCombinados = Array.from(new Set([...fixedShiftsFromDb, ...(localClient?.turnos_fijos || [])]));
+
+        // Auto-reparar en Supabase si el cliente tenía turnos en LocalStorage no registrados aún en Supabase
+        if (localClient && localClient.turnos_fijos && localClient.turnos_fijos.length > 0) {
+          const missingShifts = localClient.turnos_fijos.filter(tf => !fixedShiftsFromDb.includes(tf));
+          if (missingShifts.length > 0 && supabase) {
+            missingShifts.forEach(async (tfId) => {
+              const turnoUuid = await resolveTurnoUuid(tfId);
+              if (turnoUuid) {
+                supabase.from('asignaciones_turnos').insert({
+                  cliente_id: c.id,
+                  turno_id: turnoUuid
+                }).then(({ error }) => {
+                  if (error) console.error("Auto-sync turno fijo a Supabase error:", error);
+                });
+              }
+            });
+          }
+        }
+
         return {
           id: c.id,
           nombre: c.nombre,
@@ -370,7 +391,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           activo: c.activo,
           deuda_acumulada: Number(c.deuda_acumulada),
           ultimo_mes_pagado: c.ultimo_mes_pagado || '',
-          turnos_fijos: fixedShifts,
+          turnos_fijos: turnosFijosCombinados,
           exencion_cobro: (c.exencion_cobro || 'NINGUNA') as any,
           autorizado: c.autorizado ?? true,
           reservas_individuales: c.reservas_individuales || [],
@@ -819,8 +840,39 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const getUuidFromTurnoId = (tId: string): string => {
+    const matched = turnos.find(t => t.id === tId);
+    return matched?.db_uuid || '';
+  };
+
+  const resolveTurnoUuid = async (tId: string): Promise<string | null> => {
+    const matched = turnos.find(t => t.id === tId);
+    if (matched?.db_uuid) return matched.db_uuid;
+
+    if (supabase) {
+      const parts = tId.split('-');
+      const dia = parts[0];
+      const hora = parts[1];
+      if (dia && hora) {
+        const horaFull = hora.length === 5 ? `${hora}:00` : hora;
+        const { data } = await supabase
+          .from('turnos')
+          .select('id')
+          .eq('dia', dia)
+          .eq('hora', horaFull)
+          .maybeSingle();
+        if (data?.id) return data.id;
+      }
+    }
+    return null;
+  };
+
   // CLIENTS CRUD
-  const addCliente = (clientData: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente }) => {
+  const addCliente = (clientData: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { 
+    tipo?: TipoCliente;
+    turnos_fijos?: string[];
+    deuda_acumulada?: number;
+  }) => {
     // Validar duplicados (email o nombre+apellido idénticos)
     if (isDuplicateFuzzy(clientData.nombre, clientData.apellido, clientData.email, clientes)) {
       return { 
@@ -837,23 +889,41 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const customCode = clientData.codigo_socio?.trim() || `SOC-${nextSeq}`;
 
     const newClientId = crypto.randomUUID();
+    const initialTurnosFijos = clientData.turnos_fijos || [];
+    const initialDeuda = clientData.deuda_acumulada || 0;
+
     const newClient: Cliente = {
       ...clientData,
       codigo_socio: customCode,
       tipo: clientData.tipo || 'FIJO',
       exencion_cobro: clientData.exencion_cobro || 'NINGUNA',
       id: newClientId,
-      estado: 'ACTIVO',
-      deuda_acumulada: 0,
+      estado: initialDeuda > 0 ? 'CON_DEUDA' : 'ACTIVO',
+      deuda_acumulada: initialDeuda,
       ultimo_mes_pagado: new Date().toISOString().slice(0, 7), // Al día del mes de registro
-      turnos_fijos: [],
+      turnos_fijos: initialTurnosFijos,
       activo: true,
       creado_at: new Date().toISOString(),
       autorizado: true
     };
 
-    const updated = [newClient, ...clientes];
-    saveState(updated);
+    // Actualizar grilla de turnos para cada turno fijo asignado inicialmente
+    let updatedTurnos = [...turnos];
+    if (initialTurnosFijos.length > 0) {
+      updatedTurnos = turnos.map(t => {
+        if (initialTurnosFijos.includes(t.id)) {
+          if (t.asignados_ids.length < t.cupo_maximo) {
+            return { ...t, asignados_ids: [...t.asignados_ids.filter(id => id !== newClientId), newClientId] };
+          } else {
+            return { ...t, lista_espera_ids: [...t.lista_espera_ids.filter(id => id !== newClientId), newClientId] };
+          }
+        }
+        return t;
+      });
+    }
+
+    const updatedClientes = [newClient, ...clientes];
+    saveState(updatedClientes, undefined, undefined, updatedTurnos);
 
     if (supabase) {
       const planUuid = newClient.plan_id === 'p-none' ? '00000000-0000-0000-0000-000000000000' : newClient.plan_id;
@@ -875,9 +945,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }).then(({ error }) => {
         if (error) console.error("Error al insertar cliente en Supabase:", error);
       });
+
+      // Insertar asignaciones fijas en Supabase
+      initialTurnosFijos.forEach(async (tId) => {
+        const turnoUuid = await resolveTurnoUuid(tId);
+        if (turnoUuid && supabase) {
+          supabase.from('asignaciones_turnos').insert({
+            cliente_id: newClientId,
+            turno_id: turnoUuid
+          }).then(({ error }) => {
+            if (error) console.error("Error al insertar asignacion en Supabase:", error);
+          });
+        }
+      });
     }
 
-    addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo });
+    addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo, turnos: initialTurnosFijos });
     addToast('add', 'Socio registrado exitosamente.');
     return { success: true, message: 'Cliente registrado exitosamente.', id: newClient.id };
   };
@@ -1279,11 +1362,6 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const getUuidFromTurnoId = (tId: string): string => {
-    const matched = turnos.find(t => t.id === tId);
-    return matched?.db_uuid || '';
-  };
-
   // TURNOS
   const asignarClienteFijo = (clienteId: string, turnoId: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
@@ -1344,7 +1422,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true, message: 'El horario está completo. El cliente ha sido registrado en la lista de espera.', putInWaitlist: true };
     }
 
-    // Asignación limpia exitosa
+    // Asignación limpia exitosa — quitar de lista de espera si ya estaba anotado ahí
     const updatedClientes = clientes.map(c => {
       if (c.id === clienteId) {
         return { 
@@ -1357,22 +1435,46 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
 
+    const clienteYaEnEspera = turno.lista_espera_ids.includes(clienteId);
+
     const updatedTurnos = turnos.map(t => {
       if (t.id === turnoId) {
-        return { ...t, asignados_ids: [...t.asignados_ids, clienteId] };
+        return {
+          ...t,
+          // Agrega a asignados (sin duplicados)
+          asignados_ids: [...t.asignados_ids.filter(id => id !== clienteId), clienteId],
+          // Remueve de lista de espera si estaba anotado ahí
+          lista_espera_ids: t.lista_espera_ids.filter(id => id !== clienteId)
+        };
       }
       return t;
     });
 
+    // Si estaba en lista de espera en Supabase, eliminarlo de esa tabla también
+    if (clienteYaEnEspera && supabase) {
+      resolveTurnoUuid(turnoId).then((turnoUuid) => {
+        if (turnoUuid) {
+          supabase.from('lista_espera_turnos').delete()
+            .eq('cliente_id', clienteId).eq('turno_id', turnoUuid)
+            .then(({ error }) => {
+              if (error) console.error("Error al remover de lista de espera al asignar:", error);
+            });
+        }
+      });
+    }
+
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
 
     if (supabase) {
-      const turnoUuid = getUuidFromTurnoId(turnoId);
-      supabase.from('asignaciones_turnos').insert({
-        cliente_id: clienteId,
-        turno_id: turnoUuid
-      }).then(({ error }) => {
-        if (error) console.error("Error al asignar turno fijo en Supabase:", error);
+      resolveTurnoUuid(turnoId).then((turnoUuid) => {
+        if (turnoUuid) {
+          supabase.from('asignaciones_turnos').insert({
+            cliente_id: clienteId,
+            turno_id: turnoUuid
+          }).then(({ error }) => {
+            if (error) console.error("Error al asignar turno fijo en Supabase:", error);
+          });
+        }
       });
     }
 
@@ -1424,21 +1526,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
 
     if (supabase) {
-      const turnoUuid = getUuidFromTurnoId(turnoId);
-      supabase.from('asignaciones_turnos').delete().eq('cliente_id', clienteId).eq('turno_id', turnoUuid).then(({ error }) => {
-        if (error) console.error("Error al remover asignación fija en Supabase:", error);
+      resolveTurnoUuid(turnoId).then((turnoUuid) => {
+        if (turnoUuid) {
+          supabase.from('asignaciones_turnos').delete().eq('cliente_id', clienteId).eq('turno_id', turnoUuid).then(({ error }) => {
+            if (error) console.error("Error al remover asignación fija en Supabase:", error);
+          });
+          if (waitlistClientLiberado) {
+            supabase.from('lista_espera_turnos').delete().eq('cliente_id', waitlistClientLiberado).eq('turno_id', turnoUuid).then(({ error }) => {
+              if (error) console.error("Error al remover de lista de espera en Supabase:", error);
+            });
+            supabase.from('asignaciones_turnos').insert({
+              cliente_id: waitlistClientLiberado,
+              turno_id: turnoUuid
+            }).then(({ error }) => {
+              if (error) console.error("Error al promover de lista de espera en Supabase:", error);
+            });
+          }
+        }
       });
-      if (waitlistClientLiberado) {
-        supabase.from('lista_espera_turnos').delete().eq('cliente_id', waitlistClientLiberado).eq('turno_id', turnoUuid).then(({ error }) => {
-          if (error) console.error("Error al remover de lista de espera en Supabase:", error);
-        });
-        supabase.from('asignaciones_turnos').insert({
-          cliente_id: waitlistClientLiberado,
-          turno_id: turnoUuid
-        }).then(({ error }) => {
-          if (error) console.error("Error al promover de lista de espera en Supabase:", error);
-        });
-      }
     }
 
     addAuditLog('TURNO_ASIGNACION_REMOCION', { 
@@ -1615,13 +1720,64 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const modificarPrecioOCupoTurno = (turnoId: string, nuevoCupo: number) => {
+    let updatedClientes = [...clientes];
+
     const updated = turnos.map(t => {
-      if (t.id === turnoId) {
-        return { ...t, cupo_maximo: nuevoCupo };
+      if (t.id !== turnoId) return t;
+
+      let nuevosAsignados = [...t.asignados_ids];
+      let nuevaWaitlist = [...t.lista_espera_ids];
+      const promovidos: string[] = [];
+
+      // Promover automáticamente desde lista de espera hasta cubrir el nuevo cupo
+      while (nuevaWaitlist.length > 0 && nuevosAsignados.length < nuevoCupo) {
+        const promovidoId = nuevaWaitlist.shift()!;
+        nuevosAsignados.push(promovidoId);
+        promovidos.push(promovidoId);
       }
-      return t;
+
+      // Actualizar turnos_fijos de los clientes promovidos
+      if (promovidos.length > 0) {
+        updatedClientes = updatedClientes.map(c => {
+          if (promovidos.includes(c.id) && !c.turnos_fijos.includes(turnoId)) {
+            return { ...c, tipo: 'FIJO' as TipoCliente, turnos_fijos: [...c.turnos_fijos, turnoId] };
+          }
+          return c;
+        });
+
+        // Sincronizar en Supabase
+        if (supabase) {
+          resolveTurnoUuid(turnoId).then((turnoUuid) => {
+            if (!turnoUuid) return;
+            promovidos.forEach(promovidoId => {
+              supabase.from('lista_espera_turnos').delete()
+                .eq('cliente_id', promovidoId).eq('turno_id', turnoUuid)
+                .then(({ error }) => { if (error) console.error('Error al remover de lista espera en Supabase:', error); });
+              supabase.from('asignaciones_turnos').insert({ cliente_id: promovidoId, turno_id: turnoUuid })
+                .then(({ error }) => { if (error) console.error('Error al promover a asignados en Supabase:', error); });
+            });
+          });
+        }
+
+        if (promovidos.length > 0) {
+          addToast('add', `${promovidos.length} socio(s) promovido(s) automáticamente desde la lista de espera.`);
+        }
+      }
+
+      return { ...t, cupo_maximo: nuevoCupo, asignados_ids: nuevosAsignados, lista_espera_ids: nuevaWaitlist };
     });
-    saveState(clientes, planes, historialPrecios, updated, pagos, recuperos, auditLogs);
+
+    // Update cupo in Supabase
+    if (supabase) {
+      resolveTurnoUuid(turnoId).then((turnoUuid) => {
+        if (turnoUuid) {
+          supabase.from('turnos').update({ cupo_maximo: nuevoCupo }).eq('id', turnoUuid)
+            .then(({ error }) => { if (error) console.error('Error al actualizar cupo en Supabase:', error); });
+        }
+      });
+    }
+
+    saveState(updatedClientes, planes, historialPrecios, updated, pagos, recuperos, auditLogs);
     addAuditLog('CUPO_TURNO_EDITADO', { turno_id: turnoId, nuevo_cupo: nuevoCupo });
   };
 

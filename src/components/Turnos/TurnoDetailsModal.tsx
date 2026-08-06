@@ -1,7 +1,7 @@
 // src/components/Turnos/TurnoDetailsModal.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
-import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck } from 'lucide-react';
+import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { SearchableSelect } from '../Common/SearchableSelect';
 
 interface TurnoDetailsModalProps {
@@ -20,6 +20,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   const [nuevoCupoMaximo, setNuevoCupoMaximo] = useState('');
   const [cellActionError, setCellActionError] = useState('');
   const [cellActionSuccess, setCellActionSuccess] = useState('');
+  const [cellActionWaitlist, setCellActionWaitlist] = useState('');
   const [flexCheckInClientId, setFlexCheckInClientId] = useState('');
   const [localProfesor, setLocalProfesor] = useState('');
 
@@ -57,6 +58,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
     e.preventDefault();
     setCellActionError('');
     setCellActionSuccess('');
+    setCellActionWaitlist('');
 
     if (!selectedClientToAssignId) {
       setCellActionError('Selecciona un alumno para asignarlo.');
@@ -65,9 +67,15 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
 
     const res = asignarClienteFijo(selectedClientToAssignId, turnoId);
     if (res.success) {
-      setCellActionSuccess(res.message);
-      setSelectedClientToAssignId('');
-      setTimeout(() => setCellActionSuccess(''), 2000);
+      if (res.putInWaitlist) {
+        setCellActionWaitlist(res.message);
+        setSelectedClientToAssignId('');
+        setTimeout(() => setCellActionWaitlist(''), 6000);
+      } else {
+        setCellActionSuccess(res.message);
+        setSelectedClientToAssignId('');
+        setTimeout(() => setCellActionSuccess(''), 2000);
+      }
     } else {
       setCellActionError(res.message);
     }
@@ -139,6 +147,17 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
           {cellActionError && (
             <div className="bg-red-50 text-red-700 p-2.5 rounded-lg font-medium border border-red-200 text-[11px]">
               {cellActionError}
+            </div>
+          )}
+
+          {cellActionWaitlist && (
+            <div className="bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-300 text-[11px] flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-bold text-amber-900">⏳ Turno completo — agregado a lista de espera</p>
+                <p>{cellActionWaitlist}</p>
+                <p className="text-[10px] text-amber-600 mt-1">Podés revisar la lista de espera en el detalle del turno y resolver manualmente cuando se libere un lugar.</p>
+              </div>
             </div>
           )}
 

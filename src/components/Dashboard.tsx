@@ -103,20 +103,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const maxIngreso = Math.max(...ingresosHistoricos, 10000);
 
-  // Ocupación por horario
-  const horariosBase = ['07:00', '08:00', '09:00', '10:00', '18:00', '19:00', '20:00', '21:00'];
-  const horariosUnicos = Array.from(new Set([...horariosBase, ...turnos.map(t => t.hora)])).sort();
-  const ocupacionPorHorario = horariosUnicos.map(hora => {
-    const turnosDelHorario = turnos.filter(t => t.hora === hora);
-    const cupoTot = turnosDelHorario.reduce((acc, t) => acc + t.cupo_maximo, 0);
-    const asigTot = turnosDelHorario.reduce((acc, t) => acc + t.asignados_ids.length, 0);
-    return {
-      hora,
-      porcent: cupoTot > 0 ? Math.round((asigTot / cupoTot) * 100) : 0,
-      asig: asigTot,
-      cupo: cupoTot > 0 ? cupoTot : 10
-    };
-  });
+  // Ocupación por horario (dinámico en base a los turnos reales de la grilla)
+  const horariosUnicos = Array.from(new Set(turnos.map(t => t.hora.slice(0, 5)))).sort();
+  const ocupacionPorHorario = horariosUnicos
+    .map(hora => {
+      const turnosDelHorario = turnos.filter(t => t.hora.slice(0, 5) === hora);
+      const cupoTot = turnosDelHorario.reduce((acc, t) => acc + t.cupo_maximo, 0);
+      const asigTot = turnosDelHorario.reduce((acc, t) => acc + t.asignados_ids.length, 0);
+      return {
+        hora,
+        porcent: cupoTot > 0 ? Math.round((asigTot / cupoTot) * 100) : 0,
+        asig: asigTot,
+        cupo: cupoTot,
+        cantTurnos: turnosDelHorario.length
+      };
+    })
+    .filter(h => h.cantTurnos > 0);
 
   // Clientes por plan
   const planDistribucion = planes.map(plan => {

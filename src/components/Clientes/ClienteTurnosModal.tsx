@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, AlertCircle, CheckCircle, Calendar, Plus } from 'lucide-react';
+import { X, AlertCircle, CheckCircle, Calendar, Plus, AlertTriangle } from 'lucide-react';
 
 interface ClienteTurnosModalProps {
   isOpen: boolean;
@@ -21,12 +21,14 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
   const [selectedTurnoToAssign, setSelectedTurnoToAssign] = useState<string>('');
   const [turnosModalError, setTurnosModalError] = useState<string>('');
   const [turnosModalSuccess, setTurnosModalSuccess] = useState<string>('');
+  const [turnosModalWaitlist, setTurnosModalWaitlist] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
       setSelectedTurnoToAssign('');
       setTurnosModalError('');
       setTurnosModalSuccess('');
+      setTurnosModalWaitlist('');
     }
   }, [isOpen]);
 
@@ -48,6 +50,7 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
   const handleAssignTurno = () => {
     setTurnosModalError('');
     setTurnosModalSuccess('');
+    setTurnosModalWaitlist('');
 
     if (!selectedTurnoToAssign) {
       setTurnosModalError('Por favor selecciona un horario de la grilla.');
@@ -56,9 +59,15 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
 
     const res = asignarClienteFijo(activeClient.id, selectedTurnoToAssign);
     if (res.success) {
-      setTurnosModalSuccess(res.message);
-      setSelectedTurnoToAssign('');
-      setTimeout(() => setTurnosModalSuccess(''), 2000);
+      if (res.putInWaitlist) {
+        setTurnosModalWaitlist(res.message);
+        setSelectedTurnoToAssign('');
+        setTimeout(() => setTurnosModalWaitlist(''), 8000);
+      } else {
+        setTurnosModalSuccess(res.message);
+        setSelectedTurnoToAssign('');
+        setTimeout(() => setTurnosModalSuccess(''), 2000);
+      }
     } else {
       setTurnosModalError(res.message);
     }
@@ -92,6 +101,17 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
             </div>
           )}
 
+          {turnosModalWaitlist && (
+            <div className="bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-300 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-bold text-amber-900 text-[11px]">⏳ Turno completo — agregado a lista de espera</p>
+                <p className="text-[11px]">{turnosModalWaitlist}</p>
+                <p className="text-[10px] text-amber-600">Revisá la lista de espera del turno en la Matriz Fija para resolver cuando se libere un lugar.</p>
+              </div>
+            </div>
+          )}
+
           {turnosModalSuccess && (
             <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg flex items-center gap-2 border border-emerald-200">
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -121,7 +141,14 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
               </p>
             ) : (
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
-                {activeClient.turnos_fijos.map(tFid => (
+                {[...activeClient.turnos_fijos]
+                  .sort((a, b) => {
+                    const diaA = DIAS_ORDEN.indexOf(a.split('-')[0]);
+                    const diaB = DIAS_ORDEN.indexOf(b.split('-')[0]);
+                    if (diaA !== diaB) return diaA - diaB;
+                    return (a.split('-')[1] || '').localeCompare(b.split('-')[1] || '');
+                  })
+                  .map(tFid => (
                   <div key={tFid} className="bg-zinc-50 border border-zinc-200 py-2 px-3 rounded-lg flex justify-between items-center text-zinc-900 text-xs font-semibold">
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-emerald-600" />

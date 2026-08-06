@@ -1,9 +1,9 @@
 // src/components/SocioPanel/SocioPanel.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { 
   AlertTriangle, Megaphone, Award, QrCode, Barcode, CreditCard, 
-  Loader2, Home, User, CalendarDays, Receipt, LogOut
+  Loader2, Home, User, CalendarDays, Receipt, LogOut, PartyPopper, X
 } from 'lucide-react';
 
 import { SocioHeader } from './SocioHeader';
@@ -31,6 +31,8 @@ export const SocioPanel: React.FC = () => {
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [showPaymentChoiceModal, setShowPaymentChoiceModal] = useState(false);
+  // Feature 3: Month-start payment reminder popup
+  const [showMonthStartPopup, setShowMonthStartPopup] = useState(false);
 
   // Find simulated/logged in user
   const socio = useMemo(() => {
@@ -48,6 +50,14 @@ export const SocioPanel: React.FC = () => {
     return socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
   }, [socio]);
 
+  // Fix 2b: Current month hasn't been paid yet
+  const currentCalendarMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+
+  const isCurrentMonthUnpaid = useMemo(() => {
+    if (!socio) return false;
+    return !socio.ultimo_mes_pagado || socio.ultimo_mes_pagado < currentCalendarMonth;
+  }, [socio, currentCalendarMonth]);
+
   const canPayAdvance = useMemo(() => {
     if (!socio || hasDebt) return false;
     const now = new Date();
@@ -55,7 +65,20 @@ export const SocioPanel: React.FC = () => {
     return (lastDay - now.getDate()) < 5;
   }, [socio, hasDebt]);
 
-  const canPay = hasDebt || canPayAdvance;
+  const canPay = hasDebt || canPayAdvance || isCurrentMonthUnpaid;
+
+  // Feature 3: Show month-start popup when current month is unpaid
+  // Controlled via localStorage so user can dismiss it and it won't re-show in same session
+  useEffect(() => {
+    if (!socio || !isCurrentMonthUnpaid) return;
+    const dismissedKey = `kaha-month-popup-dismissed-${currentCalendarMonth}-${socio.id}`;
+    const wasDismissed = localStorage.getItem(dismissedKey) === 'true';
+    if (!wasDismissed) {
+      // Small delay so it doesn't flash on initial load
+      const timer = setTimeout(() => setShowMonthStartPopup(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [socio, isCurrentMonthUnpaid, currentCalendarMonth]);
 
   if (loading) {
     return (
@@ -248,6 +271,8 @@ export const SocioPanel: React.FC = () => {
                         ? 'Procesando Pago...' 
                         : hasDebt 
                         ? 'Pagar Deuda Pendiente (Mercado Pago / Transferencia)' 
+                        : isCurrentMonthUnpaid
+                        ? `Abonar mes de ${new Date().toLocaleString('es-AR', { month: 'long' })} (Mercado Pago / Transferencia)`
                         : 'Pagar por Adelantado - Próximo Mes (Mercado Pago / Transferencia)'}
                     </span>
                   </button>
@@ -458,6 +483,81 @@ export const SocioPanel: React.FC = () => {
           setIsPaying={setIsPaying}
         />
       )}
+
+      {/* FEATURE 3: MONTH-START PAYMENT REMINDER POPUP */}
+      {showMonthStartPopup && socio && isCurrentMonthUnpaid && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-sm animate-fade-in font-sans"
+          id="month-start-popup-overlay"
+        >
+          <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden animate-scale-up">
+            {/* Decorative top gradient */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-sky-400 rounded-t-3xl" />
+            
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setShowMonthStartPopup(false);
+                const dismissedKey = `kaha-month-popup-dismissed-${currentCalendarMonth}-${socio.id}`;
+                localStorage.setItem(dismissedKey, 'true');
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer border-none bg-transparent"
+              aria-label="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="p-7 pt-8 space-y-5">
+              {/* Icon + heading */}
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/30">
+                  <PartyPopper className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-widest">
+                    ¡Nuevo mes!
+                  </p>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight mt-0.5 capitalize">
+                    Ya empezó {new Date().toLocaleString('es-AR', { month: 'long' })} 🎉
+                  </h3>
+                </div>
+              </div>
+
+              {/* Body */}
+              <p className="text-slate-600 text-sm leading-relaxed font-sans">
+                Ya comenzó el nuevo mes. Podés abonar tu cuota ahora para tener todo en orden y seguir disfrutando de tus clases sin interrupciones.
+              </p>
+
+              {/* CTAs */}
+              <div className="space-y-2.5 pt-1">
+                <button
+                  onClick={() => {
+                    setShowMonthStartPopup(false);
+                    setShowPaymentChoiceModal(true);
+                  }}
+                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black py-3 px-5 rounded-2xl text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] cursor-pointer shadow-md shadow-emerald-500/30 border-none"
+                  id="month-popup-pay-btn"
+                >
+                  <CreditCard className="w-4.5 h-4.5" />
+                  Ir a abonar ahora →
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMonthStartPopup(false);
+                    const dismissedKey = `kaha-month-popup-dismissed-${currentCalendarMonth}-${socio.id}`;
+                    localStorage.setItem(dismissedKey, 'true');
+                  }}
+                  className="w-full py-2.5 px-5 rounded-2xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-all cursor-pointer border border-slate-200 bg-transparent"
+                  id="month-popup-dismiss-btn"
+                >
+                  Continuar sin pagar aún
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 };
