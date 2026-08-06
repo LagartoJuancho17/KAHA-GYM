@@ -1357,15 +1357,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Límite estricto de acuerdo al plan seleccionado para el socio
     const plan = planes.find(p => p.id === cliente.plan_id);
+    // Verificar límite de días únicos según el plan (2 turnos el mismo día = 1 día)
+    const diasUnicos = new Set(cliente.turnos_fijos.map(tId => tId.split('-')[0]));
     const maxDias = plan ? plan.dias_por_semana : 2;
-    if (cliente.turnos_fijos.length >= maxDias) {
-      return { success: false, message: `Límite alcanzado: El plan del socio (${plan?.nombre || 'Sin Plan'}) permite como máximo ${maxDias} horarios fijos semanales.` };
-    }
-
-    // Verificar conflicto de horario en el mismo día (e.g. no registrarse 2 veces el mismo día)
-    const tieneTurnoMismoDia = cliente.turnos_fijos.some(tFid => tFid.startsWith(turno.dia));
-    if (tieneTurnoMismoDia) {
-      return { success: false, message: `Conflicto de horario: El cliente ya posee un turno fijo asignado el día ${turno.dia}.` };
+    const esMismoDia = turno.dia && diasUnicos.has(turno.dia);
+    if (!esMismoDia && diasUnicos.size >= maxDias) {
+      return { success: false, message: `Límite alcanzado: El plan del socio (${plan?.nombre || 'Sin Plan'}) permite como máximo ${maxDias} días distintos por semana.` };
     }
 
     // Verificar cupo máximo
