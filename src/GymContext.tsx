@@ -914,53 +914,80 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (supabase) {
       const planUuid = newClient.plan_id === 'p-none' ? '00000000-0000-0000-0000-000000000000' : newClient.plan_id;
-      supabase.from('clientes').insert({
-        id: newClient.id,
-        nombre: newClient.nombre,
-        apellido: newClient.apellido,
-        email: newClient.email,
-        telefono: newClient.telefono,
-        tipo: newClient.tipo,
-        estado: newClient.estado,
-        plan_id: planUuid,
-        activo: newClient.activo,
-        deuda_acumulada: newClient.deuda_acumulada,
-        ultimo_mes_pagado: newClient.ultimo_mes_pagado,
-        exencion_cobro: newClient.exencion_cobro,
-        autorizado: newClient.autorizado,
-        creado_at: newClient.creado_at,
-        precio_personalizado: newClient.precio_personalizado ?? null,
-        dias_personalizados: newClient.dias_personalizados ?? null,
-        nota_plan_personalizado: newClient.nota_plan_personalizado ?? null
-      }).then(({ error }) => {
-        if (error) console.error("Error al insertar cliente en Supabase:", error);
-      });
+      // Persistencia ORDENADA: primero se inserta (y espera) el cliente, y solo
+      // cuando su fila existe se insertan las asignaciones/lista de espera, que
+      // referencian al cliente por FK. Hacerlo en paralelo (fire-and-forget)
+      // provocaba que la asignación llegara antes que el cliente y la FK la
+      // rechazara silenciosamente: el socio quedaba "perdido" en los turnos.
+      (async () => {
+        const { error: clienteError } = await supabase.from('clientes').insert({
+          id: newClient.id,
+          nombre: newClient.nombre,
+          apellido: newClient.apellido,
+          email: newClient.email,
+          telefono: newClient.telefono,
+          tipo: newClient.tipo,
+          estado: newClient.estado,
+          plan_id: planUuid,
+          activo: newClient.activo,
+          deuda_acumulada: newClient.deuda_acumulada,
+          ultimo_mes_pagado: newClient.ultimo_mes_pagado,
+          exencion_cobro: newClient.exencion_cobro,
+          autorizado: newClient.autorizado,
+          creado_at: newClient.creado_at,
+          precio_personalizado: newClient.precio_personalizado ?? null,
+          dias_personalizados: newClient.dias_personalizados ?? null,
+          nota_plan_personalizado: newClient.nota_plan_personalizado ?? null
+        });
 
-      // Insertar asignaciones fijas exitosas en Supabase
-      actuallyAssignedTurnosFijos.forEach(async (tId) => {
-        const turnoUuid = await resolveTurnoUuid(tId);
-        if (turnoUuid && supabase) {
-          supabase.from('asignaciones_turnos').insert({
+        if (clienteError) {
+          console.error("Error al insertar cliente en Supabase:", clienteError);
+          addToast('error', 'El socio no se guardó en la base de datos. Revisá la conexión y volvé a registrarlo.');
+          return; // sin cliente en la base, sus asignaciones violarían la FK
+        }
+
+        let syncFallo = false;
+
+        // Asignaciones fijas exitosas (el cliente ya existe → sin race de FK)
+        for (const tId of actuallyAssignedTurnosFijos) {
+          const turnoUuid = await resolveTurnoUuid(tId);
+          if (!turnoUuid) {
+            syncFallo = true;
+            console.warn(`No se pudo resolver el UUID del turno ${tId}; asignación no persistida en Supabase.`);
+            continue;
+          }
+          const { error } = await supabase.from('asignaciones_turnos').insert({
             cliente_id: newClientId,
             turno_id: turnoUuid
-          }).then(({ error }) => {
-            if (error) console.error("Error al insertar asignacion en Supabase:", error);
           });
+          if (error) {
+            syncFallo = true;
+            console.error("Error al insertar asignacion en Supabase:", error);
+          }
         }
-      });
 
-      // Insertar turnos en lista de espera en Supabase
-      waitlistTurnosFijos.forEach(async (tId) => {
-        const turnoUuid = await resolveTurnoUuid(tId);
-        if (turnoUuid && supabase) {
-          supabase.from('lista_espera_turnos').insert({
+        // Turnos en lista de espera
+        for (const tId of waitlistTurnosFijos) {
+          const turnoUuid = await resolveTurnoUuid(tId);
+          if (!turnoUuid) {
+            syncFallo = true;
+            console.warn(`No se pudo resolver el UUID del turno ${tId}; lista de espera no persistida en Supabase.`);
+            continue;
+          }
+          const { error } = await supabase.from('lista_espera_turnos').insert({
             cliente_id: newClientId,
             turno_id: turnoUuid
-          }).then(({ error }) => {
-            if (error) console.error("Error al insertar en lista de espera en Supabase:", error);
           });
+          if (error) {
+            syncFallo = true;
+            console.error("Error al insertar en lista de espera en Supabase:", error);
+          }
         }
-      });
+
+        if (syncFallo) {
+          addToast('error', 'El socio se guardó, pero no se pudieron sincronizar todos sus turnos. Revisá y reasignalos desde "Gestionar Turnos".');
+        }
+      })();
     }
 
     addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo, turnos: actuallyAssignedTurnosFijos, lista_espera: waitlistTurnosFijos });
@@ -1035,7 +1062,20 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       if (Object.keys(payload).length > 0) {
         supabase.from('clientes').update(payload).eq('id', id).then(({ error }) => {
-          if (error) console.error("Error al actualizar cliente en Supabase:", error);
+          if (error) {
+            console.error("Error al actualizar cliente en Supabase:", error);
+            // Si falta la columna en Supabase (error 42703), reintentar sin las columnas de plan personalizado para guardar el resto
+            if (error.code === '42703' || error.message?.includes('precio_personalizado') || error.message?.includes('dias_personalizados')) {
+              console.warn("Reintentando actualización de cliente sin campos personalizados...");
+              const safePayload = { ...payload };
+              delete safePayload.precio_personalizado;
+              delete safePayload.dias_personalizados;
+              delete safePayload.nota_plan_personalizado;
+              if (Object.keys(safePayload).length > 0) {
+                supabase.from('clientes').update(safePayload).eq('id', id);
+              }
+            }
+          }
         });
       }
     }
@@ -1472,14 +1512,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
 
     if (supabase) {
-      resolveTurnoUuid(turnoId).then((turnoUuid) => {
-        if (turnoUuid) {
-          supabase.from('asignaciones_turnos').insert({
-            cliente_id: clienteId,
-            turno_id: turnoUuid
-          }).then(({ error }) => {
-            if (error) console.error("Error al asignar turno fijo en Supabase:", error);
-          });
+      resolveTurnoUuid(turnoId).then(async (turnoUuid) => {
+        if (!turnoUuid) {
+          console.warn(`No se pudo resolver el UUID del turno ${turnoId}; asignación no persistida en Supabase.`);
+          addToast('error', 'La asignación no se sincronizó con la base (turno sin ID). Reintentá desde "Gestionar Turnos".');
+          return;
+        }
+        const { error } = await supabase.from('asignaciones_turnos').insert({
+          cliente_id: clienteId,
+          turno_id: turnoUuid
+        });
+        if (error) {
+          console.error("Error al asignar turno fijo en Supabase:", error);
+          addToast('error', 'La asignación no se guardó en la base de datos. Reintentá la asignación.');
         }
       });
     }
