@@ -41,9 +41,9 @@ export interface Cliente {
   creado_at: string;
   autorizado?: boolean;
   // Plan Personalizado: sobreescribe precio y/o días del plan base para este socio en particular
-  precio_personalizado?: number;  // Si está definido, reemplaza plan.precio para este socio
-  dias_personalizados?: number;   // Si está definido, reemplaza plan.dias_por_semana para este socio
-  nota_plan_personalizado?: string; // Descripción/motivo del plan especial
+  precio_personalizado?: number | null;  // Si está definido, reemplaza plan.precio para este socio
+  dias_personalizados?: number | null;   // Si está definido, reemplaza plan.dias_por_semana para este socio
+  nota_plan_personalizado?: string | null; // Descripción/motivo del plan especial
   foto_url?: string; // URL o DataURL en base64 de la foto de perfil del socio
 }
 

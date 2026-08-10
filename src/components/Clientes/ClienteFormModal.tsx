@@ -165,9 +165,9 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       plan_id: clienteForm.plan_id || planes[0]?.id || '',
       exencion_cobro: clienteForm.exencion_cobro,
       deuda_acumulada: clienteForm.deuda_acumulada,
-      precio_personalizado: isCustomPlan && clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : undefined,
-      dias_personalizados: isCustomPlan && clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : undefined,
-      nota_plan_personalizado: isCustomPlan ? (clienteForm.nota_plan_personalizado || undefined) : undefined
+      precio_personalizado: isCustomPlan && clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : null,
+      dias_personalizados: isCustomPlan && clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : null,
+      nota_plan_personalizado: isCustomPlan ? (clienteForm.nota_plan_personalizado || null) : null
     };
 
     if (editingClienteId) {
@@ -217,9 +217,9 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       exencion_cobro: exencion,
       deuda_acumulada: deuda,
       turnos_fijos: turnosAsignados,
-      precio_personalizado: isCustomPlan && clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : undefined,
-      dias_personalizados: isCustomPlan && clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : undefined,
-      nota_plan_personalizado: isCustomPlan ? (clienteForm.nota_plan_personalizado || undefined) : undefined
+      precio_personalizado: isCustomPlan && clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : null,
+      dias_personalizados: isCustomPlan && clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : null,
+      nota_plan_personalizado: isCustomPlan ? (clienteForm.nota_plan_personalizado || null) : null
     };
 
     // Save client to database atomically with turnos_fijos
@@ -371,8 +371,10 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
             {turnosSuccess && <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg flex items-center gap-2 border border-emerald-200"><CheckCircle className="w-4 h-4 shrink-0" /><span>{turnosSuccess}</span></div>}
 
             <div className="bg-zinc-50 border border-zinc-200 p-3 rounded-xl text-[11px] flex justify-between items-center">
-              <span className="font-semibold text-zinc-800">Plan: <strong>{plan?.nombre || 'Sin plan'}</strong></span>
-              <span className="bg-zinc-200 text-zinc-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">{turnosAsignados.length} / {plan?.dias_por_semana || 5} asignados</span>
+              <span className="font-semibold text-zinc-800">Plan: <strong>{isCustomPlan ? 'Personalizado' : (plan?.nombre || 'Sin plan')}</strong></span>
+              <span className="bg-zinc-200 text-zinc-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
+                {turnosAsignados.length} / {isCustomPlan && clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : (plan?.dias_por_semana || 5)} asignados
+              </span>
             </div>
 
             {turnosAsignadosSorted.length > 0 && (

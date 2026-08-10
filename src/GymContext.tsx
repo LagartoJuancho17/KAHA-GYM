@@ -375,7 +375,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           autorizado: c.autorizado ?? true,
           reservas_individuales: c.reservas_individuales || [],
           clases_suspendidas: c.clases_suspendidas || [],
-          creado_at: c.creado_at
+          creado_at: c.creado_at,
+          precio_personalizado: c.precio_personalizado != null ? Number(c.precio_personalizado) : undefined,
+          dias_personalizados: c.dias_personalizados != null ? Number(c.dias_personalizados) : undefined,
+          nota_plan_personalizado: c.nota_plan_personalizado || undefined
         };
       });
 
@@ -925,7 +928,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ultimo_mes_pagado: newClient.ultimo_mes_pagado,
         exencion_cobro: newClient.exencion_cobro,
         autorizado: newClient.autorizado,
-        creado_at: newClient.creado_at
+        creado_at: newClient.creado_at,
+        precio_personalizado: newClient.precio_personalizado ?? null,
+        dias_personalizados: newClient.dias_personalizados ?? null,
+        nota_plan_personalizado: newClient.nota_plan_personalizado ?? null
       }).then(({ error }) => {
         if (error) console.error("Error al insertar cliente en Supabase:", error);
       });
@@ -985,7 +991,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Si cambia de plan y tenía turnos asignados fijos, comprobar límite de turnos si excede días por semana
       const planNuevo = planes.find(p => p.id === updates.plan_id);
-      const maxDias = planNuevo ? planNuevo.dias_por_semana : 5;
+      const maxDias = updates.dias_personalizados ?? clientePrev.dias_personalizados ?? (planNuevo ? planNuevo.dias_por_semana : 5);
       if (clientePrev.turnos_fijos.length > maxDias) {
         // Recortamos turnos excedentes
         updates.turnos_fijos = clientePrev.turnos_fijos.slice(0, maxDias);
@@ -1014,12 +1020,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const allowedColumns = [
         'nombre', 'apellido', 'email', 'telefono', 'tipo', 'estado',
         'plan_id', 'activo', 'deuda_acumulada', 'ultimo_mes_pagado',
-        'exencion_cobro', 'autorizado'
+        'exencion_cobro', 'autorizado',
+        'precio_personalizado', 'dias_personalizados', 'nota_plan_personalizado'
       ];
       const payload: any = {};
       Object.keys(updates).forEach(key => {
         if (allowedColumns.includes(key)) {
-          payload[key] = (updates as any)[key];
+          const val = (updates as any)[key];
+          payload[key] = val === undefined ? null : val;
         }
       });
       if (payload.plan_id) {
@@ -1381,7 +1389,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const plan = planes.find(p => p.id === cliente.plan_id);
     // Verificar límite de días únicos según el plan (2 turnos el mismo día = 1 día)
     const diasUnicos = new Set(cliente.turnos_fijos.map(tId => tId.split('-')[0]));
-    const maxDias = plan ? plan.dias_por_semana : 2;
+    const maxDias = cliente.dias_personalizados ?? (plan ? plan.dias_por_semana : 2);
     const esMismoDia = turno.dia && diasUnicos.has(turno.dia);
     if (!esMismoDia && diasUnicos.size >= maxDias) {
       return { success: false, message: `Límite alcanzado: El plan del socio (${plan?.nombre || 'Sin Plan'}) permite como máximo ${maxDias} días distintos por semana.` };

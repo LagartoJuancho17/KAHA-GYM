@@ -155,7 +155,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                         >
                           <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                           <span>
-                            {c.turnos_fijos.length} / {plan?.dias_por_semana || 5} días
+                            {c.turnos_fijos.length} / {c.dias_personalizados ?? plan?.dias_por_semana ?? 5} días
                           </span>
                         </button>
                         {c.turnos_fijos.length > 0 && (

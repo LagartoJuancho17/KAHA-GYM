@@ -65,9 +65,9 @@ export const ClientePlanAssignModal: React.FC<ClientePlanAssignModalProps> = ({
 
     const updates: Partial<Cliente> = {
       plan_id: selectedPlanId,
-      precio_personalizado: isCustomPlan ? Number(precioPersonalizado) : undefined,
-      dias_personalizados: isCustomPlan ? Number(diasPersonalizados) : undefined,
-      nota_plan_personalizado: isCustomPlan ? notaPlanPersonalizado : undefined,
+      precio_personalizado: isCustomPlan ? (precioPersonalizado ? Number(precioPersonalizado) : null) : null,
+      dias_personalizados: isCustomPlan ? (diasPersonalizados ? Number(diasPersonalizados) : null) : null,
+      nota_plan_personalizado: isCustomPlan ? (notaPlanPersonalizado || null) : null,
     };
 
     const res = updateCliente(activeClient.id, updates);

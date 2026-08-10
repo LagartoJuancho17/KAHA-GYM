@@ -122,13 +122,13 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
           {/* Plan stats */}
           <div className="bg-zinc-50 border border-zinc-200/80 p-3 rounded-xl text-[11px] text-zinc-600 space-y-1">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-zinc-800">Plan: <strong className="text-zinc-950">{plan ? plan.nombre : 'Plan base'}</strong></span>
+              <span className="font-semibold text-zinc-800">Plan: <strong className="text-zinc-950">{activeClient.dias_personalizados != null ? 'Personalizado' : (plan ? plan.nombre : 'Plan base')}</strong></span>
               <span className="bg-zinc-200 text-zinc-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
-                {activeClient.turnos_fijos.length} / {plan ? plan.dias_por_semana : 5} asignados
+                {activeClient.turnos_fijos.length} / {activeClient.dias_personalizados ?? (plan ? plan.dias_por_semana : 5)} asignados
               </span>
             </div>
             <p className="text-zinc-500 text-[10px] pt-0.5">
-              Permite hasta {plan ? plan.dias_por_semana : 5} días fijos semanales asignados.
+              Permite hasta {activeClient.dias_personalizados ?? (plan ? plan.dias_por_semana : 5)} días fijos semanales asignados.
             </p>
           </div>
 
