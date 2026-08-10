@@ -55,6 +55,12 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
 
   const totalPaginas = Math.ceil(clientesFiltrados.length / filasPorPagina) || 1;
   
+  React.useEffect(() => {
+    if (pagina > totalPaginas) {
+      setPagina(totalPaginas);
+    }
+  }, [pagina, totalPaginas, setPagina]);
+
   const clientesPaginados = useMemo(() => {
     const inicio = (pagina - 1) * filasPorPagina;
     return clientesFiltrados.slice(inicio, inicio + filasPorPagina);

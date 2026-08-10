@@ -871,6 +871,26 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const initialTurnosFijos = clientData.turnos_fijos || [];
     const initialDeuda = clientData.deuda_acumulada || 0;
 
+    // Actualizar grilla de turnos para cada turno fijo asignado inicialmente
+    let updatedTurnos = [...turnos];
+    const actuallyAssignedTurnosFijos: string[] = [];
+    const waitlistTurnosFijos: string[] = [];
+
+    if (initialTurnosFijos.length > 0) {
+      updatedTurnos = turnos.map(t => {
+        if (initialTurnosFijos.includes(t.id)) {
+          if (t.asignados_ids.length < t.cupo_maximo) {
+            actuallyAssignedTurnosFijos.push(t.id);
+            return { ...t, asignados_ids: [...t.asignados_ids.filter(id => id !== newClientId), newClientId] };
+          } else {
+            waitlistTurnosFijos.push(t.id);
+            return { ...t, lista_espera_ids: [...t.lista_espera_ids.filter(id => id !== newClientId), newClientId] };
+          }
+        }
+        return t;
+      });
+    }
+
     const newClient: Cliente = {
       ...clientData,
       codigo_socio: customCode,
@@ -880,26 +900,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       estado: initialDeuda > 0 ? 'CON_DEUDA' : 'ACTIVO',
       deuda_acumulada: initialDeuda,
       ultimo_mes_pagado: new Date().toISOString().slice(0, 7), // Al día del mes de registro
-      turnos_fijos: initialTurnosFijos,
+      turnos_fijos: actuallyAssignedTurnosFijos,
       activo: true,
       creado_at: new Date().toISOString(),
       autorizado: true
     };
-
-    // Actualizar grilla de turnos para cada turno fijo asignado inicialmente
-    let updatedTurnos = [...turnos];
-    if (initialTurnosFijos.length > 0) {
-      updatedTurnos = turnos.map(t => {
-        if (initialTurnosFijos.includes(t.id)) {
-          if (t.asignados_ids.length < t.cupo_maximo) {
-            return { ...t, asignados_ids: [...t.asignados_ids.filter(id => id !== newClientId), newClientId] };
-          } else {
-            return { ...t, lista_espera_ids: [...t.lista_espera_ids.filter(id => id !== newClientId), newClientId] };
-          }
-        }
-        return t;
-      });
-    }
 
     const updatedClientes = [newClient, ...clientes];
     saveState(updatedClientes, undefined, undefined, updatedTurnos);
@@ -925,8 +930,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (error) console.error("Error al insertar cliente en Supabase:", error);
       });
 
-      // Insertar asignaciones fijas en Supabase
-      initialTurnosFijos.forEach(async (tId) => {
+      // Insertar asignaciones fijas exitosas en Supabase
+      actuallyAssignedTurnosFijos.forEach(async (tId) => {
         const turnoUuid = await resolveTurnoUuid(tId);
         if (turnoUuid && supabase) {
           supabase.from('asignaciones_turnos').insert({
@@ -937,10 +942,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       });
+
+      // Insertar turnos en lista de espera en Supabase
+      waitlistTurnosFijos.forEach(async (tId) => {
+        const turnoUuid = await resolveTurnoUuid(tId);
+        if (turnoUuid && supabase) {
+          supabase.from('lista_espera_turnos').insert({
+            cliente_id: newClientId,
+            turno_id: turnoUuid
+          }).then(({ error }) => {
+            if (error) console.error("Error al insertar en lista de espera en Supabase:", error);
+          });
+        }
+      });
     }
 
-    addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo, turnos: initialTurnosFijos });
-    addToast('add', 'Socio registrado exitosamente.');
+    addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo, turnos: actuallyAssignedTurnosFijos, lista_espera: waitlistTurnosFijos });
+    if (waitlistTurnosFijos.length > 0) {
+      addToast('add', `Socio registrado. Se agregó a lista de espera en ${waitlistTurnosFijos.length} turno(s) completo(s).`);
+    } else {
+      addToast('add', 'Socio registrado exitosamente.');
+    }
     return { success: true, message: 'Cliente registrado exitosamente.', id: newClient.id };
   };
 

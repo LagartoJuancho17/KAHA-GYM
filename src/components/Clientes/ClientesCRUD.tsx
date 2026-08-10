@@ -92,20 +92,40 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     setShowAddClienteModal(true);
   };
 
+  // Resetear página a 1 ante cambios en la búsqueda o filtros
+  React.useEffect(() => {
+    setPagina(1);
+  }, [buscar, filtroEstado, verInactivos]);
+
   // --- FILTRADO PROCESADO ---
   const clientesFiltrados = useMemo(() => {
     let result = clientes;
 
+    // Helper para normalizar cadenas (quitar acentos y a minúsculas)
+    const normalizeStr = (str: string) => 
+      str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
     // Buscar
     if (buscar.trim()) {
-      const bRaw = buscar.toLowerCase();
-      result = result.filter(c => 
-        c.nombre.toLowerCase().includes(bRaw) || 
-        c.apellido.toLowerCase().includes(bRaw) || 
-        c.email.toLowerCase().includes(bRaw) ||
-        (c.codigo_socio && c.codigo_socio.toLowerCase().includes(bRaw)) ||
-        c.telefono.includes(bRaw)
-      );
+      const bClean = normalizeStr(buscar.trim());
+      const bCleanDigits = bClean.replace(/\D/g, '');
+
+      result = result.filter(c => {
+        const nomComp1 = normalizeStr(`${c.nombre} ${c.apellido}`);
+        const nomComp2 = normalizeStr(`${c.apellido} ${c.nombre}`);
+        const email = normalizeStr(c.email || '');
+        const codigo = normalizeStr(c.codigo_socio || '');
+        const telefono = (c.telefono || '').replace(/\D/g, '');
+
+        return (
+          nomComp1.includes(bClean) ||
+          nomComp2.includes(bClean) ||
+          email.includes(bClean) ||
+          codigo.includes(bClean) ||
+          (bCleanDigits.length > 0 && telefono.includes(bCleanDigits)) ||
+          (c.telefono && c.telefono.includes(bClean))
+        );
+      });
     }
 
     // Estado
