@@ -987,7 +987,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (syncFallo) {
           addToast('error', 'El socio se guardó, pero no se pudieron sincronizar todos sus turnos. Revisá y reasignalos desde "Gestionar Turnos".');
         }
-      })();
+      })().catch((err) => {
+        console.error("Error inesperado al sincronizar el alta del socio con Supabase:", err);
+        addToast('error', 'Ocurrió un error al guardar el socio en la base. Verificá que se haya registrado correctamente.');
+      });
     }
 
     addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo, turnos: actuallyAssignedTurnosFijos, lista_espera: waitlistTurnosFijos });
