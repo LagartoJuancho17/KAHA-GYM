@@ -1,8 +1,8 @@
 // src/components/Pagos/PagoFormModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useGym } from '../../GymContext';
 import { MedioPago } from '../../types';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, Search, Users, Check } from 'lucide-react';
 
 interface PagoFormModalProps {
   onClose: () => void;
@@ -19,9 +19,21 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     hash_transaccion: '',
     destino_transferencia: 'JUANCHI' as 'JUANCHI' | 'RULO'
   });
+  
+  const [esPagoMultiple, setEsPagoMultiple] = useState(false);
   const [beneficiarios, setBeneficiarios] = useState<Array<{ cliente_id: string, monto: string, mes_correspondiente: string }>>([]);
   const [formErr, setFormErr] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+
+  // Búsqueda en pagador (Quién Abona)
+  const [searchPagadorText, setSearchPagadorText] = useState('');
+  const [isPagadorDropdownOpen, setIsPagadorDropdownOpen] = useState(false);
+  const pagadorRef = useRef<HTMLDivElement>(null);
+
+  // Búsqueda en beneficiario adicional
+  const [searchBeneficiarioText, setSearchBeneficiarioText] = useState('');
+  const [isBeneficiarioDropdownOpen, setIsBeneficiarioDropdownOpen] = useState(false);
+  const beneficiarioRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -29,14 +41,63 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     return () => document.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
+  // Click fuera para cerrar los dropdowns de búsqueda
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pagadorRef.current && !pagadorRef.current.contains(e.target as Node)) {
+        setIsPagadorDropdownOpen(false);
+      }
+      if (beneficiarioRef.current && !beneficiarioRef.current.contains(e.target as Node)) {
+        setIsBeneficiarioDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Opciones filtradas para Pagador
+  const pagadorOptions = useMemo(() => {
+    const activeClients = clientes.filter(c => c.activo);
+    if (!searchPagadorText.trim()) return activeClients;
+    const term = searchPagadorText.toLowerCase().trim();
+    return activeClients.filter(c => 
+      c.nombre.toLowerCase().includes(term) ||
+      c.apellido.toLowerCase().includes(term) ||
+      `${c.nombre} ${c.apellido}`.toLowerCase().includes(term) ||
+      `${c.apellido} ${c.nombre}`.toLowerCase().includes(term) ||
+      (c.email && c.email.toLowerCase().includes(term))
+    );
+  }, [clientes, searchPagadorText]);
+
+  // Opciones filtradas para Beneficiario Adicional
+  const beneficiarioOptions = useMemo(() => {
+    const activeClients = clientes.filter(c => c.activo);
+    if (!searchBeneficiarioText.trim()) return activeClients;
+    const term = searchBeneficiarioText.toLowerCase().trim();
+    return activeClients.filter(c => 
+      c.nombre.toLowerCase().includes(term) ||
+      c.apellido.toLowerCase().includes(term) ||
+      `${c.nombre} ${c.apellido}`.toLowerCase().includes(term) ||
+      `${c.apellido} ${c.nombre}`.toLowerCase().includes(term) ||
+      (c.email && c.email.toLowerCase().includes(term))
+    );
+  }, [clientes, searchBeneficiarioText]);
+
   const handleClientSelect = (clientId: string) => {
     const cl = clientes.find(c => c.id === clientId);
     if (!cl) return;
     const plan = planes.find(p => p.id === cl.plan_id);
-    const planPrecio = plan ? plan.precio : 0;
+    const planPrecio = cl.precio_personalizado ?? (plan ? plan.precio : 0);
     setPagoForm(prev => ({ ...prev, cliente_id: clientId }));
-    if (beneficiarios.length === 0) {
+    
+    // Si no es pago múltiple, el pagador es el único beneficiario
+    if (!esPagoMultiple) {
       setBeneficiarios([{ cliente_id: clientId, monto: planPrecio.toString(), mes_correspondiente: pagoForm.mes_correspondiente }]);
+    } else {
+      // Si es pago múltiple y no hay ninguno, agregar al pagador primero
+      if (beneficiarios.length === 0) {
+        setBeneficiarios([{ cliente_id: clientId, monto: planPrecio.toString(), mes_correspondiente: pagoForm.mes_correspondiente }]);
+      }
     }
   };
 
@@ -49,7 +110,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     const cl = clientes.find(c => c.id === clientId);
     if (!cl) return;
     const plan = planes.find(p => p.id === cl.plan_id);
-    const planPrecio = plan ? plan.precio : 0;
+    const planPrecio = cl.precio_personalizado ?? (plan ? plan.precio : 0);
     setBeneficiarios(prev => [...prev, { cliente_id: clientId, monto: planPrecio.toString(), mes_correspondiente: pagoForm.mes_correspondiente }]);
     setFormErr('');
   };
@@ -58,7 +119,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     e.preventDefault();
     setFormErr('');
     setFormSuccess('');
-    if (!pagoForm.cliente_id) { setFormErr('Por favor ingrese quién abona la transacción.'); return; }
+    if (!pagoForm.cliente_id) { setFormErr('Por favor seleccione quién abona la transacción.'); return; }
     if (beneficiarios.length === 0) { setFormErr('Debe ingresar al menos un beneficiario para el pago.'); return; }
 
     for (let i = 0; i < beneficiarios.length; i++) {
@@ -111,9 +172,12 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     if (failed) {
       setFormErr(failed.message);
     } else {
-      setFormSuccess('Cobro múltiple registrado exitosamente.');
+      setFormSuccess('Cobro registrado exitosamente.');
       setPagoForm({ cliente_id: '', medio_pago: 'MERCADO_PAGO', mes_correspondiente: new Date().toISOString().slice(0, 7), hash_transaccion: '', destino_transferencia: 'JUANCHI' });
       setBeneficiarios([]);
+      setSearchPagadorText('');
+      setSearchBeneficiarioText('');
+      setEsPagoMultiple(false);
       setTimeout(() => {
         onSuccess(generatedReceipts);
         setFormSuccess('');
@@ -136,29 +200,165 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
         <form onSubmit={handleManualPagoSubmit} className="p-5 space-y-4">
           {formErr && <div className="bg-red-50 text-red-700 p-2.5 rounded-lg font-medium border border-red-200">{formErr}</div>}
           {formSuccess && <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-semibold border border-emerald-200">{formSuccess}</div>}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Quién Abona (Pagador)</label>
-              <select required value={pagoForm.cliente_id} onChange={e => handleClientSelect(e.target.value)} className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium" id="pago-cliente-select">
-                <option value="">-- Seleccionar pagador --</option>
-                {clientes.filter(c => c.activo).map(c => {
-                  const pl = planes.find(p => p.id === c.plan_id);
-                  return <option key={c.id} value={c.id}>{c.apellido}, {c.nombre} (Plan {pl?.nombre} — Deuda: ${c.deuda_acumulada})</option>;
-                })}
-              </select>
+          
+          {/* BUSCADOR DE QUIÉN ABONA */}
+          <div className="space-y-1 relative" ref={pagadorRef}>
+            <label className="text-zinc-500 font-bold block text-[10px] uppercase">Quién Abona (Pagador)</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Escribí para buscar por nombre o apellido..."
+                value={searchPagadorText}
+                onFocus={() => setIsPagadorDropdownOpen(true)}
+                onChange={(e) => {
+                  setSearchPagadorText(e.target.value);
+                  setIsPagadorDropdownOpen(true);
+                }}
+                className="w-full pl-9 pr-8 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-medium"
+                id="pago-cliente-search-input"
+              />
+              {pagoForm.cliente_id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPagoForm(prev => ({ ...prev, cliente_id: '' }));
+                    setSearchPagadorText('');
+                    setBeneficiarios([]);
+                    setIsPagadorDropdownOpen(true);
+                  }}
+                  className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-100 cursor-pointer border-none bg-transparent"
+                  title="Limpiar selección"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-            <div className="space-y-1">
-              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Agregar Alumno Beneficiario</label>
-              <select value="" onChange={e => handleAddBeneficiary(e.target.value)} className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium" id="add-beneficiary-select">
-                <option value="">-- Buscar y agregar otro socio --</option>
-                {clientes.filter(c => c.activo).map(c => {
-                  const pl = planes.find(p => p.id === c.plan_id);
-                  return <option key={c.id} value={c.id}>{c.apellido}, {c.nombre} (Plan: {pl?.nombre})</option>;
-                })}
-              </select>
-            </div>
+
+            {/* Dropdown popup para Pagador */}
+            {isPagadorDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-zinc-100">
+                {pagadorOptions.length === 0 ? (
+                  <div className="p-3 text-center text-zinc-400 italic text-xs">No se encontraron socios que coincidan</div>
+                ) : (
+                  pagadorOptions.map(c => {
+                    const pl = planes.find(p => p.id === c.plan_id);
+                    const isSelected = c.id === pagoForm.cliente_id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          handleClientSelect(c.id);
+                          setSearchPagadorText(`${c.apellido}, ${c.nombre}`);
+                          setIsPagadorDropdownOpen(false);
+                        }}
+                        className={`w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors cursor-pointer text-xs ${
+                          isSelected ? 'bg-zinc-100 font-bold' : ''
+                        }`}
+                      >
+                        <div>
+                          <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
+                          <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
+                        </div>
+                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${c.deuda_acumulada > 0 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                          {c.deuda_acumulada > 0 ? `Deuda: $${c.deuda_acumulada}` : 'Al día'}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
-          {/* BENEFICIARIOS */}
+
+          {/* OPCIÓN: PAGO MÚLTIPLE O DIFERENTE BENEFICIARIO */}
+          <div className="pt-1">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-zinc-700 font-bold">
+              <input
+                type="checkbox"
+                checked={esPagoMultiple}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setEsPagoMultiple(val);
+                  if (!val && pagoForm.cliente_id) {
+                    const cl = clientes.find(c => c.id === pagoForm.cliente_id);
+                    const plan = planes.find(p => p.id === cl?.plan_id);
+                    const planPrecio = cl?.precio_personalizado ?? (plan ? plan.precio : 0);
+                    setBeneficiarios([{
+                      cliente_id: pagoForm.cliente_id,
+                      monto: planPrecio.toString(),
+                      mes_correspondiente: pagoForm.mes_correspondiente
+                    }]);
+                  }
+                }}
+                className="w-4 h-4 accent-black rounded border-zinc-300 cursor-pointer"
+                id="chk-pago-multiple"
+              />
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-zinc-500" />
+                Pagar por otro socio o grupo (ej: familiar, múltiples beneficiarios)
+              </span>
+            </label>
+          </div>
+
+          {/* BUSCADOR DE BENEFICIARIO ADICIONAL (SOLO SI SE MARCA EL CHECKBOX) */}
+          {esPagoMultiple && (
+            <div className="space-y-1 relative pt-1" ref={beneficiarioRef}>
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Agregar Alumno Beneficiario</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar y agregar otro alumno beneficiario..."
+                  value={searchBeneficiarioText}
+                  onFocus={() => setIsBeneficiarioDropdownOpen(true)}
+                  onChange={(e) => {
+                    setSearchBeneficiarioText(e.target.value);
+                    setIsBeneficiarioDropdownOpen(true);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-medium"
+                  id="add-beneficiary-search-input"
+                />
+              </div>
+
+              {isBeneficiarioDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-zinc-100">
+                  {beneficiarioOptions.length === 0 ? (
+                    <div className="p-3 text-center text-zinc-400 italic text-xs">No hay socios que coincidan</div>
+                  ) : (
+                    beneficiarioOptions.map(c => {
+                      const pl = planes.find(p => p.id === c.plan_id);
+                      const yaAgregado = beneficiarios.some(b => b.cliente_id === c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          disabled={yaAgregado}
+                          onClick={() => {
+                            handleAddBeneficiary(c.id);
+                            setSearchBeneficiarioText('');
+                            setIsBeneficiarioDropdownOpen(false);
+                          }}
+                          className={`w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors text-xs ${
+                            yaAgregado ? 'opacity-40 cursor-not-allowed bg-zinc-50' : 'cursor-pointer'
+                          }`}
+                        >
+                          <div>
+                            <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
+                            <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
+                          </div>
+                          {yaAgregado && <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1"><Check className="w-3 h-3" /> Ya agregado</span>}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* BENEFICIARIOS TABLE */}
           <div className="space-y-2">
             <label className="text-zinc-500 font-bold block text-[10px] uppercase">Detalle de Socios Cubiertos</label>
             {beneficiarios.length === 0 ? (
@@ -184,6 +384,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
               </div>
             )}
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-zinc-500 font-bold block text-[10px] uppercase">Vía de Pago</label>
@@ -215,6 +416,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
               </div>
             )}
           </div>
+
           <div className="bg-zinc-50 border border-zinc-200 p-3 rounded-lg flex justify-between items-center text-xs">
             <span className="font-semibold text-zinc-500">Total de la Transacción:</span>
             <span className="font-mono font-bold text-emerald-600 text-sm">${beneficiarios.reduce((sum, b) => sum + (parseFloat(b.monto) || 0), 0).toLocaleString('es-AR')} ARS</span>
