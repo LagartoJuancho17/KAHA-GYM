@@ -43,15 +43,11 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
     setSliderProgress(pct);
 
     if (pct >= 90) {
+      // El slide solo ARMA la eliminación (habilita el botón). No borra solo:
+      // el usuario debe tocar "Eliminar Permanente" para confirmar.
       setIsUnlocked(true);
       setSliderProgress(100);
       setIsDragging(false);
-      setTimeout(() => {
-        if (cliente) {
-          onConfirmDelete(cliente.id);
-          onClose();
-        }
-      }, 350);
     }
   };
 
@@ -82,6 +78,8 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
 
     const handleTouchMove = (e: TouchEvent) => {
       if (isDragging && e.touches[0]) {
+        // Evita que el navegador scrollee/haga pull-to-refresh mientras se arrastra
+        if (e.cancelable) e.preventDefault();
         updateProgress(e.touches[0].clientX);
       }
     };
@@ -97,7 +95,7 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
-      window.addEventListener('touchmove', handleTouchMove);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
       window.addEventListener('touchend', handleTouchEnd);
       window.addEventListener('touchcancel', handleTouchEnd);
     }
@@ -174,7 +172,7 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
               <span>Paso 2: Mantén pulsado el botón y arrastra hacia la derecha</span>
               {isUnlocked && (
                 <span className="text-emerald-600 text-[10px] font-extrabold flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5" /> Eliminando...
+                  <Check className="w-3.5 h-3.5" /> Deslizado
                 </span>
               )}
             </label>
@@ -202,8 +200,8 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
                 {!confirmCheck ? (
                   <span className="text-zinc-400">Marca la casilla del Paso 1 primero</span>
                 ) : isUnlocked ? (
-                  <span className="text-white flex items-center gap-1.5 animate-pulse font-extrabold">
-                    <Trash2 className="w-4.5 h-4.5" /> ¡Socio eliminado!
+                  <span className="text-white flex items-center gap-1.5 font-extrabold">
+                    <Check className="w-4.5 h-4.5" /> Listo — tocá "Eliminar Permanente"
                   </span>
                 ) : (
                   <span className="text-red-800/90 flex items-center gap-1">
@@ -222,7 +220,8 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
                   }`}
                   style={{
                     left: `calc(${sliderProgress}% * (100% - 48px) / 100 + 4px)`,
-                    transition: isDragging ? 'none' : 'left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    transition: isDragging ? 'none' : 'left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    touchAction: 'none'
                   }}
                   id="slide-delete-handle"
                 >
@@ -253,13 +252,14 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
                 onClose();
               }
             }}
-            className={`flex-1 font-bold rounded-xl text-xs border transition-all cursor-pointer !py-2.5 ${
+            className={`flex-1 font-bold rounded-xl text-xs border transition-all cursor-pointer !py-2.5 flex items-center justify-center gap-1.5 ${
               confirmCheck && isUnlocked
-                ? 'bg-red-600 hover:bg-red-700 text-white border-red-700 shadow-xs'
+                ? 'bg-red-600 hover:bg-red-700 text-white border-red-700 shadow-lg shadow-red-500/25 animate-pulse'
                 : 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed'
             }`}
             id="btn-confirm-hard-delete-action"
           >
+            {confirmCheck && isUnlocked && <Trash2 className="w-3.5 h-3.5" />}
             Eliminar Permanente
           </button>
         </div>

@@ -7,17 +7,15 @@ interface ClientesFilterProps {
   setBuscar: (val: string) => void;
   filtroEstado: string;
   setFiltroEstado: (val: string) => void;
-  verInactivos: boolean;
-  setVerInactivos: (val: boolean) => void;
+  verInactivos?: boolean;
+  setVerInactivos?: (val: boolean) => void;
 }
 
 export const ClientesFilter: React.FC<ClientesFilterProps> = ({
   buscar,
   setBuscar,
   filtroEstado,
-  setFiltroEstado,
-  verInactivos,
-  setVerInactivos
+  setFiltroEstado
 }) => {
   return (
     <div className="bg-white border border-zinc-200 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between" id="filter-bar-container">
@@ -49,18 +47,6 @@ export const ClientesFilter: React.FC<ClientesFilterProps> = ({
             <option value="MOROSO">Morosos</option>
           </select>
         </div>
-
-        {/* BAJA LOGICA TOGGLE */}
-        <label className="flex items-center gap-2 cursor-pointer text-xs font-sans select-none border-l border-zinc-200 pl-3">
-          <input
-            type="checkbox"
-            checked={verInactivos}
-            onChange={(e) => setVerInactivos(e.target.checked)}
-            className="rounded-sm border-zinc-300 text-black focus:ring-black h-4 w-4 cursor-pointer"
-            id="ver-inactivos-checkbox"
-          />
-          <span className="text-zinc-600 font-medium font-sans">Ver Socios Inactivos / Bajas</span>
-        </label>
       </div>
     </div>
   );

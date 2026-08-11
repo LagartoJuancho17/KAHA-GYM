@@ -133,11 +133,11 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       result = result.filter(c => c.estado === filtroEstado);
     }
 
-    // Baja lógica toggle
-    result = result.filter(c => c.activo === !verInactivos);
+    // Filtrar solo clientes activos
+    result = result.filter(c => c.activo);
 
     return result;
-  }, [clientes, buscar, filtroEstado, verInactivos]);
+  }, [clientes, buscar, filtroEstado]);
 
   // --- EXPORTAR LISTADO MÉTODOS ---
   const handleExportCSV = () => {

@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Calendar, MoreVertical, Eye, Edit2, UserMinus, UserCheck, Trash2, Check, CalendarX, CreditCard } from 'lucide-react';
+import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard } from 'lucide-react';
 
 interface ClientesTableProps {
   clientesFiltrados: Cliente[];
@@ -51,7 +51,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
   onOpenBajaClases,
   onAssignPlan
 }) => {
-  const { planes, turnos, autorizarCliente, bajaLogicaCliente, altaCliente } = useGym();
+  const { planes, turnos, autorizarCliente } = useGym();
 
   const totalPaginas = Math.ceil(clientesFiltrados.length / filasPorPagina) || 1;
   
@@ -251,30 +251,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                               Modificar Socio
                             </button>
 
-                            {/* DAR DE BAJA / ALTA LOGICA */}
-                            {c.activo ? (
-                              <button
-                                onClick={() => {
-                                  setOpenRowMenuId(null);
-                                  bajaLogicaCliente(c.id);
-                                }}
-                                className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-amber-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <UserMinus className="w-3.5 h-3.5 text-amber-500" />
-                                Dar de Baja
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setOpenRowMenuId(null);
-                                  altaCliente(c.id);
-                                }}
-                                className="w-full text-left px-4 py-2 hover:bg-zinc-50 text-emerald-700 font-medium flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                Dar de Alta
-                              </button>
-                            )}
+
 
                             {/* ASIGNAR / CAMBIAR PLAN */}
                             <button
