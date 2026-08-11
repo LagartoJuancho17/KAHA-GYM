@@ -90,7 +90,7 @@ interface GymContextType {
   // Transferencias en Revision
   pagosEnRevision: PagoEnRevision[];
   solicitarPagoTransferencia: (clienteId: string) => { success: boolean; message: string };
-  aprobarPagoTransferencia: (revisionId: string, adminEmail: string) => { success: boolean; message: string };
+  aprobarPagoTransferencia: (revisionId: string, adminEmail: string, destinoTransferencia?: 'JUANCHI' | 'RULO' | string) => { success: boolean; message: string };
   rechazarPagoTransferencia: (revisionId: string) => { success: boolean; message: string };
   
   // Novedades Methods
@@ -2405,9 +2405,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: '¡Transferencia enviada! El equipo de KAHA GYM la revisará y confirmará tu pago.' };
   };
 
-  const aprobarPagoTransferencia = (revisionId: string, adminEmail: string): { success: boolean; message: string } => {
+  const aprobarPagoTransferencia = (revisionId: string, adminEmail: string, destinoTransferencia?: 'JUANCHI' | 'RULO' | string): { success: boolean; message: string } => {
     const revision = pagosEnRevision.find(p => p.id === revisionId);
     if (!revision) return { success: false, message: 'Revisión no encontrada.' };
+
+    const destino = destinoTransferencia || 'JUANCHI';
 
     // Register the actual payment
     const res = registrarPago({
@@ -2417,16 +2419,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       medio_pago: 'TRANSFERENCIA',
       mes_correspondiente: revision.mes_correspondiente,
       hash_transaccion: `TRF-APROBADO-${revisionId}`,
+      destino_transferencia: destino,
       registrado_por: adminEmail
     }, adminEmail);
 
     if (!res.success) return res;
 
     // Mark as approved
-    const updated = pagosEnRevision.map(p => p.id === revisionId ? { ...p, estado: 'APROBADO' as const } : p);
+    const updated = pagosEnRevision.map(p => p.id === revisionId ? { ...p, estado: 'APROBADO' as const, destino_transferencia: destino } : p);
     setPagosEnRevision(updated);
     localStorage.setItem('gym_pagos_revision', JSON.stringify(updated));
-    return { success: true, message: 'Transferencia aprobada y pago registrado correctamente.' };
+    return { success: true, message: `Transferencia a ${destino} aprobada y pago registrado correctamente.` };
   };
 
   const rechazarPagoTransferencia = (revisionId: string): { success: boolean; message: string } => {

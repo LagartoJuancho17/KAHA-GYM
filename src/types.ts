@@ -85,6 +85,7 @@ export interface Pago {
   medio_pago: MedioPago;
   mes_correspondiente: string; // Formato 'YYYY-MM'
   hash_transaccion?: string;
+  destino_transferencia?: 'JUANCHI' | 'RULO' | string;
   registrado_por: string; // email del operador/admin
   creado_at: string;
 }
@@ -98,6 +99,7 @@ export interface PagoEnRevision {
   solicitado_por_email: string;
   solicitado_at: string;
   estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  destino_transferencia?: 'JUANCHI' | 'RULO' | string;
 }
 
 export interface RecuperoTurno {

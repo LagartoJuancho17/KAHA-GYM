@@ -4,9 +4,9 @@ import { useGym } from '../GymContext';
 import { 
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
-  TrendingDown, X, Minus, Check, AlertCircle
+  TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2
 } from 'lucide-react';
-import { Gasto } from '../types';
+import { Gasto, PagoEnRevision } from '../types';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -33,6 +33,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   
   // Modal state
   const [showGastoModal, setShowGastoModal] = useState(false);
+  const [transferToApprove, setTransferToApprove] = useState<PagoEnRevision | null>(null);
+  const [destinoSeleccionado, setDestinoSeleccionado] = useState<'JUANCHI' | 'RULO'>('JUANCHI');
   const [gastoForm, setGastoForm] = useState({
     concepto: '',
     monto: '',
@@ -288,9 +290,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
                   <button
                     onClick={() => {
-                      if (window.confirm(`¿Confirmar y aprobar el pago de $${p.monto.toLocaleString('es-AR')} para ${p.cliente_nombre_completo}?`)) {
-                        aprobarPagoTransferencia(p.id, googleUser?.email || 'admin@kaha.fit');
-                      }
+                      setDestinoSeleccionado('JUANCHI');
+                      setTransferToApprove(p);
                     }}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-transparent shadow-2xs"
                   >
@@ -989,6 +990,84 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SELECCION DE DESTINO (JUANCHI / RULO) AL APROBAR TRANSFERENCIA */}
+      {transferToApprove && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-zinc-200">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <h3 className="font-bold text-zinc-900 text-sm md:text-base flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                Aprobar Transferencia Bancaria
+              </h3>
+              <button 
+                onClick={() => setTransferToApprove(null)} 
+                className="text-zinc-400 hover:text-zinc-600 p-1 border-none bg-transparent cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5 text-xs">
+              <p className="font-semibold text-slate-700">Socio: <span className="font-bold text-slate-900">{transferToApprove.cliente_nombre_completo}</span></p>
+              <p className="font-semibold text-slate-700">Monto: <span className="font-bold text-emerald-700 font-mono">${transferToApprove.monto.toLocaleString('es-AR')} ARS</span></p>
+              <p className="font-semibold text-slate-700">Mes: <span className="font-bold text-slate-900">{transferToApprove.mes_correspondiente}</span></p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-700 block">
+                ¿A qué alias / cuenta ingresó la transferencia?
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDestinoSeleccionado('JUANCHI')}
+                  className={`p-3 rounded-xl border-2 font-bold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                    destinoSeleccionado === 'JUANCHI'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-xs'
+                      : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                  }`}
+                >
+                  <span className="text-sm font-extrabold">👤 Juanchi</span>
+                  <span className="text-[10px] font-medium text-zinc-500 font-mono">Alias Juanchi</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDestinoSeleccionado('RULO')}
+                  className={`p-3 rounded-xl border-2 font-bold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                    destinoSeleccionado === 'RULO'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-xs'
+                      : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                  }`}
+                >
+                  <span className="text-sm font-extrabold">👤 Rulo</span>
+                  <span className="text-[10px] font-medium text-zinc-500 font-mono">Alias Rulo</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100 text-xs font-semibold">
+              <button
+                onClick={() => setTransferToApprove(null)}
+                className="px-4 py-2 border border-zinc-200 rounded-xl hover:bg-zinc-50 text-zinc-600 cursor-pointer bg-white"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  aprobarPagoTransferencia(transferToApprove.id, googleUser?.email || 'admin@kaha.fit', destinoSeleccionado);
+                  setTransferToApprove(null);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs cursor-pointer border-none flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                Confirmar Pago a {destinoSeleccionado}
+              </button>
+            </div>
           </div>
         </div>
       )}

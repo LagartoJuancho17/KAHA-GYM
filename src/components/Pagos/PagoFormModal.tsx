@@ -16,7 +16,8 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     cliente_id: '',
     medio_pago: 'MERCADO_PAGO' as MedioPago,
     mes_correspondiente: new Date().toISOString().slice(0, 7),
-    hash_transaccion: ''
+    hash_transaccion: '',
+    destino_transferencia: 'JUANCHI' as 'JUANCHI' | 'RULO'
   });
   const [beneficiarios, setBeneficiarios] = useState<Array<{ cliente_id: string, monto: string, mes_correspondiente: string }>>([]);
   const [formErr, setFormErr] = useState('');
@@ -84,6 +85,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
         medio_pago: pagoForm.medio_pago,
         mes_correspondiente: b.mes_correspondiente,
         hash_transaccion: finalHash,
+        destino_transferencia: pagoForm.medio_pago === 'TRANSFERENCIA' ? pagoForm.destino_transferencia : undefined,
         registrado_por: 'operator@gimnasio.com.ar'
       }, 'operator@gimnasio.com.ar');
       results.push(res);
@@ -110,7 +112,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
       setFormErr(failed.message);
     } else {
       setFormSuccess('Cobro múltiple registrado exitosamente.');
-      setPagoForm({ cliente_id: '', medio_pago: 'MERCADO_PAGO', mes_correspondiente: new Date().toISOString().slice(0, 7), hash_transaccion: '' });
+      setPagoForm({ cliente_id: '', medio_pago: 'MERCADO_PAGO', mes_correspondiente: new Date().toISOString().slice(0, 7), hash_transaccion: '', destino_transferencia: 'JUANCHI' });
       setBeneficiarios([]);
       setTimeout(() => {
         onSuccess(generatedReceipts);
@@ -193,10 +195,25 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                 <option value="OTRO">Otro</option>
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Ref / ID Transacción</label>
-              <input type="text" placeholder="ej: MP-90382211 (opcional)" value={pagoForm.hash_transaccion} onChange={e => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden font-medium" />
-            </div>
+
+            {pagoForm.medio_pago === 'TRANSFERENCIA' ? (
+              <div className="space-y-1">
+                <label className="text-emerald-700 font-bold block text-[10px] uppercase">Alias / Destino (Juanchi / Rulo)</label>
+                <select 
+                  value={pagoForm.destino_transferencia || 'JUANCHI'} 
+                  onChange={e => setPagoForm(prev => ({ ...prev, destino_transferencia: e.target.value as 'JUANCHI' | 'RULO' }))}
+                  className="w-full border border-emerald-300 rounded-lg p-2 text-xs bg-emerald-50 font-bold text-emerald-900 outline-hidden"
+                >
+                  <option value="JUANCHI">Juanchi</option>
+                  <option value="RULO">Rulo</option>
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-bold block text-[10px] uppercase">Ref / ID Transacción</label>
+                <input type="text" placeholder="ej: MP-90382211 (opcional)" value={pagoForm.hash_transaccion} onChange={e => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden font-medium" />
+              </div>
+            )}
           </div>
           <div className="bg-zinc-50 border border-zinc-200 p-3 rounded-lg flex justify-between items-center text-xs">
             <span className="font-semibold text-zinc-500">Total de la Transacción:</span>
