@@ -430,6 +430,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           medio_pago: p.medio_pago as MedioPago,
           mes_correspondiente: p.mes_correspondiente,
           hash_transaccion: p.hash_transaccion,
+          destino_transferencia: p.destino_transferencia || undefined,
           registrado_por: p.registrado_por || 'admin@gimnasio.com.ar',
           fecha_pago: p.fecha_pago,
           creado_at: p.creado_at
@@ -2504,18 +2505,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 1. Insertar pago en Supabase
       // Nota: 'registrado_por' es FK a perfiles_usuario(id) UUID — se omite para evitar error de tipo
       // ya que solo tenemos el email del operador, no su UUID de perfil.
-      supabase.from('pagos').insert({
+      const pagoInsertPayload: any = {
         id: pagoId,
         cliente_id: nuevoPago.cliente_id,
         monto: nuevoPago.monto,
         medio_pago: nuevoPago.medio_pago,
         mes_correspondiente: nuevoPago.mes_correspondiente,
         hash_transaccion: cleanHash,
+        destino_transferencia: nuevoPago.destino_transferencia || null,
         fecha_pago: now,
         creado_at: now
-      }).then(({ error, data }) => {
+      };
+
+      supabase.from('pagos').insert(pagoInsertPayload).then(({ error }) => {
         if (error) {
           console.error('[Supabase] Error al insertar pago:', error.message, error.details, error.hint);
+          // Si el error es por columna inexistente (42703), reintentar sin destino_transferencia
+          if (error.code === '42703' || error.message?.includes('destino_transferencia')) {
+            const safePayload = { ...pagoInsertPayload };
+            delete safePayload.destino_transferencia;
+            supabase.from('pagos').insert(safePayload);
+          }
         } else {
           console.log('[Supabase] Pago guardado correctamente:', pagoId);
         }

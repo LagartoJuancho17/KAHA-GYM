@@ -136,7 +136,18 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                         <div className="font-mono font-bold text-emerald-600">${p.monto.toLocaleString('es-AR')}</div>
                         {planSocio && <div className="text-[10px] text-zinc-400">{planSocio.nombre}</div>}
                       </td>
-                      <td className="p-4"><span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[10px] uppercase font-bold text-zinc-700">{p.medio_pago}</span></td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[10px] uppercase font-bold text-zinc-700">
+                            {p.medio_pago}
+                          </span>
+                          {p.medio_pago === 'TRANSFERENCIA' && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide bg-violet-100 text-violet-800 border border-violet-200 font-mono">
+                              A: {p.destino_transferencia || 'JUANCHI'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-4 font-mono font-bold text-zinc-600">{p.mes_correspondiente}</td>
                       <td className="p-4">
                         <div className="font-mono text-zinc-500 text-[10px] select-all">{p.hash_transaccion || 'Ref-' + p.id.slice(-5)}</div>
