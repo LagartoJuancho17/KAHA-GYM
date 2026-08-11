@@ -33,7 +33,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   // Estado para el modal de WhatsApp Masivo
   const [showWspModal, setShowWspModal] = useState(false);
-  const [motivoPreset, setMotivoPreset] = useState<'LLUVIA' | 'RETRASO' | 'PROFESOR' | 'CUSTOM'>('LLUVIA');
+  const [motivoPreset, setMotivoPreset] = useState<'LLUVIA' | 'CORTE_LUZ' | 'RETRASO' | 'PROFESOR' | 'CUSTOM'>('LLUVIA');
   const [customMensaje, setCustomMensaje] = useState('');
 
   const getCellRealtimeData = (turnoId: string, fecha: string) => {
@@ -461,6 +461,18 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     }`}
                   >
                     🌧️ Lluvia / Mal Tiempo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMotivoPreset('CORTE_LUZ');
+                      setCustomMensaje(`Hola {nombre}! Te informamos que por un corte de luz en la zona, la clase de hoy ${selectedSlot.id.split('-')[0]} ${selectedSlot.id.split('-')[1]}hs en KAHA GYM queda suspendida. Se te reintegra el cupo.`);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer text-xs font-semibold transition-all ${
+                      motivoPreset === 'CORTE_LUZ' ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-2xs' : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700'
+                    }`}
+                  >
+                    ⚡ Corte de Luz
                   </button>
                   <button
                     type="button"
