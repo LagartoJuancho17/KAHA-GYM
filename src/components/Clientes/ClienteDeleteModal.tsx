@@ -1,7 +1,7 @@
 // src/components/Clientes/ClienteDeleteModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Cliente } from '../../types';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Trash2, ChevronsRight, Check } from 'lucide-react';
 
 interface ClienteDeleteModalProps {
   isOpen: boolean;
@@ -17,14 +17,98 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
   onConfirmDelete
 }) => {
   const [confirmCheck, setConfirmCheck] = useState<boolean>(false);
-  const [confirmText, setConfirmText] = useState<string>('');
+  const [sliderProgress, setSliderProgress] = useState<number>(0);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setConfirmCheck(false);
-      setConfirmText('');
+      setSliderProgress(0);
+      setIsDragging(false);
+      setIsUnlocked(false);
     }
   }, [isOpen]);
+
+  const updateProgress = (clientX: number) => {
+    if (!trackRef.current || !confirmCheck || isUnlocked) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const handleWidth = 48; // 48px width handle
+    const maxDrag = rect.width - handleWidth - 8; // 4px padding left/right
+    if (maxDrag <= 0) return;
+    const currentX = clientX - rect.left - 4 - handleWidth / 2;
+    const clampedX = Math.max(0, Math.min(currentX, maxDrag));
+    const pct = (clampedX / maxDrag) * 100;
+    setSliderProgress(pct);
+
+    if (pct >= 90) {
+      setIsUnlocked(true);
+      setSliderProgress(100);
+      setIsDragging(false);
+      setTimeout(() => {
+        if (cliente) {
+          onConfirmDelete(cliente.id);
+          onClose();
+        }
+      }, 350);
+    }
+  };
+
+  const handleMouseDown = () => {
+    if (!confirmCheck || isUnlocked) return;
+    setIsDragging(true);
+  };
+
+  const handleTouchStart = () => {
+    if (!confirmCheck || isUnlocked) return;
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        updateProgress(e.clientX);
+      }
+    };
+    const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        if (!isUnlocked) {
+          setSliderProgress(0);
+        }
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isDragging && e.touches[0]) {
+        updateProgress(e.touches[0].clientX);
+      }
+    };
+    const handleTouchEnd = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        if (!isUnlocked) {
+          setSliderProgress(0);
+        }
+      }
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove);
+      window.addEventListener('touchend', handleTouchEnd);
+      window.addEventListener('touchcancel', handleTouchEnd);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [isDragging, confirmCheck, isUnlocked]);
 
   if (!isOpen || !cliente) return null;
 
@@ -39,7 +123,7 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
           </div>
           <div>
             <h4 className="text-sm font-black text-red-900 tracking-tight uppercase">Confirmar Baja Permanente</h4>
-            <p className="text-[10px] text-red-500 font-mono -mt-0.5">Doble Verificación de Seguridad</p>
+            <p className="text-[10px] text-red-500 font-mono -mt-0.5">Doble Verificación por Deslizamiento</p>
           </div>
         </div>
 
@@ -68,7 +152,13 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
               <input
                 type="checkbox"
                 checked={confirmCheck}
-                onChange={(e) => setConfirmCheck(e.target.checked)}
+                onChange={(e) => {
+                  setConfirmCheck(e.target.checked);
+                  if (!e.target.checked) {
+                    setSliderProgress(0);
+                    setIsUnlocked(false);
+                  }
+                }}
                 className="w-4.5 h-4.5 accent-red-600 rounded border-zinc-300 mt-0.5 cursor-pointer"
                 id="checkbox-confirm-delete"
               />
@@ -78,19 +168,68 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
             </label>
           </div>
 
-          {/* Paso 2: Escribir ELIMINAR */}
-          <div className="space-y-1.5 transition-all font-sans">
-            <label className="block text-[11px] font-bold text-zinc-800">
-              Paso 2: Escribe la palabra <span className="font-extrabold text-red-600 font-mono text-xs">ELIMINAR</span> para autorizar:
+          {/* Paso 2: Deslizar para Eliminar */}
+          <div className="space-y-2 font-sans">
+            <label className="block text-[11px] font-bold text-zinc-800 flex justify-between items-center">
+              <span>Paso 2: Mantén pulsado el botón y arrastra hacia la derecha</span>
+              {isUnlocked && (
+                <span className="text-emerald-600 text-[10px] font-extrabold flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" /> Eliminando...
+                </span>
+              )}
             </label>
-            <input
-              type="text"
-              placeholder="Escribe ELIMINAR para proceder..."
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              className="w-full bg-white border border-red-200 focus:ring-1 focus:ring-red-500 rounded-xl p-2.5 font-mono text-xs font-bold text-center text-red-900 tracking-wider placeholder:normal-case uppercase"
-              id="input-confirm-delete-word"
-            />
+
+            <div
+              ref={trackRef}
+              className={`relative h-14 rounded-2xl p-1 select-none overflow-hidden transition-all border ${
+                !confirmCheck
+                  ? 'bg-zinc-100 border-zinc-200 opacity-50 cursor-not-allowed'
+                  : isUnlocked
+                  ? 'bg-red-600 border-red-700 shadow-lg'
+                  : 'bg-red-50/70 border-red-200 shadow-inner'
+              }`}
+            >
+              {/* Progress Fill */}
+              {confirmCheck && (
+                <div
+                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-red-500 to-red-600 transition-all duration-75"
+                  style={{ width: `${sliderProgress}%` }}
+                />
+              )}
+
+              {/* Text overlay */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-bold font-sans">
+                {!confirmCheck ? (
+                  <span className="text-zinc-400">Marca la casilla del Paso 1 primero</span>
+                ) : isUnlocked ? (
+                  <span className="text-white flex items-center gap-1.5 animate-pulse font-extrabold">
+                    <Trash2 className="w-4.5 h-4.5" /> ¡Socio eliminado!
+                  </span>
+                ) : (
+                  <span className="text-red-800/90 flex items-center gap-1">
+                    Arrastra hasta el final <ChevronsRight className="w-4 h-4 text-red-600 animate-pulse" />
+                  </span>
+                )}
+              </div>
+
+              {/* Handle Thumb */}
+              {confirmCheck && !isUnlocked && (
+                <div
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={handleTouchStart}
+                  className={`absolute top-1 bottom-1 w-12 rounded-xl bg-white shadow-md border border-red-200 flex items-center justify-center cursor-grab active:cursor-grabbing transition-transform ${
+                    isDragging ? 'scale-105 shadow-xl border-red-400' : ''
+                  }`}
+                  style={{
+                    left: `calc(${sliderProgress}% * (100% - 48px) / 100 + 4px)`,
+                    transition: isDragging ? 'none' : 'left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                  }}
+                  id="slide-delete-handle"
+                >
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
@@ -107,13 +246,15 @@ export const ClienteDeleteModal: React.FC<ClienteDeleteModalProps> = ({
           </button>
           <button
             type="button"
-            disabled={!confirmCheck || confirmText !== 'ELIMINAR'}
+            disabled={!confirmCheck || !isUnlocked}
             onClick={() => {
-              onConfirmDelete(cliente.id);
-              onClose();
+              if (confirmCheck && isUnlocked && cliente) {
+                onConfirmDelete(cliente.id);
+                onClose();
+              }
             }}
             className={`flex-1 font-bold rounded-xl text-xs border transition-all cursor-pointer !py-2.5 ${
-              confirmCheck && confirmText === 'ELIMINAR'
+              confirmCheck && isUnlocked
                 ? 'bg-red-600 hover:bg-red-700 text-white border-red-700 shadow-xs'
                 : 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed'
             }`}
