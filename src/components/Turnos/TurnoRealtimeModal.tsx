@@ -2,12 +2,22 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, Clock, Trash2, Plus } from 'lucide-react';
+import { X, Clock, Trash2, Plus, MessageCircle, Send } from 'lucide-react';
 
 interface TurnoRealtimeModalProps {
   selectedSlot: { id: string; date: string };
   onClose: () => void;
 }
+
+const formatWspPhone = (phone?: string) => {
+  if (!phone) return '';
+  const clean = phone.replace(/\D/g, '');
+  if (!clean) return '';
+  if (clean.startsWith('549')) return clean;
+  if (clean.startsWith('54')) return '549' + clean.slice(2);
+  if (clean.startsWith('11') || clean.startsWith('15')) return '549' + clean;
+  return '549' + clean;
+};
 
 export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selectedSlot, onClose }) => {
   const { 
@@ -20,6 +30,11 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   const [guestName, setGuestName] = useState('');
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
   const [realtimeSuccess, setRealtimeSuccess] = useState<string | null>(null);
+
+  // Estado para el modal de WhatsApp Masivo
+  const [showWspModal, setShowWspModal] = useState(false);
+  const [motivoPreset, setMotivoPreset] = useState<'LLUVIA' | 'RETRASO' | 'PROFESOR' | 'CUSTOM'>('LLUVIA');
+  const [customMensaje, setCustomMensaje] = useState('');
 
   const getCellRealtimeData = (turnoId: string, fecha: string) => {
     const turno = turnos.find(t => t.id === turnoId);
@@ -199,6 +214,12 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     }
   };
 
+  const handleOpenWspModal = () => {
+    setShowWspModal(true);
+    setMotivoPreset('LLUVIA');
+    setCustomMensaje(`Hola {nombre}! Te avisamos que por cuestiones climáticas la clase de hoy ${selectedSlot.id.split('-')[0]} ${selectedSlot.id.split('-')[1]}hs en KAHA GYM queda suspendida. Se te reintegra la clase.`);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs" id="realtime-turno-modal">
       <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-md overflow-hidden relative animate-scale-up max-h-[90vh] overflow-y-auto">
@@ -253,10 +274,20 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
           {/* Checklist de Asistencia */}
           <div className="space-y-2.5">
-            <h4 className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest font-sans border-b border-zinc-200 pb-1.5 flex justify-between items-center">
-              <span>Checklist de Asistencia</span>
-              <span className="text-[9px] text-zinc-400 normal-case font-normal">({checklistItems.length} alumnos esperados)</span>
-            </h4>
+            <div className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest font-sans border-b border-zinc-200 pb-1.5 flex justify-between items-center">
+              <span>Checklist de Asistencia ({checklistItems.length})</span>
+              {checklistItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleOpenWspModal}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
+                  id="btn-wsp-broadcast-trigger"
+                >
+                  <MessageCircle className="w-3 h-3 text-emerald-100" />
+                  <span>Aviso WhatsApp</span>
+                </button>
+              )}
+            </div>
             
             {checklistItems.length === 0 ? (
               <p className="text-zinc-400 italic text-[11.5px] py-2 text-center bg-zinc-50 rounded-lg border border-zinc-150">No hay alumnos agendados para este turno hoy.</p>
@@ -388,6 +419,159 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         </div>
 
       </div>
+
+      {/* MODAL / SUB-PANEL: AVISO MASIVO WHATSAPP */}
+      {showWspModal && (
+        <div className="fixed inset-0 bg-slate-950/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs" id="wsp-broadcast-modal">
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-emerald-950 text-white p-4 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-800 text-emerald-200 rounded-lg">
+                  <MessageCircle className="w-5 h-5 text-emerald-300" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-emerald-50">Enviar WhatsApp a Alumnos del Turno</h4>
+                  <p className="text-[10px] text-emerald-300 font-mono">
+                    {selectedSlot.id.split('-')[0]} {selectedSlot.id.split('-')[1]}hs — {checklistItems.length} alumno(s) esperados
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowWspModal(false)} 
+                className="text-emerald-300 hover:text-white bg-emerald-900/60 p-1.5 rounded-lg border-none cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Motivo Selector */}
+              <div className="space-y-1.5">
+                <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">Seleccionar Motivo o Plantilla</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMotivoPreset('LLUVIA');
+                      setCustomMensaje(`Hola {nombre}! Te avisamos que por cuestiones climáticas la clase de hoy ${selectedSlot.id.split('-')[0]} ${selectedSlot.id.split('-')[1]}hs en KAHA GYM queda suspendida. Se te reintegra el cupo.`);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer text-xs font-semibold transition-all ${
+                      motivoPreset === 'LLUVIA' ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-2xs' : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700'
+                    }`}
+                  >
+                    🌧️ Lluvia / Mal Tiempo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMotivoPreset('RETRASO');
+                      setCustomMensaje(`Hola {nombre}! Te notificamos que la clase de hoy ${selectedSlot.id.split('-')[0]} ${selectedSlot.id.split('-')[1]}hs en KAHA GYM comenzará con unos minutos de demora. ¡Te esperamos!`);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer text-xs font-semibold transition-all ${
+                      motivoPreset === 'RETRASO' ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-2xs' : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700'
+                    }`}
+                  >
+                    ⏱️ Retraso de Clase
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMotivoPreset('PROFESOR');
+                      setCustomMensaje(`Hola {nombre}! Te avisamos que la clase de hoy ${selectedSlot.id.split('-')[0]} ${selectedSlot.id.split('-')[1]}hs estará a cargo del profe ${rtData.profesor || 'un nuevo profesor'}. ¡Te esperamos!`);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer text-xs font-semibold transition-all ${
+                      motivoPreset === 'PROFESOR' ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-2xs' : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700'
+                    }`}
+                  >
+                    👤 Cambio de Profesor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMotivoPreset('CUSTOM');
+                      setCustomMensaje(`Hola {nombre}! Te escribimos desde KAHA GYM con un aviso sobre la clase de hoy ${selectedSlot.id.split('-')[0]} ${selectedSlot.id.split('-')[1]}hs: `);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer text-xs font-semibold transition-all ${
+                      motivoPreset === 'CUSTOM' ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-2xs' : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700'
+                    }`}
+                  >
+                    ✏️ Mensaje Personalizado
+                  </button>
+                </div>
+              </div>
+
+              {/* Textarea para personalizar */}
+              <div className="space-y-1">
+                <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">
+                  Mensaje a Enviar (Usá <code className="font-mono text-emerald-700 font-bold bg-emerald-50 px-1 py-0.5 rounded">{'{nombre}'}</code> para personalizar)
+                </label>
+                <textarea
+                  rows={3}
+                  value={customMensaje}
+                  onChange={(e) => setCustomMensaje(e.target.value)}
+                  className="w-full border border-zinc-200 rounded-xl p-3 text-xs bg-white focus:border-emerald-600 outline-hidden font-medium text-zinc-800"
+                  placeholder="Escribí el motivo o mensaje para la clase..."
+                />
+              </div>
+
+              {/* Lista de Alumnos */}
+              <div className="space-y-2 pt-2 border-t border-zinc-100">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-zinc-700 text-xs">Alumnos a Notificar ({checklistItems.length})</span>
+                  <span className="text-[10px] text-zinc-400">Clic en Enviar WA abre la app de WhatsApp</span>
+                </div>
+
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  {checklistItems.map((item) => {
+                    const clientObj = clientes.find(c => c.id === item.clienteId);
+                    const rawPhone = clientObj?.telefono || '';
+                    const formattedPhone = formatWspPhone(rawPhone);
+                    const firstName = clientObj?.nombre || item.nombre.split(',')[1]?.trim() || item.nombre;
+                    const personalizedMsg = customMensaje.replace(/{nombre}/g, firstName);
+                    const wspLink = formattedPhone ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(personalizedMsg)}` : null;
+
+                    return (
+                      <div key={item.key} className="flex items-center justify-between p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs">
+                        <div>
+                          <span className="font-bold text-zinc-900 block">{item.nombre}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">
+                            {rawPhone ? `WSP: ${rawPhone}` : 'Sin teléfono registrado'}
+                          </span>
+                        </div>
+                        {wspLink ? (
+                          <a
+                            href={wspLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all no-underline shadow-2xs cursor-pointer"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            Enviar WA
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-zinc-400 italic px-2 py-1 bg-zinc-100 rounded-md">Sin teléfono</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-50 p-4 border-t border-zinc-100 flex justify-end font-sans">
+              <button
+                type="button"
+                onClick={() => setShowWspModal(false)}
+                className="px-5 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold transition-colors cursor-pointer border-none"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
