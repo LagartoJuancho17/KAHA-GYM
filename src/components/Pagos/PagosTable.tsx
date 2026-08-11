@@ -1,7 +1,7 @@
 // src/components/Pagos/PagosTable.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pago, Cliente, Plan } from '../../types';
-import { Search, Plus, Upload } from 'lucide-react';
+import { Search, Plus, Upload, DollarSign } from 'lucide-react';
 
 // Genera los últimos N meses dinámicamente
 function generarUltimosMeses(n = 12) {
@@ -47,6 +47,21 @@ export const PagosTable: React.FC<PagosTableProps> = ({
   onAddPagoClick,
   onConciliarCSVClick
 }) => {
+  // Cálculo de Cajas: Caja Rulo, Caja Final (Suma total) y Caja Juanchi (Restante/Juanchi)
+  const cajaRulo = useMemo(() => {
+    return pagosFiltrados
+      .filter(p => p.medio_pago === 'TRANSFERENCIA' && p.destino_transferencia === 'RULO')
+      .reduce((sum, p) => sum + p.monto, 0);
+  }, [pagosFiltrados]);
+
+  const cajaFinal = useMemo(() => {
+    return pagosFiltrados.reduce((sum, p) => sum + p.monto, 0);
+  }, [pagosFiltrados]);
+
+  const cajaJuanchi = useMemo(() => {
+    return Math.max(0, cajaFinal - cajaRulo);
+  }, [cajaFinal, cajaRulo]);
+
   return (
     <div className="space-y-4">
       {/* FILTROS Y ACCIONES */}
@@ -165,10 +180,84 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                 })
               )}
             </tbody>
+            {pagosFiltrados.length > 0 && (
+              <tfoot>
+                <tr className="bg-zinc-50/90 font-bold border-t border-zinc-200 text-xs">
+                  <td colSpan={2} className="p-4 text-zinc-900 uppercase font-extrabold tracking-wider text-[10px]">
+                    Totales Cajas
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-col text-[10px] font-mono gap-0.5">
+                      <span className="text-violet-700 font-bold">Juanchi: ${cajaJuanchi.toLocaleString('es-AR')}</span>
+                      <span className="text-amber-700 font-bold">Rulo: ${cajaRulo.toLocaleString('es-AR')}</span>
+                    </div>
+                  </td>
+                  <td colSpan={4} className="p-4 text-right font-mono font-black text-emerald-700 text-sm">
+                    Caja Final: ${cajaFinal.toLocaleString('es-AR')}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
           </div>
         </div>
       </div>
+
+      {/* SECCIÓN RESUMEN AL FINAL: CAJA JUANCHI, CAJA RULO, CAJA FINAL */}
+      {pagosFiltrados.length > 0 && (
+        <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-zinc-100 pb-2.5">
+            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+              <DollarSign className="w-4 h-4 text-emerald-600" />
+              Resumen de Cajas (Período Seleccionado)
+            </span>
+            <span className="text-[10px] font-mono text-zinc-400">
+              {pagosFiltrados.length} registro(s)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* CAJA JUANCHI */}
+            <div className="bg-violet-50/60 border border-violet-200 rounded-xl p-3.5 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[10px] font-black uppercase tracking-wider text-violet-800">Caja Juanchi</span>
+                <span className="text-[9px] font-mono font-bold bg-violet-100 text-violet-800 px-2 py-0.5 rounded border border-violet-200">
+                  Juanchi
+                </span>
+              </div>
+              <div className="mt-2 font-mono font-bold text-2xl text-violet-900">
+                ${cajaJuanchi.toLocaleString('es-AR')}
+              </div>
+            </div>
+
+            {/* CAJA RULO */}
+            <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3.5 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">Caja Rulo</span>
+                <span className="text-[9px] font-mono font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
+                  Rulo
+                </span>
+              </div>
+              <div className="mt-2 font-mono font-bold text-2xl text-amber-900">
+                ${cajaRulo.toLocaleString('es-AR')}
+              </div>
+            </div>
+
+            {/* CAJA FINAL */}
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5 flex flex-col justify-between shadow-3xs">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-900">Caja Final (Suma Total)</span>
+                <span className="text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                  Juanchi + Rulo
+                </span>
+              </div>
+              <div className="mt-2 font-mono font-bold text-2xl text-emerald-800">
+                ${cajaFinal.toLocaleString('es-AR')}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
