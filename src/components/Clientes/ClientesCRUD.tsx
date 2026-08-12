@@ -57,7 +57,8 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   // --- FILTROS DE TABLA ---
   const [buscar, setBuscar] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
-  const [filtroProfesor, setFiltroProfesor] = useState<string>('TODOS');
+  const [selectedProfesores, setSelectedProfesores] = useState<string[]>([]);
+  const [matchModoProfe, setMatchModoProfe] = useState<'O' | 'Y'>('O');
   const [verInactivos, setVerInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
   const filasPorPagina = 20;
@@ -106,7 +107,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   // Resetear página a 1 ante cambios en la búsqueda o filtros
   React.useEffect(() => {
     setPagina(1);
-  }, [buscar, filtroEstado, filtroProfesor, verInactivos]);
+  }, [buscar, filtroEstado, selectedProfesores, matchModoProfe, verInactivos]);
 
   // --- FILTRADO PROCESADO ---
   const clientesFiltrados = useMemo(() => {
@@ -144,8 +145,8 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       result = result.filter(c => c.estado === filtroEstado);
     }
 
-    // Profesor
-    if (filtroProfesor !== 'TODOS') {
+    // Profesor (Checkboxes)
+    if (selectedProfesores.length > 0) {
       result = result.filter(c => {
         const profesDelCliente = Array.from(
           new Set(
@@ -155,30 +156,15 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
           )
         );
 
-        if (filtroProfesor === 'SIN_PROFESOR') {
-          return profesDelCliente.length === 0;
-        }
-
-        if (filtroProfesor === 'JUANCHI_Y_RULO') {
-          const hasJuanchi = profesDelCliente.some(p => p.toLowerCase().includes('juanchi'));
-          const hasRulo = profesDelCliente.some(p => p.toLowerCase().includes('rulo'));
-          return hasJuanchi && hasRulo;
-        }
-
-        if (filtroProfesor.startsWith('SOLO_')) {
-          const targetProf = filtroProfesor.replace('SOLO_', '').toLowerCase();
-          return (
-            profesDelCliente.length > 0 &&
-            profesDelCliente.every(p => p.toLowerCase() === targetProf)
+        if (matchModoProfe === 'Y') {
+          return selectedProfesores.every(sp =>
+            profesDelCliente.some(p => p.toLowerCase().includes(sp.toLowerCase()))
+          );
+        } else {
+          return selectedProfesores.some(sp =>
+            profesDelCliente.some(p => p.toLowerCase().includes(sp.toLowerCase()))
           );
         }
-
-        if (filtroProfesor.startsWith('INC_')) {
-          const targetProf = filtroProfesor.replace('INC_', '').toLowerCase();
-          return profesDelCliente.some(p => p.toLowerCase() === targetProf);
-        }
-
-        return true;
       });
     }
 
@@ -186,7 +172,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     result = result.filter(c => c.activo);
 
     return result;
-  }, [clientes, buscar, filtroEstado, filtroProfesor, turnos]);
+  }, [clientes, buscar, filtroEstado, selectedProfesores, matchModoProfe, turnos]);
 
   // --- EXPORTAR LISTADO MÉTODOS ---
   const handleExportCSV = () => {
@@ -356,9 +342,11 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         setBuscar={setBuscar}
         filtroEstado={filtroEstado}
         setFiltroEstado={setFiltroEstado}
-        filtroProfesor={filtroProfesor}
-        setFiltroProfesor={setFiltroProfesor}
+        selectedProfesores={selectedProfesores}
+        setSelectedProfesores={setSelectedProfesores}
         profesoresDisponibles={profesoresDisponibles}
+        matchModoProfe={matchModoProfe}
+        setMatchModoProfe={setMatchModoProfe}
       />
 
       {/* TABLA PRINCIPAL */}
