@@ -35,7 +35,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   onStartAuthorization
 }) => {
   const { 
-    clientes, planes, autorizarCliente, eliminarCliente
+    clientes, planes, turnos, profesores, autorizarCliente, eliminarCliente
   } = useGym();
 
   const [localEditingId, setLocalEditingId] = useState<string | null>(null);
@@ -57,9 +57,20 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   // --- FILTROS DE TABLA ---
   const [buscar, setBuscar] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
+  const [filtroProfesor, setFiltroProfesor] = useState<string>('TODOS');
   const [verInactivos, setVerInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
   const filasPorPagina = 20;
+
+  const profesoresDisponibles = useMemo(() => {
+    const list = new Set<string>();
+    profesores.filter(p => p.activo).forEach(p => list.add(p.nombre));
+    turnos.forEach(t => {
+      if (t.profesor && t.profesor.trim()) list.add(t.profesor.trim());
+    });
+    ['Juanchi', 'Rulo', 'Lucas', 'Denise'].forEach(p => list.add(p));
+    return Array.from(list);
+  }, [profesores, turnos]);
 
   const clientesPendientes = useMemo(() => {
     return clientes.filter(c => c.activo && c.autorizado === false);
@@ -95,7 +106,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   // Resetear página a 1 ante cambios en la búsqueda o filtros
   React.useEffect(() => {
     setPagina(1);
-  }, [buscar, filtroEstado, verInactivos]);
+  }, [buscar, filtroEstado, filtroProfesor, verInactivos]);
 
   // --- FILTRADO PROCESADO ---
   const clientesFiltrados = useMemo(() => {
@@ -133,11 +144,49 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       result = result.filter(c => c.estado === filtroEstado);
     }
 
+    // Profesor
+    if (filtroProfesor !== 'TODOS') {
+      result = result.filter(c => {
+        const profesDelCliente = Array.from(
+          new Set(
+            (c.turnos_fijos || [])
+              .map(tId => turnos.find(t => t.id === tId)?.profesor)
+              .filter((p): p is string => Boolean(p && p.trim()))
+          )
+        );
+
+        if (filtroProfesor === 'SIN_PROFESOR') {
+          return profesDelCliente.length === 0;
+        }
+
+        if (filtroProfesor === 'JUANCHI_Y_RULO') {
+          const hasJuanchi = profesDelCliente.some(p => p.toLowerCase().includes('juanchi'));
+          const hasRulo = profesDelCliente.some(p => p.toLowerCase().includes('rulo'));
+          return hasJuanchi && hasRulo;
+        }
+
+        if (filtroProfesor.startsWith('SOLO_')) {
+          const targetProf = filtroProfesor.replace('SOLO_', '').toLowerCase();
+          return (
+            profesDelCliente.length > 0 &&
+            profesDelCliente.every(p => p.toLowerCase() === targetProf)
+          );
+        }
+
+        if (filtroProfesor.startsWith('INC_')) {
+          const targetProf = filtroProfesor.replace('INC_', '').toLowerCase();
+          return profesDelCliente.some(p => p.toLowerCase() === targetProf);
+        }
+
+        return true;
+      });
+    }
+
     // Filtrar solo clientes activos
     result = result.filter(c => c.activo);
 
     return result;
-  }, [clientes, buscar, filtroEstado]);
+  }, [clientes, buscar, filtroEstado, filtroProfesor, turnos]);
 
   // --- EXPORTAR LISTADO MÉTODOS ---
   const handleExportCSV = () => {
@@ -307,8 +356,9 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         setBuscar={setBuscar}
         filtroEstado={filtroEstado}
         setFiltroEstado={setFiltroEstado}
-        verInactivos={verInactivos}
-        setVerInactivos={setVerInactivos}
+        filtroProfesor={filtroProfesor}
+        setFiltroProfesor={setFiltroProfesor}
+        profesoresDisponibles={profesoresDisponibles}
       />
 
       {/* TABLA PRINCIPAL */}

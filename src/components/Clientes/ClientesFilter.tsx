@@ -1,25 +1,30 @@
 // src/components/Clientes/ClientesFilter.tsx
 import React from 'react';
-import { Search } from 'lucide-react';
+import { Search, UserCheck } from 'lucide-react';
 
 interface ClientesFilterProps {
   buscar: string;
   setBuscar: (val: string) => void;
   filtroEstado: string;
   setFiltroEstado: (val: string) => void;
-  verInactivos?: boolean;
-  setVerInactivos?: (val: boolean) => void;
+  filtroProfesor: string;
+  setFiltroProfesor: (val: string) => void;
+  profesoresDisponibles: string[];
 }
 
 export const ClientesFilter: React.FC<ClientesFilterProps> = ({
   buscar,
   setBuscar,
   filtroEstado,
-  setFiltroEstado
+  setFiltroEstado,
+  filtroProfesor,
+  setFiltroProfesor,
+  profesoresDisponibles
 }) => {
   return (
-    <div className="bg-white border border-zinc-200 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between" id="filter-bar-container">
-      <div className="relative w-full md:w-80">
+    <div className="bg-white border border-zinc-200 p-4 rounded-xl flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shadow-3xs" id="filter-bar-container">
+      {/* Search Input */}
+      <div className="relative w-full md:w-72">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
         <input
           type="text"
@@ -32,13 +37,43 @@ export const ClientesFilter: React.FC<ClientesFilterProps> = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-        {/* ESTADO */}
+        {/* PROFESOR FILTER */}
         <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-zinc-500 font-sans font-medium">Estado:</span>
+          <span className="text-zinc-500 font-sans font-bold text-[11px] flex items-center gap-1">
+            <UserCheck className="w-3.5 h-3.5 text-zinc-400" />
+            Profesor:
+          </span>
+          <select
+            value={filtroProfesor}
+            onChange={(e) => setFiltroProfesor(e.target.value)}
+            className="border border-zinc-200 rounded-lg py-1.5 px-2.5 outline-hidden text-zinc-800 bg-white cursor-pointer font-medium text-xs shadow-2xs"
+            id="filter-profesor-select"
+          >
+            <option value="TODOS">Todos los Profesores</option>
+            <optgroup label="--- Solo un Profesor ---">
+              {profesoresDisponibles.map(p => (
+                <option key={`SOLO_${p}`} value={`SOLO_${p}`}>Solo {p}</option>
+              ))}
+            </optgroup>
+            <optgroup label="--- Combinaciones Especiales ---">
+              <option value="JUANCHI_Y_RULO">Juanchi y Rulo (Ambos)</option>
+            </optgroup>
+            <optgroup label="--- Alumnos que cursan con ---">
+              {profesoresDisponibles.map(p => (
+                <option key={`INC_${p}`} value={`INC_${p}`}>Cursan con {p} (Solo o con otros)</option>
+              ))}
+            </optgroup>
+            <option value="SIN_PROFESOR">Sin Profesor Asignado</option>
+          </select>
+        </div>
+
+        {/* ESTADO FILTER */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-zinc-500 font-sans font-medium text-[11px]">Estado:</span>
           <select
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
-            className="border border-zinc-200 rounded-md py-1 px-2 outline-hidden text-zinc-700 bg-white cursor-pointer"
+            className="border border-zinc-200 rounded-lg py-1.5 px-2.5 outline-hidden text-zinc-800 bg-white cursor-pointer font-medium text-xs shadow-2xs"
             id="filter-status-select"
           >
             <option value="TODOS">Todos</option>

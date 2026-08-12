@@ -159,7 +159,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                           </span>
                         </button>
                         {c.turnos_fijos.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-0.5 max-w-[200px]">
+                          <div className="flex flex-wrap gap-1 mt-0.5 max-w-[220px]">
                             {c.turnos_fijos.map(tfId => {
                               const t = turnos.find(turno => turno.id === tfId);
                               if (!t) return null;
@@ -171,6 +171,25 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                             })}
                           </div>
                         )}
+                        {(() => {
+                          const profesSocio = Array.from(
+                            new Set(
+                              (c.turnos_fijos || [])
+                                .map(tfId => turnos.find(t => t.id === tfId)?.profesor)
+                                .filter((p): p is string => Boolean(p && p.trim()))
+                            )
+                          );
+                          if (profesSocio.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {profesSocio.map(pName => (
+                                <span key={pName} className="px-1.5 py-0.5 text-[9px] font-extrabold rounded bg-violet-100 text-violet-800 border border-violet-200 flex items-center gap-0.5 font-sans">
+                                  👤 {pName}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
