@@ -605,9 +605,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (localProfesores) setProfesores(JSON.parse(localProfesores));
       else {
         const initProfesores = [
-          { id: 'prof-1', nombre: 'Juan Ferrari', email: 'jmferrariprofe@gmail.com', telefono: '11-3803-2652', valor_hora: 2500, activo: true },
-          { id: 'prof-2', nombre: 'Carlos Gómez', email: 'carlos@gimnasio.com.ar', telefono: '11-4455-6677', valor_hora: 2000, activo: true },
-          { id: 'prof-3', nombre: 'María Rodríguez', email: 'maria@gimnasio.com.ar', telefono: '11-8899-0011', valor_hora: 2200, activo: true }
+          { id: 'prof-1', nombre: 'Juanchi', email: 'juanchi@gimnasio.com.ar', telefono: '11-3803-2652', valor_hora: 2500, activo: true },
+          { id: 'prof-2', nombre: 'Rulo', email: 'rulo@gimnasio.com.ar', telefono: '11-4455-6677', valor_hora: 2500, activo: true },
+          { id: 'prof-3', nombre: 'Lucas', email: 'lucas@gimnasio.com.ar', telefono: '11-8899-0011', valor_hora: 2200, activo: true },
+          { id: 'prof-4', nombre: 'Denise', email: 'denise@gimnasio.com.ar', telefono: '11-7788-9900', valor_hora: 2200, activo: true }
         ];
         setProfesores(initProfesores as Profesor[]);
         localStorage.setItem('gym_profesores', JSON.stringify(initProfesores));

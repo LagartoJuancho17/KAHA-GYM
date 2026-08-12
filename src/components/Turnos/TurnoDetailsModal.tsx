@@ -9,6 +9,8 @@ interface TurnoDetailsModalProps {
   onClose: () => void;
 }
 
+const PROFE_PRESETS = ['Juanchi', 'Rulo', 'Lucas', 'Denise'];
+
 export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, onClose }) => {
   const { 
     turnos, clientes, planes, profesores,
@@ -23,6 +25,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   const [cellActionWaitlist, setCellActionWaitlist] = useState('');
   const [flexCheckInClientId, setFlexCheckInClientId] = useState('');
   const [localProfesor, setLocalProfesor] = useState('');
+  const [mostrarOtroProfeInput, setMostrarOtroProfeInput] = useState(false);
 
   const selectedTurno = useMemo(() => {
     return turnos.find(t => t.id === turnoId) || null;
@@ -168,34 +171,95 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
           )}
 
           {/* 1. PROFESOR FIJO */}
-          <form onSubmit={handleSaveProfesor} className="bg-zinc-50 p-3.5 rounded-lg border border-zinc-200 space-y-2">
-            <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Profesor Fijo / Clase</label>
-            <div className="flex gap-2">
-              {profesores.filter(p => p.activo).length > 0 ? (
-                <select
-                  value={localProfesor}
-                  onChange={(e) => setLocalProfesor(e.target.value)}
-                  className="border border-zinc-300 rounded-lg p-2 flex-1 bg-white outline-hidden text-xs font-medium"
+          <form onSubmit={handleSaveProfesor} className="bg-zinc-50 p-3.5 rounded-xl border border-zinc-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">
+                Profesor Fijo / Clase
+              </label>
+              {localProfesor && (
+                <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  Asignado: {localProfesor}
+                </span>
+              )}
+            </div>
+
+            {/* Presets: Juanchi, Rulo, Lucas, Denise + Otro */}
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
+                {PROFE_PRESETS.map((profName) => {
+                  const isSelected = localProfesor === profName && !mostrarOtroProfeInput;
+                  return (
+                    <button
+                      key={profName}
+                      type="button"
+                      onClick={() => {
+                        setLocalProfesor(profName);
+                        setMostrarOtroProfeInput(false);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                        isSelected
+                          ? 'bg-black text-white border-black shadow-xs'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                      }`}
+                    >
+                      👤 {profName}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarOtroProfeInput(true);
+                    if (PROFE_PRESETS.includes(localProfesor)) {
+                      setLocalProfesor('');
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                    mostrarOtroProfeInput || (!PROFE_PRESETS.includes(localProfesor) && localProfesor !== '')
+                      ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
+                      : 'bg-white text-zinc-600 border-dashed border-zinc-300 hover:bg-zinc-100'
+                  }`}
                 >
-                  <option value="">— Sin asignar —</option>
-                  {profesores.filter(p => p.activo).map(p => (
-                    <option key={p.id} value={p.nombre}>{p.nombre}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  placeholder="Ej: Prof. Juan"
-                  value={localProfesor}
-                  onChange={(e) => setLocalProfesor(e.target.value)}
-                  className="border border-zinc-300 rounded-lg p-2 flex-1 bg-white outline-hidden text-xs"
-                />
+                  + Agregar otro profe
+                </button>
+              </div>
+
+              {/* Input si se selecciona "Agregar otro profe" o tiene un profesor personalizado */}
+              {(mostrarOtroProfeInput || (!PROFE_PRESETS.includes(localProfesor) && localProfesor !== '')) && (
+                <div className="pt-1">
+                  <input
+                    type="text"
+                    placeholder="Escribí el nombre del profesor..."
+                    value={localProfesor}
+                    onChange={(e) => setLocalProfesor(e.target.value)}
+                    className="w-full border border-zinc-300 rounded-lg p-2 bg-white outline-hidden text-xs font-medium"
+                    id="input-custom-profesor-name"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1 border-t border-zinc-200/60">
+              {localProfesor && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocalProfesor('');
+                    setMostrarOtroProfeInput(false);
+                    asignarProfesorTurno(turnoId, '');
+                    setCellActionSuccess('Profesor desasignado.');
+                  }}
+                  className="bg-zinc-200 hover:bg-zinc-300 text-zinc-700 rounded-lg text-xs font-semibold px-3 py-1.5 cursor-pointer border-none"
+                >
+                  Quitar Profesor
+                </button>
               )}
               <button
                 type="submit"
-                className="bg-black hover:bg-zinc-800 text-white rounded-lg text-xs font-semibold px-3 py-2 cursor-pointer transition-colors border-none"
+                className="bg-black hover:bg-zinc-800 text-white rounded-lg text-xs font-semibold px-4 py-1.5 cursor-pointer transition-colors border-none shadow-xs"
               >
-                Guardar
+                Guardar Profesor
               </button>
             </div>
           </form>

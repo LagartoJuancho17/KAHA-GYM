@@ -43,13 +43,16 @@ export function generarTurnosIniciales(): Turno[] {
   const turnos: Turno[] = [];
   
   DIAS.forEach(dia => {
+    const esDiasLMW = dia === 'LUNES' || dia === 'MIERCOLES' || dia === 'VIERNES';
+
     const horasBase = [
       { hora: '07:30', cupo: 7 },
       { hora: '08:30', cupo: 7 },
       { hora: '09:30', cupo: 7 },
-      { hora: '10:30', cupo: 5 },
+      { hora: '10:30', cupo: esDiasLMW ? 7 : 5 },
       { hora: '11:00', cupo: 3 },
-      { hora: '12:00', cupo: 7 },
+      { hora: '11:30', cupo: 5 },
+      { hora: '12:00', cupo: esDiasLMW ? 3 : 7 },
       { hora: '16:00', cupo: 7 },
       { hora: '17:00', cupo: 7 },
       { hora: '18:00', cupo: 7 },
