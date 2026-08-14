@@ -35,7 +35,7 @@ export const GoogleSignIn: React.FC = () => {
   const [customPassword, setCustomPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const clientId = "1048882583808-8e6f1fvh32n1a1e0j6g3g8q50r23a78m.apps.googleusercontent.com";
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "476950168779-qoejj8elncpaetpc8elreo5dmkgubedv.apps.googleusercontent.com";
 
   useEffect(() => {
     let interval: any;
