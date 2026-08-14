@@ -149,8 +149,8 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   }, [socio, paidMonth]);
 
   const reintegratedSuspensionsCount = useMemo(() => {
-    return suspendedClassesThisMonth.filter(s => s.reintegrado).length;
-  }, [suspendedClassesThisMonth]);
+    return suspendedClassesThisMonth.filter(s => s.reintegrado && socio.turnos_fijos.includes(s.turno_id)).length;
+  }, [suspendedClassesThisMonth, socio.turnos_fijos]);
 
   const totalMonthlySlots = useMemo(() => {
     if (!planSocio) return 12;

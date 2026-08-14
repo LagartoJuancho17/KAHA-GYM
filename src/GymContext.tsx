@@ -2046,12 +2046,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const filtradas = (c.reservas_individuales || []).filter(r => r.id !== reservaId);
         
         const clasesSuspendidas = [...(c.clases_suspendidas || [])];
-        clasesSuspendidas.push({
-          turno_id: reserva.turno_id,
-          fecha: reserva.fecha,
-          reintegrado,
-          creado_at: new Date().toISOString()
-        });
+        if (!reintegrado) {
+          clasesSuspendidas.push({
+            turno_id: reserva.turno_id,
+            fecha: reserva.fecha,
+            reintegrado: false,
+            creado_at: new Date().toISOString()
+          });
+        }
 
         return {
           ...c,

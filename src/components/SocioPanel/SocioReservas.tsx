@@ -107,8 +107,8 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
   }, [socio, paidMonth]);
 
   const reintegratedSuspensionsCount = useMemo(() => {
-    return suspendedClassesThisMonth.filter(s => s.reintegrado).length;
-  }, [suspendedClassesThisMonth]);
+    return suspendedClassesThisMonth.filter(s => s.reintegrado && socio.turnos_fijos.includes(s.turno_id)).length;
+  }, [suspendedClassesThisMonth, socio.turnos_fijos]);
 
   const usedSlots = useMemo(() => {
     return Math.max(0, totalFixedSlotsForMonth - reintegratedSuspensionsCount + activeIndividualReservations.length);
