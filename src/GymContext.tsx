@@ -56,7 +56,7 @@ interface GymContextType {
   removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
 
   // Clientes Methods
-  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
+  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean; initialReservaIndividual?: { turno_id: string; fecha: string } }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
   autorizarCliente: (id: string, planId?: string, tipo?: TipoCliente) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
@@ -858,6 +858,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     turnos_fijos?: string[];
     deuda_acumulada?: number;
     allowDuplicate?: boolean;
+    initialReservaIndividual?: { turno_id: string; fecha: string };
   }) => {
     // Validar duplicados (email o nombre+apellido idénticos) salvo que allowDuplicate sea true
     if (!clientData.allowDuplicate && isDuplicateFuzzy(clientData.nombre, clientData.apellido, clientData.email, clientes)) {
@@ -898,6 +899,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    const initialReservas: ReservaIndividual[] = clientData.initialReservaIndividual ? [{
+      id: `res-${Date.now()}`,
+      turno_id: clientData.initialReservaIndividual.turno_id,
+      fecha: clientData.initialReservaIndividual.fecha,
+      creado_at: new Date().toISOString()
+    }] : [];
+
     const newClient: Cliente = {
       ...clientData,
       codigo_socio: customCode,
@@ -908,6 +916,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deuda_acumulada: initialDeuda,
       ultimo_mes_pagado: new Date().toISOString().slice(0, 7), // Al día del mes de registro
       turnos_fijos: actuallyAssignedTurnosFijos,
+      reservas_individuales: initialReservas,
+      clases_suspendidas: [],
       activo: true,
       creado_at: new Date().toISOString(),
       autorizado: true
@@ -941,7 +951,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           creado_at: newClient.creado_at,
           precio_personalizado: newClient.precio_personalizado ?? null,
           dias_personalizados: newClient.dias_personalizados ?? null,
-          nota_plan_personalizado: newClient.nota_plan_personalizado ?? null
+          nota_plan_personalizado: newClient.nota_plan_personalizado ?? null,
+          reservas_individuales: newClient.reservas_individuales || []
         });
 
         if (clienteError) {

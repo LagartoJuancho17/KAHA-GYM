@@ -93,12 +93,11 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     setRealtimeError(null);
     setRealtimeSuccess(null);
 
-    let targetClientId = realtimeCandidateClient;
-
     if (guestName.trim()) {
-      const parts = guestName.trim().split(' ');
+      const fullGuestName = guestName.trim();
+      const parts = fullGuestName.split(' ');
       const name = parts[0] || 'Invitado';
-      const lastname = parts.slice(1).join(' ') || '(Invitado)';
+      const lastname = parts.length > 1 ? parts.slice(1).join(' ') + ' (Invitado)' : '(Invitado)';
       
       const newGuestResult = addCliente({
         nombre: name,
@@ -108,23 +107,32 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         tipo: 'FIJO',
         plan_id: 'p-none',
         exencion_cobro: 'NINGUNA',
-        allowDuplicate: true
+        allowDuplicate: true,
+        initialReservaIndividual: {
+          turno_id: selectedSlot.id,
+          fecha: selectedSlot.date
+        }
       });
 
-      if (newGuestResult.success && (newGuestResult as any).id) {
-        targetClientId = (newGuestResult as any).id;
+      if (newGuestResult.success) {
+        setRealtimeSuccess(`Invitado "${fullGuestName}" agendado con éxito.`);
+        setGuestName('');
+        setRealtimeCandidateClient('');
+        setSearchQuery('');
+        setIsDropdownOpen(false);
+        setTimeout(() => setRealtimeSuccess(null), 3000);
       } else {
-        setRealtimeError(newGuestResult.message || 'Error al registrar el socio invitado.');
-        return;
+        setRealtimeError(newGuestResult.message || 'Error al agendar el socio invitado.');
       }
+      return;
     }
 
-    if (!targetClientId) {
+    if (!realtimeCandidateClient) {
       setRealtimeError('Debes elegir un alumno o escribir el nombre de un invitado.');
       return;
     }
 
-    const res = crearReservaIndividual(targetClientId, selectedSlot.id, selectedSlot.date);
+    const res = crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
     if (res.success) {
       setRealtimeSuccess(res.message);
       setRealtimeCandidateClient('');
@@ -161,12 +169,18 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
       });
     });
 
-    // Variables
+    // Variables / Invitados
     rtData.variables.forEach(c => {
+      const isGuest = c.apellido.includes('Invitado') || c.email.includes('invitado-');
+      const cleanLastname = c.apellido.replace('(Invitado)', '').trim();
+      const displayName = isGuest
+        ? (cleanLastname ? `${c.nombre} ${cleanLastname} (Invitado)` : `${c.nombre} (Invitado)`)
+        : `${c.apellido}, ${c.nombre}`;
+
       items.push({
         id: c.id,
         clienteId: c.id,
-        nombre: `${c.apellido}, ${c.nombre}`,
+        nombre: displayName,
         tipo: 'VARIABLE',
         presente: true,
         key: `var-${c.id}`
