@@ -489,7 +489,12 @@ export const SocioPanel: React.FC = () => {
           className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] border-none bg-transparent relative"
           id="bottom-nav-perfil"
         >
-          <User className={`w-5 h-5 transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`} />
+          <div className="relative">
+            <User className={`w-5 h-5 transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`} />
+            {novedades.some(n => n.destacado) && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full border border-white"></span>
+            )}
+          </div>
           <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`}>Membresía</span>
           {activeTabSection === 'PERFIL' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
         </button>

@@ -2,7 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Menu, Sparkles, Home, User, CalendarDays, Receipt, Megaphone, ChevronDown, LogOut, Shield, X, Barcode, Info } from 'lucide-react';
+import { Menu, Sparkles, Home, User, CalendarDays, Receipt, Megaphone, ChevronDown, LogOut, Shield, X, Barcode, Info, Bell } from 'lucide-react';
 import logoKaha from '../../assets/logokaha.png';
 
 interface SocioHeaderProps {
@@ -60,7 +60,7 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
           </button>
 
           <img src={logoKaha} alt="KAHA GYM Logo" className="w-9 h-9 rounded-xl object-contain drop-shadow-xs shrink-0" />
-          <div>
+          <div className="hidden sm:block">
             <div className="flex items-center gap-1.5">
               <h1 className="text-sm font-black text-slate-800 tracking-wider uppercase">KAHA Portal</h1>
               <span className="text-[8px] bg-emerald-50 text-emerald-800 border border-emerald-100 font-mono font-bold px-1.5 py-0.2 rounded-md">PASS ACTIVE</span>
@@ -148,6 +148,19 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
               <span className="hidden sm:inline">Guía Rápida</span>
             </button>
           )}
+
+          {/* Botón rápido de Notificaciones */}
+          <button
+            onClick={() => setActiveTabSection('NOVEDADES')}
+            className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-xl transition-all cursor-pointer shadow-2xs relative text-slate-600 hover:text-slate-900"
+            title="Notificaciones y Cartelera"
+            aria-label="Ver Notificaciones"
+          >
+            <Bell className="w-4 h-4 text-slate-600" />
+            {novedades.some(n => n.destacado) && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full animate-ping" />
+            )}
+          </button>
 
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
