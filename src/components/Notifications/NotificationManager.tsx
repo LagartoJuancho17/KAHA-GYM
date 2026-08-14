@@ -1,7 +1,6 @@
 // src/components/Notifications/NotificationManager.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, BellOff, BellRing, X, Check } from 'lucide-react';
-import { useGym } from '../../GymContext';
 import type { Turno } from '../../types';
 
 const DAY_MAP: Record<string, number> = {
@@ -28,11 +27,32 @@ const NOTIFICATION_STORAGE_KEY = 'kaha-notifications-enabled';
 const LAST_NOTIFICATION_KEY = 'kaha-last-notification';
 const NOTIFICATION_PROMPT_DISMISSED_KEY = 'kaha-notification-prompt-dismissed';
 
+/** Safe check — returns true only if the Notification API is fully available */
+function isNotificationSupported(): boolean {
+  try {
+    return typeof window !== 'undefined' && 'Notification' in window && typeof window.Notification !== 'undefined';
+  } catch {
+    return false;
+  }
+}
+
+/** Safe getter for Notification.permission */
+function getPermission(): NotificationPermission | 'unsupported' {
+  try {
+    if (isNotificationSupported()) {
+      return window.Notification.permission;
+    }
+  } catch {
+    // ignore
+  }
+  return 'unsupported';
+}
+
 /**
  * NotificationManager
  * - Requests notification permission from the user (non-intrusively)
  * - Schedules local reminders based on the socio's turnos_fijos
- * - Shows a reminder notification on training days at 7:00 AM
+ * - Shows a reminder notification on training days
  */
 export const NotificationManager: React.FC<{
   socioId: string;
@@ -40,7 +60,7 @@ export const NotificationManager: React.FC<{
   turnos: Turno[];
 }> = ({ socioId, turnosFijos, turnos }) => {
 
-  const [permissionState, setPermissionState] = useState<NotificationPermission | 'unsupported'>('default');
+  const [permissionState, setPermissionState] = useState<NotificationPermission | 'unsupported'>('unsupported');
   const [isEnabled, setIsEnabled] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -48,21 +68,19 @@ export const NotificationManager: React.FC<{
 
   // Check if notifications are supported and get permission state
   useEffect(() => {
-    if (!('Notification' in window)) {
-      setPermissionState('unsupported');
-      return;
-    }
-    setPermissionState(Notification.permission);
+    const perm = getPermission();
+    setPermissionState(perm);
+
+    if (perm === 'unsupported') return;
 
     const stored = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
-    if (stored === 'true' && Notification.permission === 'granted') {
+    if (stored === 'true' && perm === 'granted') {
       setIsEnabled(true);
     }
 
     // Show the prompt banner if user hasn't dismissed it and hasn't enabled notifications
     const dismissed = localStorage.getItem(NOTIFICATION_PROMPT_DISMISSED_KEY);
-    if (!dismissed && Notification.permission !== 'granted' && turnosFijos.length > 0) {
-      // Delay slightly so it doesn't appear immediately on load
+    if (!dismissed && perm !== 'granted' && turnosFijos.length > 0) {
       const timer = setTimeout(() => setShowPrompt(true), 3000);
       return () => clearTimeout(timer);
     }
@@ -75,7 +93,6 @@ export const NotificationManager: React.FC<{
       if (turno) {
         return { dia: turno.dia, hora: turno.hora, id: turno.id };
       }
-      // Parse from the ID format "LUNES-10:30"
       const parts = tfId.split('-');
       const dia = parts[0];
       const hora = parts.slice(1).join(':');
@@ -85,13 +102,12 @@ export const NotificationManager: React.FC<{
 
   // Check if today is a training day and send notification if needed
   const checkAndNotify = useCallback(() => {
-    if (!isEnabled || Notification.permission !== 'granted') return;
+    if (!isEnabled || !isNotificationSupported() || getPermission() !== 'granted') return;
 
     const now = new Date();
     const todayDayNum = now.getDay();
     const todayStr = now.toISOString().split('T')[0];
 
-    // Check if we already sent a notification today
     const lastNotif = localStorage.getItem(`${LAST_NOTIFICATION_KEY}-${socioId}`);
     if (lastNotif === todayStr) return;
 
@@ -102,24 +118,25 @@ export const NotificationManager: React.FC<{
       const horasStr = todayTurnos.map(t => t.hora.slice(0, 5)).join(' y ');
       const dayName = DAY_NAMES_ES[todayDayNum];
 
-      // Only notify between 6:00 AM and 10:00 PM
       const hours = now.getHours();
       if (hours >= 6 && hours <= 22) {
-        const notification = new Notification('🏋️ ¡Hoy tenés clase en KAHA!', {
-          body: `${dayName} — Tu turno es a las ${horasStr} hs. ¡No te olvides!`,
-          icon: '/favicon.png',
-          badge: '/favicon-32x32.png',
-          tag: 'kaha-training-reminder',
-          renotify: true,
-          vibrate: [200, 100, 200],
-        } as NotificationOptions);
+        try {
+          const notification = new window.Notification('🏋️ ¡Hoy tenés clase en KAHA!', {
+            body: `${dayName} — Tu turno es a las ${horasStr} hs. ¡No te olvides!`,
+            icon: '/favicon.png',
+            badge: '/favicon-32x32.png',
+            tag: 'kaha-training-reminder',
+          });
 
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-        };
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
 
-        localStorage.setItem(`${LAST_NOTIFICATION_KEY}-${socioId}`, todayStr);
+          localStorage.setItem(`${LAST_NOTIFICATION_KEY}-${socioId}`, todayStr);
+        } catch {
+          // Notification constructor may throw on some platforms
+        }
       }
     }
   }, [isEnabled, socioId, getTurnosInfo]);
@@ -134,10 +151,7 @@ export const NotificationManager: React.FC<{
       return;
     }
 
-    // Check immediately on enable
     checkAndNotify();
-
-    // Then check every 30 minutes
     intervalRef.current = setInterval(checkAndNotify, 30 * 60 * 1000);
 
     return () => {
@@ -149,10 +163,10 @@ export const NotificationManager: React.FC<{
 
   // Handle enabling notifications
   const handleEnableNotifications = async () => {
-    if (!('Notification' in window)) return;
+    if (!isNotificationSupported()) return;
 
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await window.Notification.requestPermission();
       setPermissionState(permission);
 
       if (permission === 'granted') {
@@ -162,18 +176,21 @@ export const NotificationManager: React.FC<{
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 4000);
 
-        // Send a test notification
-        new Notification('✅ ¡Recordatorios activados!', {
-          body: 'Vas a recibir recordatorios antes de cada clase en KAHA GYM.',
-          icon: '/favicon.png',
-          tag: 'kaha-setup-complete',
-        });
+        try {
+          new window.Notification('✅ ¡Recordatorios activados!', {
+            body: 'Vas a recibir recordatorios antes de cada clase en KAHA GYM.',
+            icon: '/favicon.png',
+            tag: 'kaha-setup-complete',
+          });
+        } catch {
+          // Ignore if test notification fails
+        }
       } else {
         setIsEnabled(false);
         localStorage.setItem(NOTIFICATION_STORAGE_KEY, 'false');
       }
-    } catch (err) {
-      console.warn('[KAHA Notifications] Error:', err);
+    } catch {
+      console.warn('[KAHA Notifications] Permission request failed');
     }
   };
 
@@ -257,8 +274,8 @@ export const NotificationManager: React.FC<{
         </div>
       )}
 
-      {/* Small toggle button in the header area - rendered via portal or prop */}
-      {isEnabled && Notification.permission === 'granted' && (
+      {/* Small toggle button */}
+      {isEnabled && getPermission() === 'granted' && (
         <div className="fixed bottom-4 right-4 z-[50]">
           <button
             onClick={handleDisableNotifications}
@@ -275,7 +292,7 @@ export const NotificationManager: React.FC<{
       )}
 
       {/* Re-enable button when dismissed but permission available */}
-      {!isEnabled && !showPrompt && Notification.permission !== 'denied' && turnosFijos.length > 0 && (
+      {!isEnabled && !showPrompt && getPermission() !== 'denied' && getPermission() !== 'unsupported' && turnosFijos.length > 0 && (
         <div className="fixed bottom-4 right-4 z-[50]">
           <button
             onClick={handleEnableNotifications}
