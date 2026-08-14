@@ -110,20 +110,6 @@ export const GoogleSignIn: React.FC = () => {
       return;
     }
 
-    const mailClean = customEmail.trim().toLowerCase();
-
-    // 🔒 Seguridad: Cuentas Gmail o de Administradores deben usar obligatoriamente Google OAuth
-    if (
-      mailClean.endsWith('@gmail.com') ||
-      mailClean === 'tobiasarraiza17@gmail.com' ||
-      mailClean === 'totoarr17@gmail.com' ||
-      mailClean === 'jmferrariprofe@gmail.com' ||
-      mailClean === 'ianvelazquez97@gmail.com'
-    ) {
-      setErrorMsg('Por motivos de seguridad, las cuentas de Gmail y Administradores deben ingresar obligatoriamente usando el botón verde "Acceder con Google" con su contraseña.');
-      return;
-    }
-
     setLoading(true);
     try {
       await signInWithEmailAndPassword(customEmail, customPassword);

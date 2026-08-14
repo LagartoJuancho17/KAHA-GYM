@@ -13,6 +13,7 @@ import { SocioPerfil } from './SocioPerfil';
 import { SocioPagos } from './SocioPagos';
 import { SocioNovedades } from './SocioNovedades';
 import { SocioPaymentChoiceModal } from './SocioPaymentChoiceModal';
+import { OnboardingModal } from '../Onboarding/OnboardingModal';
 import { Footer } from '../Common/Footer';
 
 export const SocioPanel: React.FC = () => {
@@ -26,6 +27,9 @@ export const SocioPanel: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Mercado Pago states
   const [isPaying, setIsPaying] = useState(false);
@@ -79,6 +83,25 @@ export const SocioPanel: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [socio, isCurrentMonthUnpaid, currentCalendarMonth]);
+
+  // Onboarding first time detection
+  useEffect(() => {
+    if (socio) {
+      const userKey = socio.id || socio.email || 'socio';
+      const onboardingDone = localStorage.getItem(`kaha_onboarding_${userKey}`);
+      if (!onboardingDone) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [socio]);
+
+  const handleCloseOnboarding = () => {
+    if (socio) {
+      const userKey = socio.id || socio.email || 'socio';
+      localStorage.setItem(`kaha_onboarding_${userKey}`, 'true');
+    }
+    setShowOnboarding(false);
+  };
 
   if (loading) {
     return (
@@ -134,6 +157,7 @@ export const SocioPanel: React.FC = () => {
         isDropdownOpen={isDropdownOpen}
         setIsDropdownOpen={setIsDropdownOpen}
         socio={socio}
+        onOpenOnboarding={() => setShowOnboarding(true)}
       />
 
       {/* ERROR & SUCCESS STATUS BANNER */}
@@ -557,7 +581,14 @@ export const SocioPanel: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
 
+      {/* ONBOARDING MODAL */}
+      <OnboardingModal 
+        isOpen={showOnboarding}
+        onClose={handleCloseOnboarding}
+        rol="SOCIO"
+        nombreUsuario={socio?.nombre}
+      />
+    </div>
   );
 };

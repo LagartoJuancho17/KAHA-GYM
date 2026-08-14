@@ -13,6 +13,7 @@ interface SocioHeaderProps {
   isDropdownOpen: boolean;
   setIsDropdownOpen: (open: boolean) => void;
   socio: Cliente;
+  onOpenOnboarding?: () => void;
 }
 
 export const SocioHeader: React.FC<SocioHeaderProps> = ({
@@ -22,7 +23,8 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
   setDrawerOpen,
   isDropdownOpen,
   setIsDropdownOpen,
-  socio
+  socio,
+  onOpenOnboarding
 }) => {
   const { googleUser, signOutGoogle, setRolActivo, novedades } = useGym();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -135,7 +137,18 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
         </nav>
 
         {/* PROFILE CHIP & DROPDOWN */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="flex items-center gap-2" ref={dropdownRef}>
+          {onOpenOnboarding && (
+            <button
+              onClick={onOpenOnboarding}
+              className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Ver tutorial y guía de uso"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+              <span className="hidden sm:inline">Guía Rápida</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 px-3 py-2 rounded-xl transition-all cursor-pointer shadow-xs text-left"

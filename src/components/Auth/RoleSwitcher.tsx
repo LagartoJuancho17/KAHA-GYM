@@ -1,8 +1,9 @@
 // src/components/RoleSwitcher.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useGym } from '../../GymContext';
-import { Shield, User, Dumbbell, ChevronDown, Check } from 'lucide-react';
+import { Shield, User, Dumbbell, ChevronDown, Check, Sparkles } from 'lucide-react';
 import logoKaha from '../../assets/logokaha.png';
+import { OnboardingModal } from '../Onboarding/OnboardingModal';
 
 export const RoleSwitcher: React.FC = () => {
   const {
@@ -11,6 +12,7 @@ export const RoleSwitcher: React.FC = () => {
   } = useGym();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -80,9 +82,9 @@ export const RoleSwitcher: React.FC = () => {
                 type="button"
                 onClick={() => handleSelectRole('ADMIN')}
                 disabled={isOperatorBound}
-                className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
-                  isOperatorBound 
-                    ? 'opacity-40 cursor-not-allowed text-slate-400' 
+                className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors border-none bg-transparent cursor-pointer ${
+                  isOperatorBound
+                    ? 'opacity-40 cursor-not-allowed text-slate-400'
                     : rolActivo === 'ADMIN'
                     ? 'bg-sky-50 font-bold text-sky-900'
                     : 'hover:bg-slate-50 text-slate-700'
@@ -95,11 +97,11 @@ export const RoleSwitcher: React.FC = () => {
                 {rolActivo === 'ADMIN' && <Check className="w-3.5 h-3.5 text-sky-600" />}
               </button>
 
-              {/* PROFESOR OPTION */}
+              {/* OPERADOR OPTION */}
               <button
                 type="button"
                 onClick={() => handleSelectRole('OPERADOR')}
-                className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors border-none bg-transparent cursor-pointer ${
                   rolActivo === 'OPERADOR'
                     ? 'bg-slate-100 font-bold text-slate-900'
                     : 'hover:bg-slate-50 text-slate-700'
@@ -109,14 +111,14 @@ export const RoleSwitcher: React.FC = () => {
                   <Dumbbell className="w-3.5 h-3.5 text-slate-600" />
                   <span>Profesor / Operador</span>
                 </span>
-                {rolActivo === 'OPERADOR' && <Check className="w-3.5 h-3.5 text-slate-700" />}
+                {rolActivo === 'OPERADOR' && <Check className="w-3.5 h-3.5 text-slate-600" />}
               </button>
 
               {/* SOCIO OPTION */}
               <button
                 type="button"
                 onClick={() => handleSelectRole('SOCIO')}
-                className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors border-none bg-transparent cursor-pointer ${
                   rolActivo === 'SOCIO'
                     ? 'bg-emerald-50 font-bold text-emerald-900'
                     : 'hover:bg-slate-50 text-slate-700'
@@ -131,6 +133,17 @@ export const RoleSwitcher: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* ONBOARDING TUTORIAL BUTTON */}
+        <button
+          type="button"
+          onClick={() => setShowOnboardingModal(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100/80 transition-all cursor-pointer shadow-2xs"
+          title="Ver guía tutorial de inicio"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+          <span className="hidden sm:inline">Guía / Tutorial</span>
+        </button>
       </div>
 
       {/* Selected Socio Dropdown (Only visible if SOCIO is active) */}
@@ -152,6 +165,14 @@ export const RoleSwitcher: React.FC = () => {
           </select>
         </div>
       )}
+
+      {/* ONBOARDING MODAL */}
+      <OnboardingModal 
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+        rol={rolActivo}
+        nombreUsuario={googleUser?.name}
+      />
     </div>
   );
 };
