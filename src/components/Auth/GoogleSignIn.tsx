@@ -1,7 +1,7 @@
-// src/components/GoogleSignIn.tsx
+// src/components/Auth/GoogleSignIn.tsx
 import React, { useState, useEffect } from 'react';
 import { useGym } from '../../GymContext';
-import { Mail, ArrowRight, AlertCircle, ShieldCheck, Lock, ChevronLeft } from 'lucide-react';
+import { Mail, ArrowRight, AlertCircle, ShieldCheck, Lock, ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import logoKaha from '../../assets/logokaha.png';
 
 // Decodes Google's credential JWT securely on the client-side
@@ -23,30 +23,31 @@ function decodeJwt(token: string) {
 }
 
 export const GoogleSignIn: React.FC = () => {
-  const { signInWithGoogle } = useGym();
+  const { signInWithGoogle, signInWithEmailAndPassword } = useGym();
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [btnLoaded, setBtnLoaded] = useState(false);
-  const [customEmail, setCustomEmail] = useState('');
-  const [showEmailForm, setShowEmailForm] = useState(false);
 
-  // Load custom client ID from localStorage or environment
-  const clientId = localStorage.getItem('gym_google_client_id') || 
-                   ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string) || 
-                   '476950168779-qoejj8elncpaetpc8elreo5dmkgubedv.apps.googleusercontent.com';
+  // Custom email/password state
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [customEmail, setCustomEmail] = useState('');
+  const [customPassword, setCustomPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const clientId = "1048882583808-8e6f1fvh32n1a1e0j6g3g8q50r23a78m.apps.googleusercontent.com";
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: any;
 
     const renderGoogleButton = () => {
-      const google = (window as any).google;
-
-      if (google && google.accounts && google.accounts.id) {
-        const btnContainer = document.getElementById('google-real-btn-container');
-        if (btnContainer) {
-          clearInterval(interval);
+      const btnContainer = document.getElementById('google-real-btn-container');
+      if (btnContainer && (window as any).google?.accounts?.id) {
+        clearInterval(interval);
+        
+        if (!btnContainer.hasChildNodes()) {
           try {
+            const google = (window as any).google;
             google.accounts.id.initialize({
               client_id: clientId,
               callback: (response: any) => {
@@ -104,9 +105,14 @@ export const GoogleSignIn: React.FC = () => {
       return;
     }
 
+    if (!customPassword.trim()) {
+      setErrorMsg('Por favor ingresá tu contraseña.');
+      return;
+    }
+
     const mailClean = customEmail.trim().toLowerCase();
 
-    // 🔒 Seguridad: Cuentas Gmail o de Administradores deben usar obligatoriamente Google OAuth (con contraseña)
+    // 🔒 Seguridad: Cuentas Gmail o de Administradores deben usar obligatoriamente Google OAuth
     if (
       mailClean.endsWith('@gmail.com') ||
       mailClean === 'tobiasarraiza17@gmail.com' ||
@@ -120,10 +126,9 @@ export const GoogleSignIn: React.FC = () => {
 
     setLoading(true);
     try {
-      const defaultName = mailClean.split('@')[0];
-      await signInWithGoogle(mailClean, defaultName);
+      await signInWithEmailAndPassword(customEmail, customPassword);
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Error al iniciar sesión con el correo ingresado.');
+      setErrorMsg(err?.message || 'Error al iniciar sesión con las credenciales ingresadas.');
     } finally {
       setLoading(false);
     }
@@ -169,7 +174,7 @@ export const GoogleSignIn: React.FC = () => {
               </div>
             </div>
             <div className="text-center space-y-0.5">
-              <p className="text-zinc-900 font-bold text-xs">Verificando cuenta...</p>
+              <p className="text-zinc-900 font-bold text-xs">Verificando credenciales...</p>
               <p className="text-slate-500 text-[10px]">Iniciando sesión segura</p>
             </div>
           </div>
@@ -222,7 +227,7 @@ export const GoogleSignIn: React.FC = () => {
               >
                 <span className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-                  <span>Ingresar con correo o Hotmail</span>
+                  <span>Ingresar con correo y contraseña</span>
                 </span>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
               </button>
@@ -230,7 +235,7 @@ export const GoogleSignIn: React.FC = () => {
               <form onSubmit={handleCustomEmailSubmit} className="space-y-3 bg-slate-50/80 p-4 border border-slate-200 rounded-2xl animate-scale-in">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-emerald-600" /> Correo Electrónico
+                    <Lock className="w-3.5 h-3.5 text-emerald-600" /> Correo y Contraseña
                   </span>
                   <button
                     type="button"
@@ -241,24 +246,49 @@ export const GoogleSignIn: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="relative">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Correo Electrónico</label>
                   <input
                     type="email"
                     required
                     autoFocus
-                    placeholder="ejemplo@hotmail.com / gmail.com"
+                    placeholder="ejemplo@hotmail.com / yahoo.com"
                     value={customEmail}
                     onChange={(e) => setCustomEmail(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-hidden text-zinc-900 transition-all"
                   />
                 </div>
 
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Contraseña</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Ingresá tu contraseña de acceso"
+                      value={customPassword}
+                      onChange={(e) => setCustomPassword(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-hidden text-zinc-900 transition-all pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer border-none bg-transparent"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400 block italic">
+                    (Para socios, tu contraseña por defecto es tu número de celular registrado)
+                  </span>
+                </div>
+
                 <button
                   type="submit"
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                 >
-                  <span>Continuar con este Correo</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Ingresar con Contraseña</span>
                 </button>
               </form>
             )}
@@ -272,21 +302,13 @@ export const GoogleSignIn: React.FC = () => {
             )}
 
             {successMsg && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-xl text-[11px] font-semibold text-center">
-                {successMsg}
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-xl text-[11px] font-semibold text-center flex items-center gap-2 justify-center">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{successMsg}</span>
               </div>
             )}
           </div>
         )}
-
-        {/* FOOTER */}
-        <div className="pt-2 text-center border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-          <span className="flex items-center gap-1 font-medium">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Autenticación Encriptada
-          </span>
-          <span className="font-mono">KAHA GYM © 2026</span>
-        </div>
-
       </div>
     </div>
   );

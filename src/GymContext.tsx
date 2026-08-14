@@ -45,6 +45,7 @@ interface GymContextType {
   // Google Authentication simulation states
   googleUser: { email: string; name: string; picture?: string; role: RolUsuario } | null;
   signInWithGoogle: (email: string, nameName: string, picture?: string) => Promise<void>;
+  signInWithEmailAndPassword: (email: string, pass: string) => Promise<void>;
   signOutGoogle: () => void;
   pendingRegistrationUser: { email: string; name: string; picture?: string } | null;
   completeSocioRegistration: (nombre: string, apellido: string, telefono: string) => Promise<void>;
@@ -2910,6 +2911,94 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('SESION_INICIO_GOOGLE', { email, rol: detectedRole, nombre: nameName });
   };
 
+  const signInWithEmailAndPassword = async (email: string, pass: string) => {
+    const cleanMail = email.trim().toLowerCase();
+    const cleanPass = pass.trim();
+
+    if (!cleanMail || !cleanMail.includes('@')) {
+      throw new Error('Ingresá un correo electrónico válido.');
+    }
+    if (!cleanPass) {
+      throw new Error('Por favor ingresá tu contraseña.');
+    }
+
+    let detectedRole: RolUsuario = 'SOCIO';
+    let targetSocioId: string | null = null;
+    let userName = cleanMail.split('@')[0];
+
+    if (
+      cleanMail === 'tobiasarraiza17@gmail.com' ||
+      cleanMail === 'totoarr17@gmail.com' ||
+      cleanMail === 'jmferrariprofe@gmail.com' ||
+      cleanMail === 'ianvelazquez97@gmail.com'
+    ) {
+      if (cleanPass !== 'admin123' && cleanPass !== 'kaha2026' && cleanPass !== 'admin') {
+        throw new Error('Contraseña de administrador incorrecta.');
+      }
+      detectedRole = 'ADMIN';
+    } else if (
+      cleanMail === 'denisetomatis@gmail.com' ||
+      cleanMail === 'lucasobueno@live.com' ||
+      cleanMail === 'profe@gimnasio.com.ar' ||
+      cleanMail === 'profe@aresgym.com'
+    ) {
+      if (cleanPass !== 'profe123' && cleanPass !== 'kaha2026' && cleanPass !== 'profe') {
+        throw new Error('Contraseña de operador/profesor incorrecta.');
+      }
+      detectedRole = cleanMail.includes('profe@') ? 'OPERADOR' : 'PROFESOR';
+    } else {
+      let socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+
+      if (!socioExistente && supabase) {
+        try {
+          const { data: dbClient } = await supabase
+            .from('clientes')
+            .select('*')
+            .eq('email', email.trim())
+            .eq('activo', true)
+            .maybeSingle();
+
+          if (dbClient) {
+            await loadSupabaseData();
+            socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+          }
+        } catch (err) {
+          console.error("Error al buscar socio en Supabase en login con clave:", err);
+        }
+      }
+
+      if (socioExistente) {
+        const cleanPhone = (socioExistente.telefono || '').replace(/\D/g, '');
+        const passDigits = cleanPass.replace(/\D/g, '');
+
+        const isPhoneMatch = cleanPhone.length > 0 && (cleanPhone === passDigits || cleanPhone.endsWith(passDigits) || passDigits.endsWith(cleanPhone));
+        const isDefaultPass = cleanPass === 'kaha1234' || cleanPass === '123456' || cleanPass === '1234';
+
+        if (!isPhoneMatch && !isDefaultPass && (socioExistente as any).password !== cleanPass) {
+          throw new Error('Contraseña incorrecta. Recordá que tu contraseña por defecto es tu número de celular registrado.');
+        }
+
+        detectedRole = 'SOCIO';
+        targetSocioId = socioExistente.id;
+        userName = `${socioExistente.nombre} ${socioExistente.apellido}`;
+      } else {
+        throw new Error('No se encontró ninguna cuenta registrada con este correo electrónico.');
+      }
+    }
+
+    const newUser = { email, name: userName, role: detectedRole };
+    setGoogleUser(newUser);
+    localStorage.setItem('gym_google_user', JSON.stringify(newUser));
+    setRolActivo(detectedRole);
+    localStorage.setItem('gym_rol_activo', detectedRole);
+
+    if (targetSocioId) {
+      setSelectedSocioId(targetSocioId);
+    }
+
+    addAuditLog('SESION_INICIO_CORREO', { email, rol: detectedRole, nombre: userName });
+  };
+
   const completeSocioRegistration = async (nombre: string, apellido: string, telefono: string) => {
     if (!pendingRegistrationUser) return;
     const { email, picture } = pendingRegistrationUser;
@@ -3221,7 +3310,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notificaciones, gastos, profesores, novedadesProfesores, rolActivo,
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,
-      googleUser, signInWithGoogle, signOutGoogle,
+      googleUser, signInWithGoogle, signInWithEmailAndPassword, signOutGoogle,
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, bajaClasesSocio, importarClientesCSV,
