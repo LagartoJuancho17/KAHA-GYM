@@ -14,12 +14,13 @@ import { SocioPagos } from './SocioPagos';
 import { SocioNovedades } from './SocioNovedades';
 import { SocioPaymentChoiceModal } from './SocioPaymentChoiceModal';
 import { OnboardingModal } from '../Onboarding/OnboardingModal';
+import { NotificationManager } from '../Notifications/NotificationManager';
 import { Footer } from '../Common/Footer';
 
 export const SocioPanel: React.FC = () => {
   const { 
     clientes, planes, selectedSocioId, googleUser,
-    novedades, setRolActivo, signOutGoogle, loading
+    novedades, setRolActivo, signOutGoogle, loading, turnos
   } = useGym();
 
   const [activeTabSection, setActiveTabSection] = useState<'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES'>('HOME');
@@ -589,6 +590,15 @@ export const SocioPanel: React.FC = () => {
         rol="SOCIO"
         nombreUsuario={socio?.nombre}
       />
+
+      {/* NOTIFICATION MANAGER — Training day reminders */}
+      {socio && (
+        <NotificationManager
+          socioId={socio.id}
+          turnosFijos={socio.turnos_fijos || []}
+          turnos={turnos}
+        />
+      )}
     </div>
   );
 };
