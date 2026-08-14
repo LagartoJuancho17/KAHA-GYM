@@ -56,7 +56,7 @@ interface GymContextType {
   removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
 
   // Clientes Methods
-  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
+  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
   autorizarCliente: (id: string, planId?: string, tipo?: TipoCliente) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
@@ -857,9 +857,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     tipo?: TipoCliente;
     turnos_fijos?: string[];
     deuda_acumulada?: number;
+    allowDuplicate?: boolean;
   }) => {
-    // Validar duplicados (email o nombre+apellido idénticos)
-    if (isDuplicateFuzzy(clientData.nombre, clientData.apellido, clientData.email, clientes)) {
+    // Validar duplicados (email o nombre+apellido idénticos) salvo que allowDuplicate sea true
+    if (!clientData.allowDuplicate && isDuplicateFuzzy(clientData.nombre, clientData.apellido, clientData.email, clientes)) {
       return { 
         success: false, 
         message: 'Ya existe un cliente activo registrado con el mismo email o mismo nombre completo (Fuzzy Matching)',

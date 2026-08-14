@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, Clock, Trash2, Plus, MessageCircle, Send } from 'lucide-react';
+import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck } from 'lucide-react';
 
 interface TurnoRealtimeModalProps {
   selectedSlot: { id: string; date: string };
@@ -28,6 +28,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
   const [realtimeSuccess, setRealtimeSuccess] = useState<string | null>(null);
 
@@ -63,11 +65,26 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   const isFull = rtData.total >= rtData.cupo;
   
   // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date
-  const candidateClients = clientes.filter(c => {
-    return c.activo && 
-      !c.turnos_fijos.includes(selectedSlot.id) && 
-      !(c.reservas_individuales || []).some(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date);
-  });
+  const candidateClients = useMemo(() => {
+    return clientes.filter(c => {
+      return c.activo && 
+        !c.turnos_fijos.includes(selectedSlot.id) && 
+        !(c.reservas_individuales || []).some(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date);
+    });
+  }, [clientes, selectedSlot.id, selectedSlot.date]);
+
+  const filteredCandidates = useMemo(() => {
+    if (!searchQuery.trim()) return candidateClients;
+    const q = searchQuery.toLowerCase().trim();
+    return candidateClients.filter(c => 
+      `${c.nombre} ${c.apellido}`.toLowerCase().includes(q) ||
+      `${c.apellido} ${c.nombre}`.toLowerCase().includes(q)
+    );
+  }, [candidateClients, searchQuery]);
+
+  const selectedCandidateObj = useMemo(() => {
+    return clientes.find(c => c.id === realtimeCandidateClient);
+  }, [clientes, realtimeCandidateClient]);
 
   const handleAddRealtimeVariable = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +107,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         telefono: '11-0000-0000',
         tipo: 'FIJO',
         plan_id: 'p-none',
-        exencion_cobro: 'NINGUNA'
+        exencion_cobro: 'NINGUNA',
+        allowDuplicate: true
       });
 
       if (newGuestResult.success && (newGuestResult as any).id) {
@@ -111,6 +129,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
       setRealtimeSuccess(res.message);
       setRealtimeCandidateClient('');
       setGuestName('');
+      setSearchQuery('');
+      setIsDropdownOpen(false);
       setTimeout(() => setRealtimeSuccess(null), 3000);
     } else {
       setRealtimeError(res.message);
@@ -354,23 +374,91 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
           <form onSubmit={handleAddRealtimeVariable} className="border-t border-zinc-100 pt-4 space-y-3">
             <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Agendar Alumno Variable o Invitado</label>
             
-            <div className="space-y-1">
-              <span className="text-[9px] text-zinc-400 font-sans block">Socio Registrado:</span>
-              <select
-                value={realtimeCandidateClient}
-                onChange={(e) => {
-                  setRealtimeCandidateClient(e.target.value);
-                  if (e.target.value) setGuestName('');
-                }}
-                className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
-              >
-                <option value="">-- Selecciona socio --</option>
-                {candidateClients.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.apellido}, {c.nombre}
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-1 relative">
+              <span className="text-[9px] text-zinc-400 font-sans block">Socio Registrado (Escribí para buscar):</span>
+              
+              {selectedCandidateObj ? (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-emerald-900">
+                      {selectedCandidateObj.apellido}, {selectedCandidateObj.nombre}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRealtimeCandidateClient('');
+                      setSearchQuery('');
+                    }}
+                    className="text-emerald-700 hover:text-emerald-900 text-xs font-bold px-2 py-0.5 rounded hover:bg-emerald-100 border-none cursor-pointer"
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="relative flex items-center">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Escribí nombre o apellido para buscar..."
+                      value={searchQuery}
+                      onFocus={() => setIsDropdownOpen(true)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setIsDropdownOpen(true);
+                        setGuestName('');
+                      }}
+                      className="w-full pl-8 pr-8 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden font-medium focus:border-slate-800 transition-colors"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 text-zinc-400 hover:text-zinc-600 text-xs font-bold border-none bg-transparent cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {isDropdownOpen && (
+                    <>
+                      {/* Overlay to close on outside click */}
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setIsDropdownOpen(false)}
+                      />
+                      
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto font-sans">
+                        {filteredCandidates.length > 0 ? (
+                          filteredCandidates.map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setRealtimeCandidateClient(c.id);
+                                setGuestName('');
+                                setIsDropdownOpen(false);
+                                setSearchQuery('');
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-900 border-b border-zinc-50 last:border-none cursor-pointer transition-colors flex items-center justify-between"
+                            >
+                              <span className="font-semibold">{c.apellido}, {c.nombre}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 font-mono">{c.tipo}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-3 text-xs text-zinc-400 text-center font-sans">
+                            No se encontraron socios que coincidan con &quot;{searchQuery}&quot;
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 text-zinc-300 text-[8px] font-bold uppercase tracking-wider justify-center my-1 select-none">
