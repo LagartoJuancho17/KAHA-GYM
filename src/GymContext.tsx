@@ -343,6 +343,30 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .limit(100);
       if (logsErr) throw logsErr;
 
+      // Migración: el turno de 11:00 de Lunes/Miércoles/Viernes ya no existe.
+      // generarTurnosIniciales dejó de crearlo, pero pueden quedar filas viejas
+      // en la tabla `turnos` de Supabase (por eso seguía apareciendo en la grilla
+      // y no se podía quitar). Las filtramos al cargar y las limpiamos de la base.
+      const TURNOS_OBSOLETOS = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00'];
+      const localIdDeTurno = (t: any) => `${t.dia}-${t.hora.substring(0, 5)}`;
+      const turnosObsoletos = dbTurnos.filter(t => TURNOS_OBSOLETOS.includes(localIdDeTurno(t)));
+      if (turnosObsoletos.length > 0) {
+        const uuidsObsoletos = turnosObsoletos.map(t => t.id);
+        // Limpieza best-effort en Supabase (hijos primero por FK). Si falla por
+        // permisos, el filtro en memoria igual los oculta de inmediato.
+        supabase.from('asignaciones_turnos').delete().in('turno_id', uuidsObsoletos).then(({ error }) => {
+          if (error) console.error('Error al limpiar asignaciones de turnos obsoletos (11 LMV):', error);
+        });
+        supabase.from('lista_espera_turnos').delete().in('turno_id', uuidsObsoletos).then(({ error }) => {
+          if (error) console.error('Error al limpiar lista de espera de turnos obsoletos (11 LMV):', error);
+        });
+        supabase.from('turnos').delete().in('id', uuidsObsoletos).then(({ error }) => {
+          if (error) console.error('Error al eliminar turnos obsoletos (11 LMV) en Supabase:', error);
+        });
+        // Filtrado en memoria: no aparecen aunque la limpieza en la base falle.
+        dbTurnos = dbTurnos.filter(t => !TURNOS_OBSOLETOS.includes(localIdDeTurno(t)));
+      }
+
       // Mapping helpers
       const getTurnoIdFromUuid = (uuid: string): string => {
         const matched = dbTurnos.find(t => t.id === uuid);
