@@ -534,8 +534,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('gym_historial_precios', JSON.stringify(INITIAL_HISTORIAL_PRECIOS));
       }
 
-      if (localTurnos) setTurnos(JSON.parse(localTurnos));
-      else {
+      if (localTurnos) {
+        let parsedTurnos: Turno[] = JSON.parse(localTurnos);
+        // Migración: eliminar turno 11:00 de Lunes, Miércoles y Viernes
+        const turnosA_Eliminar = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00'];
+        const turnosFiltrados = parsedTurnos.filter(t => !turnosA_Eliminar.includes(t.id));
+        if (turnosFiltrados.length !== parsedTurnos.length) {
+          localStorage.setItem('gym_turnos', JSON.stringify(turnosFiltrados));
+          parsedTurnos = turnosFiltrados;
+        }
+        setTurnos(parsedTurnos);
+      } else {
         const baseTurnos = generarTurnosIniciales();
         INITIAL_CLIENTES.forEach(c => {
           if (c.activo && c.tipo === 'FIJO' && c.turnos_fijos) {
