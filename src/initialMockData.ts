@@ -36,7 +36,7 @@ export const INITIAL_HISTORIAL_PRECIOS: HistorialPrecioPlan[] = [
 const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const;
 
 // Horarios de Lunes a Viernes: 
-// 7:30 (cupo 7), 8:30 (7), 9:30 (7), 10:30 (5), 11:00 (3), 12:00 (7),
+// 7:30 (cupo 7), 8:30 (7), 9:30 (7), 10:30 (5 ó 7), 11:00 (3 solo Ma+Ju), 11:30 (5), 12:00 (7),
 // 16:00 (7), 17:00 (7), 18:00 (7), 19:00 (7), 20:00 (7), 21:00 (8)
 // Adicionalmente solo Martes + Jueves + Viernes: 15:00 (cupo 7)
 export function generarTurnosIniciales(): Turno[] {
@@ -50,7 +50,7 @@ export function generarTurnosIniciales(): Turno[] {
       { hora: '08:30', cupo: 7 },
       { hora: '09:30', cupo: 7 },
       { hora: '10:30', cupo: esDiasLMW ? 7 : 5 },
-      { hora: '11:00', cupo: 3 },
+      ...(!esDiasLMW ? [{ hora: '11:00', cupo: 3 }] : []),
       { hora: '11:30', cupo: 5 },
       { hora: '12:00', cupo: esDiasLMW ? 3 : 7 },
       { hora: '16:00', cupo: 7 },
