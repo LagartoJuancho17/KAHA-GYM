@@ -1892,8 +1892,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const turno = turnos.find(t => t.id === turnoId);
     if (!turno) return { success: false, message: 'Turno no encontrado.' };
 
-    // Check capacity: fijos + other individual bookings on this same date for this turn
-    const fijosCount = turno.asignados_ids.length;
+    // Check capacity: fijos ACTIVOS (excluyendo los que suspendieron su clase ese
+    // día, que liberan lugar) + reservas individuales de esa fecha. Debe coincidir
+    // con getOccupiedCountOnDate del panel del socio; si no, la grilla muestra un
+    // cupo libre pero la reserva se rechaza por "turno completo" (falla silenciosa).
+    const fijosCount = turno.asignados_ids.filter(fid => {
+      const fijoCliente = clientes.find(c => c.id === fid);
+      return !((fijoCliente?.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha));
+    }).length;
     // Count individual bookings on this date for this turn
     const individualCount = clientes.reduce((acc, c) => {
       const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha);
@@ -1918,7 +1924,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const nuevaReserva: ReservaIndividual = {
-      id: `res-${Date.now()}`,
+      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       turno_id: turnoId,
       fecha,
       creado_at: new Date().toISOString()
@@ -2022,7 +2028,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Auto-promote candidate
     const nuevaReservaAuto: ReservaIndividual = {
-      id: `res-auto-${Date.now()}`,
+      id: `res-auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       turno_id: turnoId,
       fecha,
       creado_at: new Date().toISOString()

@@ -410,7 +410,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
               {socio.turnos_fijos.length > 0 ? (
                 <span>{socio.turnos_fijos.length} días fijos semanales <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded">({socio.turnos_fijos.length * 4}/{totalMonthlySlots} cupos)</span></span>
               ) : (
-                <span className="text-slate-400 italic text-xs font-medium">No posees horarios fijos semanales (Flex)</span>
+                <span className="text-slate-400 italic text-xs font-medium">No tenés horarios fijos semanales asignados</span>
               )}
             </p>
           </div>
