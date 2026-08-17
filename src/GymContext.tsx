@@ -86,6 +86,7 @@ interface GymContextType {
 
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
+  actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO') => void;
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
 
   // Transferencias en Revision
@@ -2612,6 +2613,15 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
   };
 
+  // ACTUALIZAR DESTINO (JUANCHI / RULO) DE UN PAGO EXISTENTE
+  const actualizarDestinoPago = (pagoId: string, destino: 'JUANCHI' | 'RULO') => {
+    const updatedPagos = pagos.map(p =>
+      p.id === pagoId ? { ...p, destino_transferencia: destino } : p
+    );
+    setPagos(updatedPagos);
+    localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
+  };
+
   // IMPORTACIÓN CSV EXTRACTO
   const importarPagosCSV = (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => {
     let procesados = 0;
@@ -3365,7 +3375,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
-      registrarPago, importarPagosCSV,
+      registrarPago, actualizarDestinoPago, importarPagosCSV,
       pagosEnRevision,
       solicitarPagoTransferencia,
       aprobarPagoTransferencia,

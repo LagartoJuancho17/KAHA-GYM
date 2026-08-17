@@ -58,7 +58,8 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   const { 
     pagos, clientes, planes, 
     gastos, registrarGasto, eliminarGasto,
-    profesores, turnos, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor
+    profesores, turnos, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
+    actualizarDestinoPago
   } = useGym();
 
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('INGRESOS');
@@ -327,6 +328,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             onOpenReceipt={handleOpenReceipt}
             onAddPagoClick={() => setShowAddPagoModal(true)}
             onConciliarCSVClick={() => setShowImportStatementModal(true)}
+            onActualizarDestino={actualizarDestinoPago}
           />
         </div>
       )}

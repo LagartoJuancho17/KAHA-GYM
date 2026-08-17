@@ -31,6 +31,7 @@ interface PagosTableProps {
   onOpenReceipt: (pago: Pago) => void;
   onAddPagoClick: () => void;
   onConciliarCSVClick: () => void;
+  onActualizarDestino: (pagoId: string, destino: 'JUANCHI' | 'RULO') => void;
 }
 
 export const PagosTable: React.FC<PagosTableProps> = ({
@@ -45,12 +46,13 @@ export const PagosTable: React.FC<PagosTableProps> = ({
   planes,
   onOpenReceipt,
   onAddPagoClick,
-  onConciliarCSVClick
+  onConciliarCSVClick,
+  onActualizarDestino
 }) => {
-  // Cálculo de Cajas: Caja Rulo, Caja Final (Suma total) y Caja Juanchi (Restante/Juanchi)
+  // Cálculo de Cajas: por destino_transferencia (aplica a todos los medios de pago)
   const cajaRulo = useMemo(() => {
     return pagosFiltrados
-      .filter(p => p.medio_pago === 'TRANSFERENCIA' && p.destino_transferencia === 'RULO')
+      .filter(p => p.destino_transferencia === 'RULO')
       .reduce((sum, p) => sum + p.monto, 0);
   }, [pagosFiltrados]);
 
@@ -59,8 +61,10 @@ export const PagosTable: React.FC<PagosTableProps> = ({
   }, [pagosFiltrados]);
 
   const cajaJuanchi = useMemo(() => {
-    return Math.max(0, cajaFinal - cajaRulo);
-  }, [cajaFinal, cajaRulo]);
+    return pagosFiltrados
+      .filter(p => !p.destino_transferencia || p.destino_transferencia === 'JUANCHI')
+      .reduce((sum, p) => sum + p.monto, 0);
+  }, [pagosFiltrados]);
 
   return (
     <div className="space-y-4">
@@ -152,15 +156,30 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                         {planSocio && <div className="text-[10px] text-zinc-400">{planSocio.nombre}</div>}
                       </td>
                       <td className="p-4">
-                        <div className="flex flex-col gap-1 items-start">
+                        <div className="flex flex-col gap-1.5 items-start">
                           <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[10px] uppercase font-bold text-zinc-700">
                             {p.medio_pago}
                           </span>
-                          {p.medio_pago === 'TRANSFERENCIA' && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide bg-violet-100 text-violet-800 border border-violet-200 font-mono">
-                              A: {p.destino_transferencia || 'JUANCHI'}
-                            </span>
-                          )}
+                          {/* Selector inline Juanchi / Rulo */}
+                          <div className="flex gap-1">
+                            {(['JUANCHI', 'RULO'] as const).map(dest => (
+                              <button
+                                key={dest}
+                                type="button"
+                                onClick={() => onActualizarDestino(p.id, dest)}
+                                className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide border transition-all cursor-pointer ${
+                                  (p.destino_transferencia || 'JUANCHI') === dest
+                                    ? dest === 'JUANCHI'
+                                      ? 'bg-violet-600 text-white border-violet-600'
+                                      : 'bg-amber-500 text-white border-amber-500'
+                                    : 'bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50'
+                                }`}
+                                title={`Asignar a ${dest}`}
+                              >
+                                {dest === 'JUANCHI' ? '🟣 J' : '🟡 R'}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </td>
                       <td className="p-4 font-mono font-bold text-zinc-600">{p.mes_correspondiente}</td>
