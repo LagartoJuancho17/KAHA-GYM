@@ -240,11 +240,8 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => onSelectCliente(c)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
                   >
-                    <div className="w-11 h-11 rounded-full bg-zinc-900 flex items-center justify-center text-white font-bold uppercase text-xs shrink-0">
-                      {c.nombre[0]}{c.apellido[0]}
-                    </div>
                     <div className="min-w-0">
                       <div className="font-bold text-zinc-950 text-sm leading-tight truncate">
                         {c.apellido}, {c.nombre}
@@ -257,13 +254,12 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                   <SocioActionsMenu {...menuProps(c)} />
                 </div>
 
-                {/* Celular + WhatsApp */}
-                <div className="mt-3 flex items-center justify-between gap-2 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2">
-                  <span className="text-zinc-700 font-semibold text-xs truncate">
-                    {c.telefono || 'Sin celular'}
-                  </span>
-                  {c.telefono && <WhatsAppIcon phone={c.telefono} />}
-                </div>
+                {/* WhatsApp */}
+                {c.telefono && (
+                  <div className="mt-3 flex items-center justify-end">
+                    <WhatsAppIcon phone={c.telefono} />
+                  </div>
+                )}
 
                 {/* Grid de datos clave */}
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
