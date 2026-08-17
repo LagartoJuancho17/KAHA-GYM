@@ -251,15 +251,13 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                       </span>
                     </div>
                   </button>
-                  <SocioActionsMenu {...menuProps(c)} />
+                  {/* WhatsApp + menú */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {c.telefono && <WhatsAppIcon phone={c.telefono} />}
+                    <SocioActionsMenu {...menuProps(c)} />
+                  </div>
                 </div>
 
-                {/* WhatsApp */}
-                {c.telefono && (
-                  <div className="mt-3 flex items-center justify-end">
-                    <WhatsAppIcon phone={c.telefono} />
-                  </div>
-                )}
 
                 {/* Grid de datos clave */}
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
