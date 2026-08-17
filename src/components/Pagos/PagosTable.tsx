@@ -1,7 +1,6 @@
-// src/components/Pagos/PagosTable.tsx
 import React, { useMemo } from 'react';
 import { Pago, Cliente, Plan } from '../../types';
-import { Search, Plus, Upload, DollarSign } from 'lucide-react';
+import { Search, Plus, Upload, DollarSign, Trash2 } from 'lucide-react';
 
 // Genera los últimos N meses dinámicamente
 function generarUltimosMeses(n = 12) {
@@ -32,6 +31,7 @@ interface PagosTableProps {
   onAddPagoClick: () => void;
   onConciliarCSVClick: () => void;
   onActualizarDestino: (pagoId: string, destino: 'JUANCHI' | 'RULO') => void;
+  onEliminarPago: (pago: Pago) => void;
 }
 
 export const PagosTable: React.FC<PagosTableProps> = ({
@@ -47,7 +47,8 @@ export const PagosTable: React.FC<PagosTableProps> = ({
   onOpenReceipt,
   onAddPagoClick,
   onConciliarCSVClick,
-  onActualizarDestino
+  onActualizarDestino,
+  onEliminarPago
 }) => {
   // Cálculo de Cajas: por destino_transferencia (aplica a todos los medios de pago)
   const cajaRulo = useMemo(() => {
@@ -134,16 +135,17 @@ export const PagosTable: React.FC<PagosTableProps> = ({
               <tr className="bg-zinc-50 text-zinc-500 font-semibold border-b border-zinc-200 uppercase tracking-wider text-[10px]">
                 <th className="p-4">Socio</th>
                 <th className="p-4">Abono</th>
-                <th className="p-4">Medio</th>
+                <th className="p-4">Medio / Destino</th>
                 <th className="p-4">Mes Cubierto</th>
                 <th className="p-4">Ref. / ID</th>
                 <th className="p-4">Registrado por</th>
                 <th className="p-4 text-center">Recibo</th>
+                <th className="p-4 text-center">Borrar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 text-zinc-700 font-medium">
               {pagosFiltrados.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-zinc-400 italic">Sin registros de cobros coincidentes este mes.</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-zinc-400 italic">Sin registros de cobros coincidentes este mes.</td></tr>
               ) : (
                 pagosFiltrados.map(p => {
                   const cl = clientes.find(c => c.id === p.cliente_id);
@@ -160,26 +162,19 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                           <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[10px] uppercase font-bold text-zinc-700">
                             {p.medio_pago}
                           </span>
-                          {/* Selector inline Juanchi / Rulo */}
-                          <div className="flex gap-1">
-                            {(['JUANCHI', 'RULO'] as const).map(dest => (
-                              <button
-                                key={dest}
-                                type="button"
-                                onClick={() => onActualizarDestino(p.id, dest)}
-                                className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide border transition-all cursor-pointer ${
-                                  (p.destino_transferencia || 'JUANCHI') === dest
-                                    ? dest === 'JUANCHI'
-                                      ? 'bg-violet-600 text-white border-violet-600'
-                                      : 'bg-amber-500 text-white border-amber-500'
-                                    : 'bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50'
-                                }`}
-                                title={`Asignar a ${dest}`}
-                              >
-                                {dest === 'JUANCHI' ? '🟣 J' : '🟡 R'}
-                              </button>
-                            ))}
-                          </div>
+                          {/* Select Juanchi / Rulo */}
+                          <select
+                            value={p.destino_transferencia || 'JUANCHI'}
+                            onChange={e => onActualizarDestino(p.id, e.target.value as 'JUANCHI' | 'RULO')}
+                            className={`text-[9px] font-extrabold uppercase tracking-wide border rounded px-1.5 py-0.5 cursor-pointer outline-none transition-colors ${
+                              (p.destino_transferencia || 'JUANCHI') === 'JUANCHI'
+                                ? 'bg-violet-100 text-violet-800 border-violet-300'
+                                : 'bg-amber-100 text-amber-800 border-amber-300'
+                            }`}
+                          >
+                            <option value="JUANCHI">🟣 Juanchi</option>
+                            <option value="RULO">🟡 Rulo</option>
+                          </select>
                         </div>
                       </td>
                       <td className="p-4 font-mono font-bold text-zinc-600">{p.mes_correspondiente}</td>
@@ -192,6 +187,15 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                         <button onClick={() => onOpenReceipt(p)} className="px-2.5 py-1 text-[10.5px] border border-emerald-200 rounded bg-emerald-50 text-emerald-800 flex items-center gap-1.5 hover:bg-emerald-100 font-bold justify-center mx-auto cursor-pointer transition-colors border-none">
                           <svg className="w-3.5 h-3.5 fill-current text-emerald-600" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.66.986 3.284 1.48 4.909 1.481 5.482 0 9.94-4.461 9.943-9.94.002-2.654-1.029-5.15-2.901-7.025C16.726 1.795 14.237.772 11.583.772c-5.485 0-9.94 4.46-9.943 9.94-.001 1.904.5 3.76 1.45 5.421L2.09 21.65l5.557-1.496zm12.355-6.883c-.302-.15-1.787-.882-2.062-.982-.275-.1-.475-.15-.674.15-.2.3-.775.982-.95 1.182-.175.2-.35.225-.65.075-.3-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.784-1.275-2.083.175-.3.275-.475.375-.674.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.925-2.225-.244-.589-.493-.51-.674-.519-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5 0 1.475 1.075 2.9 1.225 3.1.15.2 2.11 3.22 5.11 4.52.714.31 1.272.496 1.706.634.717.228 1.37.195 1.887.118.575-.085 1.788-.73 2.038-1.43.25-.7.25-1.3.175-1.43-.075-.125-.275-.2-.575-.35z"/></svg>
                           Ver Recibo WA
+                        </button>
+                      </td>
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={() => onEliminarPago(p)}
+                          className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 border border-red-200 transition-colors cursor-pointer mx-auto flex"
+                          title="Eliminar pago"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>

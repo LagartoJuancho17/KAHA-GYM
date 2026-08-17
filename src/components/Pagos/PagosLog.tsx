@@ -11,6 +11,7 @@ import { PagoFormModal } from './PagoFormModal';
 import { PagoCSVImportModal } from './PagoCSVImportModal';
 import { PagoReceiptModal } from './PagoReceiptModal';
 import { PagosTable } from './PagosTable';
+import { PagoDeleteModal } from './PagoDeleteModal';
 
 interface PagosLogProps {
   showAddPagoModal: boolean;
@@ -59,7 +60,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     pagos, clientes, planes, 
     gastos, registrarGasto, eliminarGasto,
     profesores, turnos, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
-    actualizarDestinoPago
+    actualizarDestinoPago, eliminarPago
   } = useGym();
 
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('INGRESOS');
@@ -73,6 +74,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   const [receiptClientText, setReceiptClientText] = useState<string | null>(null);
   const [recibosMultiples, setRecibosMultiples] = useState<Array<{ cliente_nombre: string, messageText: string, telefono: string, copiado: boolean }>>([]);
   const [showRecibosModal, setShowRecibosModal] = useState(false);
+  const [pagoParaEliminar, setPagoParaEliminar] = useState<import('../../types').Pago | null>(null);
 
   // ─── EGRESOS STATE ───────────────────────────────────────────────
   const [filtroMesGastos, setFiltroMesGastos] = useState<string>(new Date().toISOString().slice(0, 7));
@@ -329,6 +331,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             onAddPagoClick={() => setShowAddPagoModal(true)}
             onConciliarCSVClick={() => setShowImportStatementModal(true)}
             onActualizarDestino={actualizarDestinoPago}
+            onEliminarPago={(p) => setPagoParaEliminar(p)}
           />
         </div>
       )}
@@ -751,6 +754,19 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
           }}
         />
       )}
+
+      {/* PAGO DELETE MODAL */}
+      <PagoDeleteModal
+        isOpen={!!pagoParaEliminar}
+        onClose={() => setPagoParaEliminar(null)}
+        pago={pagoParaEliminar}
+        clienteNombre={(() => {
+          if (!pagoParaEliminar) return '';
+          const cl = clientes.find(c => c.id === pagoParaEliminar.cliente_id);
+          return cl ? `${cl.apellido}, ${cl.nombre}` : pagoParaEliminar.cliente_nombre_completo;
+        })()}
+        onConfirmDelete={(id) => { eliminarPago(id); setPagoParaEliminar(null); }}
+      />
     </div>
   );
 };

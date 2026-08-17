@@ -87,6 +87,7 @@ interface GymContextType {
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
   actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO') => void;
+  eliminarPago: (pagoId: string) => void;
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
 
   // Transferencias en Revision
@@ -2622,6 +2623,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
   };
 
+  // ELIMINAR UN PAGO REGISTRADO
+  const eliminarPago = (pagoId: string) => {
+    const updatedPagos = pagos.filter(p => p.id !== pagoId);
+    setPagos(updatedPagos);
+    localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
+    addToast('delete', 'Pago eliminado.');
+  };
+
   // IMPORTACIÓN CSV EXTRACTO
   const importarPagosCSV = (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => {
     let procesados = 0;
@@ -3375,7 +3384,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
-      registrarPago, actualizarDestinoPago, importarPagosCSV,
+      registrarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
       pagosEnRevision,
       solicitarPagoTransferencia,
       aprobarPagoTransferencia,
