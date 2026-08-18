@@ -211,9 +211,9 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
       if (item.presente) {
         const res = suspenderClaseFija(item.clienteId, selectedSlot.id, selectedSlot.date);
         if (res.success) {
-          // Aviso por email: baja de esta clase puntual (fecha del día seleccionado)
+          // Aviso al socio: baja de esta clase puntual (WhatsApp o email), con la fecha del día
           const avisado = notificarBajaClase(item.clienteId, selectedSlot.id, selectedSlot.date);
-          setRealtimeSuccess(avisado ? `${res.message} Se le avisó al socio por email.` : res.message);
+          setRealtimeSuccess(avisado ? `${res.message} Se le avisó al socio de la baja.` : res.message);
           setTimeout(() => setRealtimeSuccess(null), 3000);
         } else {
           setRealtimeError(res.message);
@@ -235,9 +235,9 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         if (resObj) {
           const res = cancelarReservaIndividual(item.clienteId, resObj.id);
           if (res.success) {
-            // Aviso por email: baja de la reserva de esta clase puntual
+            // Aviso al socio: baja de la reserva de esta clase puntual (WhatsApp o email)
             const avisado = notificarBajaClase(item.clienteId, selectedSlot.id, selectedSlot.date);
-            setRealtimeSuccess(avisado ? `${res.message} Se le avisó al socio por email.` : res.message);
+            setRealtimeSuccess(avisado ? `${res.message} Se le avisó al socio de la baja.` : res.message);
             setTimeout(() => setRealtimeSuccess(null), 3000);
           } else {
             setRealtimeError(res.message);

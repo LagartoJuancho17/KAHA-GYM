@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeArgPhone, isSendablePhone } from './services/notify/phone.js';
 
 // Load environment variables from .env
 dotenv.config();
@@ -204,39 +205,80 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// Aviso por email al socio cuando lo dan de baja de una clase (vía Resend).
-// La API key vive SOLO en env (RESEND_API_KEY); nunca en el frontend ni en el repo.
-// El remitente se controla con RESEND_FROM (ej: "KAHA GYM <no-reply@kaha.com.ar>").
+// Aviso al socio cuando lo dan de baja de una clase.
+// Canal 1 (preferido): WhatsApp Business API oficial (plantilla "utility" de Meta).
+// Canal 2 (respaldo):  email vía Resend, si no hay WhatsApp o el número no sirve.
+// Todas las credenciales viven SOLO en env; nunca en el frontend ni en el repo.
+//   WhatsApp: WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID,
+//             WHATSAPP_TEMPLATE_BAJA (def "baja_clase"), WHATSAPP_TEMPLATE_LANG (def "es_AR"),
+//             WHATSAPP_API_VERSION (def "v21.0")
+//   Email:    RESEND_API_KEY, RESEND_FROM
 // -----------------------------------------------------------------------------
-app.post('/api/notify-baja', async (req, res) => {
-  try {
-    const { email, nombre = '', apellido = '', dia = '', hora = '', fecha = '', motivo = '' } = req.body || {};
 
-    // Los invitados usan emails ficticios (invitado-*@kaha.com): a esos no se envía.
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    const esInvitado = cleanEmail.startsWith('invitado-') && cleanEmail.endsWith('@kaha.com');
-    const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail);
-    if (!emailValido || esInvitado) {
-      return res.status(200).json({ sent: false, reason: 'sin_email_valido' });
-    }
+// Texto seguro para parámetros de plantilla de WhatsApp (sin saltos ni espacios largos).
+function paramSafe(s) {
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+}
 
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      console.warn('>> [notify-baja] RESEND_API_KEY no configurada; no se envía email.');
-      return res.status(200).json({ sent: false, reason: 'sin_api_key' });
-    }
+// Envía la plantilla de baja por WhatsApp Cloud API. Devuelve { ok, id } o { ok:false, detail }.
+async function enviarWhatsappBaja({ telefono, nombreSocio, claseTxt }) {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) return { ok: false, reason: 'sin_whatsapp_config' };
 
-    const from = process.env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>';
-    const nombreSocio = String(nombre || '').trim() || 'Hola';
-    const horaFmt = hora ? String(hora).slice(0, 5) : '';
-    // Si viene fecha (baja de una clase puntual desde la turnera), la mostramos DD/MM.
-    // Si no, es la baja del horario fijo semanal (solo día + hora).
-    const fechaMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha || '').trim());
-    const fechaFmt = fechaMatch ? `${fechaMatch[3]}/${fechaMatch[2]}` : '';
-    const claseTxt = [dia, fechaFmt, horaFmt ? `${horaFmt} hs` : ''].filter(Boolean).join(' ') || 'tu clase';
-    const motivoLinea = motivo ? `<p style="margin:0 0 16px;color:#3f3f46;font-size:14px;">Motivo: ${motivo}</p>` : '';
+  const to = normalizeArgPhone(telefono);
+  if (!isSendablePhone(to)) return { ok: false, reason: 'telefono_invalido' };
 
-    const html = `<!doctype html><html><body style="margin:0;background:#f4f4f2;font-family:Inter,Arial,sans-serif;">
+  const templateName = process.env.WHATSAPP_TEMPLATE_BAJA || 'baja_clase';
+  const lang = process.env.WHATSAPP_TEMPLATE_LANG || 'es_AR';
+  const version = process.env.WHATSAPP_API_VERSION || 'v21.0';
+
+  const resp = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: lang },
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: paramSafe(nombreSocio) },
+              { type: 'text', text: paramSafe(claseTxt) }
+            ]
+          }
+        ]
+      }
+    })
+  });
+
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    console.error('>> [notify-baja] Error de WhatsApp:', JSON.stringify(data));
+    return { ok: false, reason: 'whatsapp_error', detail: data };
+  }
+  const id = data && data.messages && data.messages[0] && data.messages[0].id;
+  return { ok: true, id };
+}
+
+// Envía el aviso por email vía Resend. Devuelve { ok, id } o { ok:false, detail }.
+async function enviarEmailBaja({ email, nombreSocio, claseTxt, motivo }) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const esInvitado = cleanEmail.startsWith('invitado-') && cleanEmail.endsWith('@kaha.com');
+  const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail);
+  if (!emailValido || esInvitado) return { ok: false, reason: 'sin_email_valido' };
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, reason: 'sin_api_key' };
+
+  const from = process.env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>';
+  const motivoLinea = motivo ? `<p style="margin:0 0 16px;color:#3f3f46;font-size:14px;">Motivo: ${motivo}</p>` : '';
+
+  const html = `<!doctype html><html><body style="margin:0;background:#f4f4f2;font-family:Inter,Arial,sans-serif;">
       <div style="max-width:520px;margin:0 auto;padding:24px;">
         <div style="background:#18181b;border-radius:20px;padding:24px 24px 20px;">
           <div style="color:#c8f63e;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-family:monospace;">KAHA GYM</div>
@@ -254,23 +296,45 @@ app.post('/api/notify-baja', async (req, res) => {
       </div>
     </body></html>`;
 
-    const resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from,
-        to: [cleanEmail],
-        subject: `Baja de ${claseTxt} — KAHA GYM`,
-        html
-      })
-    });
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [cleanEmail], subject: `Baja de ${claseTxt} — KAHA GYM`, html })
+  });
 
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      console.error('>> [notify-baja] Error de Resend:', data);
-      return res.status(502).json({ sent: false, reason: 'resend_error', detail: data });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    console.error('>> [notify-baja] Error de Resend:', data);
+    return { ok: false, reason: 'resend_error', detail: data };
+  }
+  return { ok: true, id: data.id };
+}
+
+app.post('/api/notify-baja', async (req, res) => {
+  try {
+    const { email, telefono = '', nombre = '', dia = '', hora = '', fecha = '', motivo = '' } = req.body || {};
+
+    const nombreSocio = String(nombre || '').trim() || 'Hola';
+    const horaFmt = hora ? String(hora).slice(0, 5) : '';
+    // Si viene fecha (baja de una clase puntual desde la turnera), la mostramos DD/MM.
+    // Si no, es la baja del horario fijo semanal (solo día + hora).
+    const fechaMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha || '').trim());
+    const fechaFmt = fechaMatch ? `${fechaMatch[3]}/${fechaMatch[2]}` : '';
+    const claseTxt = [dia, fechaFmt, horaFmt ? `${horaFmt} hs` : ''].filter(Boolean).join(' ') || 'tu clase';
+
+    // 1) WhatsApp primero (si está configurado y el número sirve).
+    const wpp = await enviarWhatsappBaja({ telefono, nombreSocio, claseTxt });
+    if (wpp.ok) {
+      return res.status(200).json({ sent: true, channel: 'whatsapp', id: wpp.id });
     }
-    return res.status(200).json({ sent: true, id: data.id });
+
+    // 2) Email de respaldo.
+    const mail = await enviarEmailBaja({ email, nombreSocio, claseTxt, motivo });
+    if (mail.ok) {
+      return res.status(200).json({ sent: true, channel: 'email', id: mail.id, whatsapp_skip: wpp.reason });
+    }
+
+    return res.status(200).json({ sent: false, reason: mail.reason, whatsapp_skip: wpp.reason });
   } catch (err) {
     console.error('>> [notify-baja] Error:', err);
     return res.status(500).json({ sent: false, reason: 'server_error', detail: err.message });

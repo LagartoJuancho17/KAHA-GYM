@@ -1598,13 +1598,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const email = (socio.email || '').trim().toLowerCase();
     const esInvitado = email.startsWith('invitado-') && email.endsWith('@kaha.com');
     const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && !esInvitado;
-    if (!emailValido) return false;
+    // Teléfono con al menos 8 dígitos = candidato a WhatsApp (el server normaliza y valida).
+    const tieneTelefono = (socio.telefono || '').replace(/\D/g, '').length >= 8;
+    // Si no hay ni email válido ni teléfono, no hay a dónde avisar.
+    if (!emailValido && !tieneTelefono) return false;
     const turno = turnos.find(t => t.id === turnoId);
     fetch('/api/notify-baja', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: socio.email,
+        telefono: socio.telefono || '',
         nombre: socio.nombre,
         apellido: socio.apellido,
         dia: turno?.dia || turnoId.split('-')[0] || '',
@@ -1684,11 +1688,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       promocion_automatica: waitlistClientLiberado ? `Se promovió automáticamente de lista de espera a ${waitlistClientNombre}` : 'Ninguno'
     });
 
-    // Aviso automático por email al socio dado de baja de este horario fijo.
+    // Aviso automático al socio dado de baja de este horario fijo (WhatsApp o email).
     const avisado = notificarBajaClase(clienteId, turnoId);
 
     addToast('delete', avisado
-      ? 'Asignación removida. Se le envió un aviso por email al socio.'
+      ? 'Asignación removida. Se le avisó al socio de la baja.'
       : 'Asignación de turno removida.');
   };
 
