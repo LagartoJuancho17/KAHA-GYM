@@ -171,6 +171,13 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     // Filtrar solo clientes activos
     result = result.filter(c => c.activo);
 
+    // Excluir invitados de la lista
+    result = result.filter(c => {
+      const email = (c.email || '').trim().toLowerCase();
+      const esInvitado = email.startsWith('invitado-') && email.endsWith('@kaha.com');
+      return !esInvitado;
+    });
+
     return result;
   }, [clientes, buscar, filtroEstado, selectedProfesores, matchModoProfe, turnos]);
 
