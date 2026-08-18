@@ -66,9 +66,6 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
         {/* Header */}
         <div className="bg-zinc-900 text-white p-6 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-lime-400 font-bold uppercase text-lg">
-              {selectedCliente.nombre[0]}{selectedCliente.apellido[0]}
-            </div>
             <div>
               <h3 className="text-xl font-bold tracking-tight">{selectedCliente.nombre} {selectedCliente.apellido}</h3>
               <p className="text-zinc-400 text-xs">Socio registrado el {new Date(selectedCliente.creado_at).toLocaleDateString('es-AR')}</p>
@@ -98,7 +95,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
         </div>
 
         {/* Content body */}
-        <div className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 space-y-6 overflow-x-auto flex-1">
           
           {/* Información Personal */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">

@@ -86,6 +86,8 @@ interface GymContextType {
 
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
+  actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO') => void;
+  eliminarPago: (pagoId: string) => void;
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
 
   // Transferencias en Revision
@@ -343,6 +345,30 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .limit(100);
       if (logsErr) throw logsErr;
 
+      // Migración: el turno de 11:00 de Lunes/Miércoles/Viernes ya no existe.
+      // generarTurnosIniciales dejó de crearlo, pero pueden quedar filas viejas
+      // en la tabla `turnos` de Supabase (por eso seguía apareciendo en la grilla
+      // y no se podía quitar). Las filtramos al cargar y las limpiamos de la base.
+      const TURNOS_OBSOLETOS = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00'];
+      const localIdDeTurno = (t: any) => `${t.dia}-${t.hora.substring(0, 5)}`;
+      const turnosObsoletos = dbTurnos.filter(t => TURNOS_OBSOLETOS.includes(localIdDeTurno(t)));
+      if (turnosObsoletos.length > 0) {
+        const uuidsObsoletos = turnosObsoletos.map(t => t.id);
+        // Limpieza best-effort en Supabase (hijos primero por FK). Si falla por
+        // permisos, el filtro en memoria igual los oculta de inmediato.
+        supabase.from('asignaciones_turnos').delete().in('turno_id', uuidsObsoletos).then(({ error }) => {
+          if (error) console.error('Error al limpiar asignaciones de turnos obsoletos (11 LMV):', error);
+        });
+        supabase.from('lista_espera_turnos').delete().in('turno_id', uuidsObsoletos).then(({ error }) => {
+          if (error) console.error('Error al limpiar lista de espera de turnos obsoletos (11 LMV):', error);
+        });
+        supabase.from('turnos').delete().in('id', uuidsObsoletos).then(({ error }) => {
+          if (error) console.error('Error al eliminar turnos obsoletos (11 LMV) en Supabase:', error);
+        });
+        // Filtrado en memoria: no aparecen aunque la limpieza en la base falle.
+        dbTurnos = dbTurnos.filter(t => !TURNOS_OBSOLETOS.includes(localIdDeTurno(t)));
+      }
+
       // Mapping helpers
       const getTurnoIdFromUuid = (uuid: string): string => {
         const matched = dbTurnos.find(t => t.id === uuid);
@@ -534,8 +560,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('gym_historial_precios', JSON.stringify(INITIAL_HISTORIAL_PRECIOS));
       }
 
-      if (localTurnos) setTurnos(JSON.parse(localTurnos));
-      else {
+      if (localTurnos) {
+        let parsedTurnos: Turno[] = JSON.parse(localTurnos);
+        // Migración: eliminar turno 11:00 de Lunes, Miércoles y Viernes
+        const turnosA_Eliminar = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00'];
+        const turnosFiltrados = parsedTurnos.filter(t => !turnosA_Eliminar.includes(t.id));
+        if (turnosFiltrados.length !== parsedTurnos.length) {
+          localStorage.setItem('gym_turnos', JSON.stringify(turnosFiltrados));
+          parsedTurnos = turnosFiltrados;
+        }
+        setTurnos(parsedTurnos);
+      } else {
         const baseTurnos = generarTurnosIniciales();
         INITIAL_CLIENTES.forEach(c => {
           if (c.activo && c.tipo === 'FIJO' && c.turnos_fijos) {
@@ -1697,9 +1732,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const recTurno = turnos.find(t => t.id === data.turno_recupero_id);
       if (!recTurno) return { success: false, message: 'Turno de recupero inválido.' };
 
-      // Validar cupos en el turno de recupero
-      if (recTurno.asignados_ids.length >= recTurno.cupo_maximo) {
-        return { success: false, message: 'El turno del recupero no posee cupos disponibles.' };
+      // Validar cupos para la fecha destino con el mismo criterio que
+      // programarRecuperoPendiente: fijos ACTIVOS (sin los suspendidos ese día) +
+      // reservas individuales + otros recuperos ya agendados en esa fecha.
+      const fechaDest = data.fecha_recupero;
+      const fijosActivos = recTurno.asignados_ids.filter(fid => {
+        const fc = clientes.find(c => c.id === fid);
+        return !((fc?.clases_suspendidas || []).some(s => s.turno_id === recTurno.id && s.fecha === fechaDest));
+      }).length;
+      const individualCount = clientes.reduce((acc, c) =>
+        acc + (c.reservas_individuales || []).filter(r => r.turno_id === recTurno.id && r.fecha === fechaDest).length, 0);
+      const recuperosCount = recuperos.filter(r => r.estado === 'PENDIENTE' && r.turno_recupero_id === recTurno.id && r.fecha_recupero === fechaDest).length;
+      const totalOccupied = fijosActivos + individualCount + recuperosCount;
+
+      if (totalOccupied >= recTurno.cupo_maximo) {
+        return { success: false, message: `El turno del recupero ya está completo para esa fecha (${totalOccupied}/${recTurno.cupo_maximo}).` };
       }
     }
 
@@ -1857,15 +1904,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const turno = turnos.find(t => t.id === turnoId);
     if (!turno) return { success: false, message: 'Turno no encontrado.' };
 
-    // Check capacity: fijos + other individual bookings on this same date for this turn
-    const fijosCount = turno.asignados_ids.length;
+    // Check capacity: fijos ACTIVOS (excluyendo los que suspendieron su clase ese
+    // día, que liberan lugar) + reservas individuales de esa fecha. Debe coincidir
+    // con getOccupiedCountOnDate del panel del socio; si no, la grilla muestra un
+    // cupo libre pero la reserva se rechaza por "turno completo" (falla silenciosa).
+    const fijosCount = turno.asignados_ids.filter(fid => {
+      const fijoCliente = clientes.find(c => c.id === fid);
+      return !((fijoCliente?.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha));
+    }).length;
     // Count individual bookings on this date for this turn
     const individualCount = clientes.reduce((acc, c) => {
       const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha);
       return acc + bookingsOnDate.length;
     }, 0);
+    // Los recuperos agendados en este slot/fecha también ocupan lugar. Sin contarlos
+    // se podía reservar por encima del cupo (ej.: 8 anotados en un turno de 7 cuando
+    // había un recupero agendado que este chequeo no veía).
+    const recuperosCount = recuperos.filter(
+      r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turnoId && r.fecha_recupero === fecha
+    ).length;
 
-    const totalOccupied = fijosCount + individualCount;
+    const totalOccupied = fijosCount + individualCount + recuperosCount;
     if (totalOccupied >= turno.cupo_maximo) {
       return { success: false, message: `El turno ya está completo para esa fecha (${totalOccupied}/${turno.cupo_maximo}).` };
     }
@@ -1883,7 +1942,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const nuevaReserva: ReservaIndividual = {
-      id: `res-${Date.now()}`,
+      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       turno_id: turnoId,
       fecha,
       creado_at: new Date().toISOString()
@@ -1987,7 +2046,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Auto-promote candidate
     const nuevaReservaAuto: ReservaIndividual = {
-      id: `res-auto-${Date.now()}`,
+      id: `res-auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       turno_id: turnoId,
       fecha,
       creado_at: new Date().toISOString()
@@ -2577,6 +2636,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('add', 'Pago registrado exitosamente.');
 
     return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
+  };
+
+  // ACTUALIZAR DESTINO (JUANCHI / RULO) DE UN PAGO EXISTENTE
+  const actualizarDestinoPago = (pagoId: string, destino: 'JUANCHI' | 'RULO') => {
+    const updatedPagos = pagos.map(p =>
+      p.id === pagoId ? { ...p, destino_transferencia: destino } : p
+    );
+    setPagos(updatedPagos);
+    localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
+  };
+
+  // ELIMINAR UN PAGO REGISTRADO
+  const eliminarPago = (pagoId: string) => {
+    const updatedPagos = pagos.filter(p => p.id !== pagoId);
+    setPagos(updatedPagos);
+    localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
+    addToast('delete', 'Pago eliminado.');
   };
 
   // IMPORTACIÓN CSV EXTRACTO
@@ -3332,7 +3408,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
-      registrarPago, importarPagosCSV,
+      registrarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
       pagosEnRevision,
       solicitarPagoTransferencia,
       aprobarPagoTransferencia,

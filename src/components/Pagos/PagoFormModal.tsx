@@ -146,7 +146,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
         medio_pago: pagoForm.medio_pago,
         mes_correspondiente: b.mes_correspondiente,
         hash_transaccion: finalHash,
-        destino_transferencia: pagoForm.medio_pago === 'TRANSFERENCIA' ? pagoForm.destino_transferencia : undefined,
+        destino_transferencia: pagoForm.destino_transferencia,
         registrado_por: 'operator@gimnasio.com.ar'
       }, 'operator@gimnasio.com.ar');
       results.push(res);
@@ -385,7 +385,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="text-zinc-500 font-bold block text-[10px] uppercase">Vía de Pago</label>
               <select value={pagoForm.medio_pago} onChange={e => setPagoForm(prev => ({ ...prev, medio_pago: e.target.value as MedioPago }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium">
@@ -397,24 +397,33 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
               </select>
             </div>
 
-            {pagoForm.medio_pago === 'TRANSFERENCIA' ? (
-              <div className="space-y-1">
-                <label className="text-emerald-700 font-bold block text-[10px] uppercase">Alias / Destino (Juanchi / Rulo)</label>
-                <select 
-                  value={pagoForm.destino_transferencia || 'JUANCHI'} 
-                  onChange={e => setPagoForm(prev => ({ ...prev, destino_transferencia: e.target.value as 'JUANCHI' | 'RULO' }))}
-                  className="w-full border border-emerald-300 rounded-lg p-2 text-xs bg-emerald-50 font-bold text-emerald-900 outline-hidden"
-                >
-                  <option value="JUANCHI">Juanchi</option>
-                  <option value="RULO">Rulo</option>
-                </select>
+            <div className="space-y-1">
+              <label className="text-violet-700 font-bold block text-[10px] uppercase">Destino (Juanchi / Rulo)</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(['JUANCHI', 'RULO'] as const).map(dest => (
+                  <button
+                    key={dest}
+                    type="button"
+                    onClick={() => setPagoForm(prev => ({ ...prev, destino_transferencia: dest }))}
+                    className={`py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                      pagoForm.destino_transferencia === dest
+                        ? dest === 'JUANCHI'
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                        : 'bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                    id={`btn-destino-${dest.toLowerCase()}`}
+                  >
+                    {dest === 'JUANCHI' ? '🟣 Juanchi' : '🟡 Rulo'}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="space-y-1">
-                <label className="text-zinc-500 font-bold block text-[10px] uppercase">Ref / ID Transacción</label>
-                <input type="text" placeholder="ej: MP-90382211 (opcional)" value={pagoForm.hash_transaccion} onChange={e => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden font-medium" />
-              </div>
-            )}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Ref / ID Transacción</label>
+              <input type="text" placeholder="ej: MP-90382211 (opcional)" value={pagoForm.hash_transaccion} onChange={e => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden font-medium" />
+            </div>
           </div>
 
           <div className="bg-zinc-50 border border-zinc-200 p-3 rounded-lg flex justify-between items-center text-xs">
