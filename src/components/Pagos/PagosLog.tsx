@@ -136,9 +136,9 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     let textMsg = '';
     if (cl && cl.tipo === 'FIJO' && cl.turnos_fijos.length > 0) {
       const turnosStr = cl.turnos_fijos.map(tfId => { const parts = tfId.split('-'); return `${parts[0]} ${parts[1] || '00:00'}hs`; }).join(', ');
-      textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA GYM. Tus turnos fijos son ${turnosStr}. Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
+      textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA BOX. Tus turnos fijos son ${turnosStr}. Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
     } else {
-      textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA GYM. ¡Gracias! Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
+      textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA BOX. ¡Gracias! Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
     }
     setReceiptClientText(textMsg);
   };

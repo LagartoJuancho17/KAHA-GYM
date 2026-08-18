@@ -160,9 +160,9 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
             const parts = tfId.split('-');
             return `${parts[0]} ${parts[1] || '00:00'}hs`;
           }).join(', ');
-          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA GYM. ¡Muchas gracias por tu compromiso! Tus turnos fijos son ${turnosStr}. Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
+          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA BOX. ¡Muchas gracias por tu compromiso! Tus turnos fijos son ${turnosStr}. Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
         } else {
-          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA GYM. ¡Muchas gracias por tu compromiso! Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
+          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA BOX. ¡Muchas gracias por tu compromiso! Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
         }
         generatedReceipts.push({ cliente_nombre: `${clObj.apellido}, ${clObj.nombre}`, messageText: textMsg, telefono: clObj.telefono || '5491123456789', copiado: false });
       }
