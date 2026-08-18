@@ -71,6 +71,7 @@ interface GymContextType {
   // Turnos Methods
   asignarClienteFijo: (clienteId: string, turnoId: string) => { success: boolean; message: string; putInWaitlist?: boolean };
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
+  notificarBajaClase: (clienteId: string, turnoId: string, fecha?: string) => boolean;
   asignarTurnoVariable: (clienteId: string, turnoId: string | null) => { success: boolean; message: string };
   checkInFlexible: (clienteId: string, turnoId: string) => { success: boolean; message: string };
   agregarRecupero: (recupero: Omit<RecuperoTurno, 'id' | 'estado' | 'fecha_limite'> & { fecha_limite?: string }) => { success: boolean; message: string };
@@ -1587,6 +1588,33 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Asignación directa de horario completada exitosamente.' };
   };
 
+  // Aviso por email al socio de una baja de clase (vía /api/notify-baja -> Resend).
+  // fecha opcional: presente = baja de una clase puntual (turnera de tiempo real);
+  // ausente = baja del horario fijo semanal. Fire-and-forget; devuelve true si se
+  // disparó el aviso (socio con email real, no invitado).
+  const notificarBajaClase = (clienteId: string, turnoId: string, fecha?: string): boolean => {
+    const socio = clientes.find(c => c.id === clienteId);
+    if (!socio) return false;
+    const email = (socio.email || '').trim().toLowerCase();
+    const esInvitado = email.startsWith('invitado-') && email.endsWith('@kaha.com');
+    const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && !esInvitado;
+    if (!emailValido) return false;
+    const turno = turnos.find(t => t.id === turnoId);
+    fetch('/api/notify-baja', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: socio.email,
+        nombre: socio.nombre,
+        apellido: socio.apellido,
+        dia: turno?.dia || turnoId.split('-')[0] || '',
+        hora: turno?.hora || turnoId.split('-')[1] || '',
+        fecha: fecha || ''
+      })
+    }).catch(() => { /* en dev local /api no existe; se ignora silenciosamente */ });
+    return true;
+  };
+
   const removerAsignacionFija = (clienteId: string, turnoId: string) => {
     let waitlistClientLiberado: string | null = null;
     let waitlistClientNombre = '';
@@ -1656,29 +1684,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       promocion_automatica: waitlistClientLiberado ? `Se promovió automáticamente de lista de espera a ${waitlistClientNombre}` : 'Ninguno'
     });
 
-    // Aviso automático por email al socio dado de baja de esta clase fija.
-    // Fire-and-forget: el endpoint /api/notify-baja (server.js) envía vía Resend;
-    // si no hay email real o no está la API key configurada, no hace nada.
-    const socioBaja = clientes.find(c => c.id === clienteId);
-    const turnoBaja = turnos.find(t => t.id === turnoId);
-    const emailSocio = (socioBaja?.email || '').trim().toLowerCase();
-    const esInvitado = emailSocio.startsWith('invitado-') && emailSocio.endsWith('@kaha.com');
-    const tieneEmailReal = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailSocio) && !esInvitado;
-    if (tieneEmailReal && socioBaja) {
-      fetch('/api/notify-baja', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: socioBaja.email,
-          nombre: socioBaja.nombre,
-          apellido: socioBaja.apellido,
-          dia: turnoBaja?.dia || '',
-          hora: turnoBaja?.hora || ''
-        })
-      }).catch(() => { /* en dev local /api no existe; se ignora silenciosamente */ });
-    }
+    // Aviso automático por email al socio dado de baja de este horario fijo.
+    const avisado = notificarBajaClase(clienteId, turnoId);
 
-    addToast('delete', tieneEmailReal
+    addToast('delete', avisado
       ? 'Asignación removida. Se le envió un aviso por email al socio.'
       : 'Asignación de turno removida.');
   };
@@ -3430,7 +3439,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
-      asignarClienteFijo, removerAsignacionFija, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
+      asignarClienteFijo, removerAsignacionFija, notificarBajaClase, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
       registrarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,

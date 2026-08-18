@@ -210,7 +210,7 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
 // -----------------------------------------------------------------------------
 app.post('/api/notify-baja', async (req, res) => {
   try {
-    const { email, nombre = '', apellido = '', dia = '', hora = '', motivo = '' } = req.body || {};
+    const { email, nombre = '', apellido = '', dia = '', hora = '', fecha = '', motivo = '' } = req.body || {};
 
     // Los invitados usan emails ficticios (invitado-*@kaha.com): a esos no se envía.
     const cleanEmail = String(email || '').trim().toLowerCase();
@@ -229,7 +229,11 @@ app.post('/api/notify-baja', async (req, res) => {
     const from = process.env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>';
     const nombreSocio = String(nombre || '').trim() || 'Hola';
     const horaFmt = hora ? String(hora).slice(0, 5) : '';
-    const claseTxt = [dia, horaFmt ? `${horaFmt} hs` : ''].filter(Boolean).join(' ') || 'tu clase';
+    // Si viene fecha (baja de una clase puntual desde la turnera), la mostramos DD/MM.
+    // Si no, es la baja del horario fijo semanal (solo día + hora).
+    const fechaMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha || '').trim());
+    const fechaFmt = fechaMatch ? `${fechaMatch[3]}/${fechaMatch[2]}` : '';
+    const claseTxt = [dia, fechaFmt, horaFmt ? `${horaFmt} hs` : ''].filter(Boolean).join(' ') || 'tu clase';
     const motivoLinea = motivo ? `<p style="margin:0 0 16px;color:#3f3f46;font-size:14px;">Motivo: ${motivo}</p>` : '';
 
     const html = `<!doctype html><html><body style="margin:0;background:#f4f4f2;font-family:Inter,Arial,sans-serif;">
