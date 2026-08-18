@@ -17,7 +17,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     medio_pago: 'MERCADO_PAGO' as MedioPago,
     mes_correspondiente: new Date().toISOString().slice(0, 7),
     hash_transaccion: '',
-    destino_transferencia: 'JUANCHI' as 'JUANCHI' | 'RULO'
+    destino_transferencia: 'RULO' as 'JUANCHI' | 'RULO'
   });
   
   const [esPagoMultiple, setEsPagoMultiple] = useState(false);
@@ -173,7 +173,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
       setFormErr(failed.message);
     } else {
       setFormSuccess('Cobro registrado exitosamente.');
-      setPagoForm({ cliente_id: '', medio_pago: 'MERCADO_PAGO', mes_correspondiente: new Date().toISOString().slice(0, 7), hash_transaccion: '', destino_transferencia: 'JUANCHI' });
+      setPagoForm({ cliente_id: '', medio_pago: 'MERCADO_PAGO', mes_correspondiente: new Date().toISOString().slice(0, 7), hash_transaccion: '', destino_transferencia: 'RULO' });
       setBeneficiarios([]);
       setSearchPagadorText('');
       setSearchBeneficiarioText('');
@@ -400,7 +400,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
             <div className="space-y-1">
               <label className="text-violet-700 font-bold block text-[10px] uppercase">Destino (Juanchi / Rulo)</label>
               <div className="grid grid-cols-2 gap-1.5">
-                {(['JUANCHI', 'RULO'] as const).map(dest => (
+                {(['RULO', 'JUANCHI'] as const).map(dest => (
                   <button
                     key={dest}
                     type="button"
