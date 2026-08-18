@@ -144,12 +144,14 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
     }
 
     const cleanEmail = clienteForm.email.trim().toLowerCase();
-    if (!editingClienteId) {
-      const emailExiste = clientes.some(c => c.activo && c.email.toLowerCase().trim() === cleanEmail);
-      if (emailExiste) {
-        setFormError('El correo electrónico ya se encuentra registrado por otro socio.');
-        return;
-      }
+    const emailExiste = clientes.some(c =>
+      c.activo &&
+      c.email.toLowerCase().trim() === cleanEmail &&
+      c.id !== editingClienteId   // excluir al propio socio en modo edición
+    );
+    if (emailExiste) {
+      setFormError('El correo electrónico ya se encuentra registrado por otro socio.');
+      return;
     }
 
     const parts = clienteForm.nombre_completo.trim().split(/\s+/);
@@ -278,7 +280,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
 
             <div className="space-y-1">
               <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Correo Electrónico (Único)</label>
-              <input type="email" required placeholder="ej: juanperez@gmail.com" value={clienteForm.email} disabled={!!editingClienteId} onChange={(e) => setClienteForm(prev => ({ ...prev, email: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white disabled:bg-zinc-100 disabled:text-zinc-400" id="form-email" />
+              <input type="email" required placeholder="ej: juanperez@gmail.com" value={clienteForm.email} onChange={(e) => setClienteForm(prev => ({ ...prev, email: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white" id="form-email" />
             </div>
 
             <div className="space-y-1">
