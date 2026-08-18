@@ -1650,12 +1650,37 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    addAuditLog('TURNO_ASIGNACION_REMOCION', { 
-      cliente_id: clienteId, 
+    addAuditLog('TURNO_ASIGNACION_REMOCION', {
+      cliente_id: clienteId,
       turno_id: turnoId,
       promocion_automatica: waitlistClientLiberado ? `Se promovió automáticamente de lista de espera a ${waitlistClientNombre}` : 'Ninguno'
     });
-    addToast('delete', 'Asignación de turno removida.');
+
+    // Aviso automático por email al socio dado de baja de esta clase fija.
+    // Fire-and-forget: el endpoint /api/notify-baja (server.js) envía vía Resend;
+    // si no hay email real o no está la API key configurada, no hace nada.
+    const socioBaja = clientes.find(c => c.id === clienteId);
+    const turnoBaja = turnos.find(t => t.id === turnoId);
+    const emailSocio = (socioBaja?.email || '').trim().toLowerCase();
+    const esInvitado = emailSocio.startsWith('invitado-') && emailSocio.endsWith('@kaha.com');
+    const tieneEmailReal = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailSocio) && !esInvitado;
+    if (tieneEmailReal && socioBaja) {
+      fetch('/api/notify-baja', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: socioBaja.email,
+          nombre: socioBaja.nombre,
+          apellido: socioBaja.apellido,
+          dia: turnoBaja?.dia || '',
+          hora: turnoBaja?.hora || ''
+        })
+      }).catch(() => { /* en dev local /api no existe; se ignora silenciosamente */ });
+    }
+
+    addToast('delete', tieneEmailReal
+      ? 'Asignación removida. Se le envió un aviso por email al socio.'
+      : 'Asignación de turno removida.');
   };
 
   const asignarTurnoVariable = (clienteId: string, turnoId: string | null) => {

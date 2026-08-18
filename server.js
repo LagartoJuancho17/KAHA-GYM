@@ -203,6 +203,76 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
+// Aviso por email al socio cuando lo dan de baja de una clase (vía Resend).
+// La API key vive SOLO en env (RESEND_API_KEY); nunca en el frontend ni en el repo.
+// El remitente se controla con RESEND_FROM (ej: "KAHA GYM <no-reply@kaha.com.ar>").
+// -----------------------------------------------------------------------------
+app.post('/api/notify-baja', async (req, res) => {
+  try {
+    const { email, nombre = '', apellido = '', dia = '', hora = '', motivo = '' } = req.body || {};
+
+    // Los invitados usan emails ficticios (invitado-*@kaha.com): a esos no se envía.
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const esInvitado = cleanEmail.startsWith('invitado-') && cleanEmail.endsWith('@kaha.com');
+    const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail);
+    if (!emailValido || esInvitado) {
+      return res.status(200).json({ sent: false, reason: 'sin_email_valido' });
+    }
+
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.warn('>> [notify-baja] RESEND_API_KEY no configurada; no se envía email.');
+      return res.status(200).json({ sent: false, reason: 'sin_api_key' });
+    }
+
+    const from = process.env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>';
+    const nombreSocio = String(nombre || '').trim() || 'Hola';
+    const horaFmt = hora ? String(hora).slice(0, 5) : '';
+    const claseTxt = [dia, horaFmt ? `${horaFmt} hs` : ''].filter(Boolean).join(' ') || 'tu clase';
+    const motivoLinea = motivo ? `<p style="margin:0 0 16px;color:#3f3f46;font-size:14px;">Motivo: ${motivo}</p>` : '';
+
+    const html = `<!doctype html><html><body style="margin:0;background:#f4f4f2;font-family:Inter,Arial,sans-serif;">
+      <div style="max-width:520px;margin:0 auto;padding:24px;">
+        <div style="background:#18181b;border-radius:20px;padding:24px 24px 20px;">
+          <div style="color:#c8f63e;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-family:monospace;">KAHA GYM</div>
+          <h1 style="color:#fff;margin:6px 0 0;font-size:20px;font-weight:800;">Baja de una clase</h1>
+        </div>
+        <div style="background:#fff;border:1px solid #e7e7e4;border-top:none;border-radius:0 0 20px 20px;padding:24px;">
+          <p style="margin:0 0 14px;color:#18181b;font-size:15px;">${nombreSocio}, te avisamos que fuiste dado/a de baja de la siguiente clase:</p>
+          <div style="background:#f7ffe3;border:1px solid #dcfd85;border-radius:14px;padding:14px 16px;margin:0 0 16px;">
+            <div style="color:#3b4e17;font-size:18px;font-weight:800;">${claseTxt}</div>
+          </div>
+          ${motivoLinea}
+          <p style="margin:0 0 20px;color:#52525b;font-size:14px;line-height:1.5;">Si creés que es un error o querés reprogramar tu horario, respondé este mail o escribinos por WhatsApp y lo resolvemos.</p>
+          <p style="margin:0;color:#a1a1aa;font-size:12px;">— Equipo KAHA GYM</p>
+        </div>
+      </div>
+    </body></html>`;
+
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: [cleanEmail],
+        subject: `Baja de ${claseTxt} — KAHA GYM`,
+        html
+      })
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.error('>> [notify-baja] Error de Resend:', data);
+      return res.status(502).json({ sent: false, reason: 'resend_error', detail: data });
+    }
+    return res.status(200).json({ sent: true, id: data.id });
+  } catch (err) {
+    console.error('>> [notify-baja] Error:', err);
+    return res.status(500).json({ sent: false, reason: 'server_error', detail: err.message });
+  }
+});
+
 // Serve static assets from build output folder
 app.use(express.static(path.join(__dirname, 'dist')));
 
