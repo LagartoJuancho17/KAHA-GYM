@@ -1732,9 +1732,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const recTurno = turnos.find(t => t.id === data.turno_recupero_id);
       if (!recTurno) return { success: false, message: 'Turno de recupero inválido.' };
 
-      // Validar cupos en el turno de recupero
-      if (recTurno.asignados_ids.length >= recTurno.cupo_maximo) {
-        return { success: false, message: 'El turno del recupero no posee cupos disponibles.' };
+      // Validar cupos para la fecha destino con el mismo criterio que
+      // programarRecuperoPendiente: fijos ACTIVOS (sin los suspendidos ese día) +
+      // reservas individuales + otros recuperos ya agendados en esa fecha.
+      const fechaDest = data.fecha_recupero;
+      const fijosActivos = recTurno.asignados_ids.filter(fid => {
+        const fc = clientes.find(c => c.id === fid);
+        return !((fc?.clases_suspendidas || []).some(s => s.turno_id === recTurno.id && s.fecha === fechaDest));
+      }).length;
+      const individualCount = clientes.reduce((acc, c) =>
+        acc + (c.reservas_individuales || []).filter(r => r.turno_id === recTurno.id && r.fecha === fechaDest).length, 0);
+      const recuperosCount = recuperos.filter(r => r.estado === 'PENDIENTE' && r.turno_recupero_id === recTurno.id && r.fecha_recupero === fechaDest).length;
+      const totalOccupied = fijosActivos + individualCount + recuperosCount;
+
+      if (totalOccupied >= recTurno.cupo_maximo) {
+        return { success: false, message: `El turno del recupero ya está completo para esa fecha (${totalOccupied}/${recTurno.cupo_maximo}).` };
       }
     }
 
@@ -1905,8 +1917,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha);
       return acc + bookingsOnDate.length;
     }, 0);
+    // Los recuperos agendados en este slot/fecha también ocupan lugar. Sin contarlos
+    // se podía reservar por encima del cupo (ej.: 8 anotados en un turno de 7 cuando
+    // había un recupero agendado que este chequeo no veía).
+    const recuperosCount = recuperos.filter(
+      r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turnoId && r.fecha_recupero === fecha
+    ).length;
 
-    const totalOccupied = fijosCount + individualCount;
+    const totalOccupied = fijosCount + individualCount + recuperosCount;
     if (totalOccupied >= turno.cupo_maximo) {
       return { success: false, message: `El turno ya está completo para esa fecha (${totalOccupied}/${turno.cupo_maximo}).` };
     }

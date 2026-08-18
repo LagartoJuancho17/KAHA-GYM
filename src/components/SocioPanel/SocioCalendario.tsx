@@ -16,7 +16,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   setErrorMessage
 }) => {
   const {
-    turnos, clientes, planes, waitlistReservas,
+    turnos, clientes, planes, waitlistReservas, recuperos,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija, agregarListaEsperaReserva, removerListaEsperaReserva
   } = useGym();
 
@@ -131,7 +131,14 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
       return acc + bookingsOnDate.length;
     }, 0);
 
-    return fijosActivosCount + individualCount;
+    // Los recuperos (clases a recuperar agendadas en este slot/fecha) también ocupan
+    // un lugar físico. Contarlos evita que la ocupación mostrada al socio quede por
+    // debajo de la real de la turnera y se sobre-reserve por encima del cupo.
+    const recuperosCount = (recuperos || []).filter(
+      r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turnoId && r.fecha_recupero === dateStr
+    ).length;
+
+    return fijosActivosCount + individualCount + recuperosCount;
   };
 
   const turnosDelDia = useMemo(() => {
@@ -286,6 +293,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                         ? new Date(slotDateStr + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
                         : null;
                       const realtimeOccupancyCount = slotDateStr ? getOccupiedCountOnDate(turno.id, slotDateStr) : turno.asignados_ids.length;
+                      const isFull = realtimeOccupancyCount >= turno.cupo_maximo;
 
                       return (
                         <div 
@@ -373,9 +381,14 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                     setBookingTurnId(turno.id);
                                     setReprogramTurnId(null);
                                   }}
-                                  className="px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer font-sans border-none w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                                  className={`px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer font-sans border w-full text-center shadow-xs ${
+                                    isFull
+                                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
+                                  }`}
+                                  title={isFull ? 'Turno completo — anotate en la lista de espera' : 'Reservar este cupo'}
                                 >
-                                  <span className="truncate">RESERVAR</span>
+                                  <span className="truncate">{isFull ? 'Completo · Lista de espera' : 'RESERVAR'}</span>
                                 </button>
                               )}
                             </div>
