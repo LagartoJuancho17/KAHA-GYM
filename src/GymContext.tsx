@@ -11,6 +11,7 @@ import {
   INITIAL_CLIENTES, INITIAL_PAGOS, INITIAL_AUDIT_LOGS, INITIAL_RECUPEROS, INITIAL_NOVEDADES, INITIAL_GASTOS
 } from './initialMockData';
 import { supabase } from './supabaseClient';
+import { mergeLogs, logsFaltantesEnDb, parsearLogsGuardados, normalizarIdsLegacy, nuevoLogId, MAX_LOGS } from './lib/auditLogs';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -497,27 +498,33 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTurnos(shiftList);
       setPagos(mappedPagos);
       setRecuperos(mappedRecs);
-      if (mappedLogs.length > 0) {
-        setAuditLogs(mappedLogs);
-        localStorage.setItem('gym_audit_logs', JSON.stringify(mappedLogs));
-      } else {
-        const localLogs = localStorage.getItem('gym_audit_logs');
-        if (localLogs) {
-          try {
-            const parsed = JSON.parse(localLogs);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setAuditLogs(parsed);
-              // Backfill initial logs a Supabase
-              parsed.slice(0, 50).forEach((l: AuditLog) => {
-                supabase.from('logs_auditoria').insert({
-                  usuario_email: l.usuario_email || 'admin@gimnasio.com.ar',
-                  accion: l.accion,
-                  detalles: l.detalles || {}
-                }).then(() => {});
-              });
-            }
-          } catch(e) {}
-        }
+      // Historial: unir base + local, nunca reemplazar.
+      // Antes, si la base traía aunque sea 1 fila, se pisaba localStorage entero y
+      // todo lo que no había llegado a subir se perdía en el refresh. Ese era el bug.
+      // normalizarIdsLegacy: los logs de versiones viejas tenían id "log-<ts>-<rnd>",
+      // que la columna uuid rechaza y haría fallar el backfill entero.
+      const logsLocales = normalizarIdsLegacy(parsearLogsGuardados(localStorage.getItem('gym_audit_logs')));
+      const logsUnidos = mergeLogs(mappedLogs, logsLocales);
+      setAuditLogs(logsUnidos);
+      localStorage.setItem('gym_audit_logs', JSON.stringify(logsUnidos));
+
+      // Backfill: subir lo que está local y todavía no en la base. Corre SIEMPRE
+      // (antes solo corría con la base vacía), así los inserts que fallaron se
+      // reintentan solos y el historial converge entre dispositivos.
+      const faltantes = logsFaltantesEnDb(logsLocales, mappedLogs);
+      if (faltantes.length > 0) {
+        const aSubir = faltantes.slice(0, MAX_LOGS).map(l => ({
+          id: l.id,
+          usuario_email: l.usuario_email || 'admin@gimnasio.com.ar',
+          accion: l.accion,
+          detalles: l.detalles || {},
+          creado_at: l.creado_at
+        }));
+        // upsert por id: si alguno ya estaba, no rompe con duplicate key.
+        supabase.from('logs_auditoria').upsert(aSubir, { onConflict: 'id' }).then(({ error }) => {
+          if (error) console.error('Backfill de logs de auditoría falló:', error);
+          else console.log(`✅ Historial: ${aSubir.length} log(s) locales subidos a Supabase`);
+        });
       }
 
       const localGoogleUser = localStorage.getItem('gym_google_user');
@@ -631,8 +638,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('gym_recuperos', JSON.stringify(INITIAL_RECUPEROS));
       }
 
-      if (localLogs) setAuditLogs(JSON.parse(localLogs));
-      else {
+      // Parseo defensivo: un JSON.parse crudo acá tiraba y cortaba toda la carga
+      // de la app si el storage quedaba a medio escribir.
+      const logsGuardados = parsearLogsGuardados(localLogs);
+      if (logsGuardados.length > 0) {
+        setAuditLogs(mergeLogs(logsGuardados));
+      } else {
         setAuditLogs(INITIAL_AUDIT_LOGS);
         localStorage.setItem('gym_audit_logs', JSON.stringify(INITIAL_AUDIT_LOGS));
       }
@@ -735,7 +746,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setRecuperos(val);
             break;
           case 'gym_audit_logs':
-            setAuditLogs(val);
+            // Otra pestaña escribió logs: unir, no reemplazar. Si esta pestaña
+            // tiene un log que la otra no vio todavía, no se pierde.
+            setAuditLogs(prev => mergeLogs(Array.isArray(val) ? val : [], prev));
             break;
           case 'gym_novedades':
             setNovedades(val);
@@ -806,10 +819,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRecuperos(updatedRecuperos);
       localStorage.setItem('gym_recuperos', JSON.stringify(updatedRecuperos));
     }
-    if (updatedLogs) {
-      setAuditLogs(updatedLogs);
-      localStorage.setItem('gym_audit_logs', JSON.stringify(updatedLogs));
-    }
+    // OJO: `updatedLogs` se ignora a propósito. Los 31 call sites de saveState le
+    // pasan el `auditLogs` del closure del render, que es una foto VIEJA: si en el
+    // mismo handler ya corrió addAuditLog, escribir esa foto borraba el log recién
+    // creado del state y de localStorage. addAuditLog es el único dueño del
+    // historial (state + localStorage + Supabase); saveState no lo toca.
+    void updatedLogs;
     if (updatedNovedades) {
       setNovedades(updatedNovedades);
       localStorage.setItem('gym_novedades', JSON.stringify(updatedNovedades));
@@ -851,42 +866,44 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addAuditLog = (accion: string, detalles: any, userEmail?: string) => {
     const emailToUse = userEmail || googleUser?.email || (rolActivo === 'ADMIN' ? 'admin@gimnasio.com.ar' : 'operador@gimnasio.com.ar');
-    const tempId = `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    // El id se genera acá y es el MISMO en state, localStorage y Supabase.
+    // Antes el id local era temporal ("log-...") y el de la base otro distinto,
+    // así que al refrescar el mismo evento se veía duplicado o se perdía.
     const newLog: AuditLog = {
-      id: tempId,
+      id: nuevoLogId(),
       usuario_id: googleUser?.id || '',
       usuario_email: emailToUse,
       accion,
       detalles: detalles || {},
       creado_at: new Date().toISOString()
     };
-    
-    setAuditLogs(prev => [newLog, ...prev]);
 
-    // Persistir en la base de datos Supabase
+    // Fuente de verdad en memoria: siempre funcional, nunca desde un closure viejo.
+    setAuditLogs(prev => mergeLogs([newLog], prev));
+
+    // localStorage: se relee y se une, así no pisa lo que haya escrito otra pestaña.
+    try {
+      const guardados = parsearLogsGuardados(localStorage.getItem('gym_audit_logs'));
+      localStorage.setItem('gym_audit_logs', JSON.stringify(mergeLogs([newLog], guardados)));
+    } catch (e) { /* cuota llena o modo privado: el log igual vive en memoria y en la base */ }
+
+    // Supabase: se manda el id y la fecha explícitos para que coincidan con lo local.
+    // Si falla (sin red, error puntual), el log queda en localStorage y el próximo
+    // arranque lo sube solo vía backfill. No se pierde.
     if (supabase) {
       supabase
         .from('logs_auditoria')
         .insert({
+          id: newLog.id,
           usuario_email: emailToUse,
           accion,
-          detalles: detalles || {}
+          detalles: detalles || {},
+          creado_at: newLog.creado_at
         })
-        .select()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('Error al insertar log de auditoría en Supabase:', error);
-          } else if (data && data[0]) {
-            setAuditLogs(prev => prev.map(l => l.id === tempId ? { ...l, id: data[0].id } : l));
-          }
+        .then(({ error }) => {
+          if (error) console.error('Log de auditoría no subió (se reintenta al recargar):', error);
         });
     }
-
-    try {
-      const stored = localStorage.getItem('gym_audit_logs');
-      const parsed = stored ? JSON.parse(stored) : [];
-      localStorage.setItem('gym_audit_logs', JSON.stringify([newLog, ...parsed].slice(0, 500)));
-    } catch(e) {}
   };
 
   const handleSetRolActivo = (rol: RolUsuario) => {
