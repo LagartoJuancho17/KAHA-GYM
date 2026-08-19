@@ -10,6 +10,8 @@ import {
 
 import { TurnoDetailsModal } from './TurnoDetailsModal';
 import { TurnoRealtimeModal } from './TurnoRealtimeModal';
+import { TurnosHistorialModal } from './TurnosHistorialModal';
+import { History } from 'lucide-react';
 
 export const TurnosGrid: React.FC = () => {
   const { 
@@ -28,6 +30,7 @@ export const TurnosGrid: React.FC = () => {
 
   // Cell selection state
   const [selectedTurnoId, setSelectedTurnoId] = useState<string | null>(null);
+  const [showHistorialModal, setShowHistorialModal] = useState<boolean>(false);
 
   // Real-time week states
   const [selectedRealtimeSlot, setSelectedRealtimeSlot] = useState<{ id: string; date: string } | null>(null);
@@ -250,30 +253,42 @@ export const TurnosGrid: React.FC = () => {
           <p className="text-zinc-500 font-sans text-sm">Organiza turnos de asistencia, lista de espera dinámica y recuperos de inasistencias</p>
         </div>
 
-        {/* SUB TOOGLE */}
-        <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 flex-wrap gap-1">
+        {/* ACCIONES Y SUB TOOGLE */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => setSubTab('GRILLA')}
-            className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
-              subTab === 'GRILLA'
-                ? 'bg-white text-zinc-950 shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-950'
-            }`}
-            id="subtab-grilla-trigger"
+            onClick={() => setShowHistorialModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white font-semibold text-xs transition-all shadow-xs cursor-pointer border-none"
+            id="btn-ver-historial-turnos"
+            title="Ver auditoría e historial de altas, bajas, recuperos y lista de espera"
           >
-            Matriz Fija Semanal
+            <History className="w-3.5 h-3.5 text-lime-400" />
+            <span>Historial de Movimientos</span>
           </button>
-          <button
-            onClick={() => setSubTab('TIEMPO_REAL')}
-            className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
-              subTab === 'TIEMPO_REAL'
-                ? 'bg-white text-zinc-900 shadow-sm font-bold'
-                : 'text-zinc-500 hover:text-zinc-950'
-            }`}
-            id="subtab-tiemporeal-trigger"
-          >
-            Turnera de Tiempo Real
-          </button>
+
+          <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 flex-wrap gap-1">
+            <button
+              onClick={() => setSubTab('GRILLA')}
+              className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
+                subTab === 'GRILLA'
+                  ? 'bg-white text-zinc-950 shadow-sm font-semibold'
+                  : 'text-zinc-500 hover:text-zinc-950'
+              }`}
+              id="subtab-grilla-trigger"
+            >
+              Matriz Fija Semanal
+            </button>
+            <button
+              onClick={() => setSubTab('TIEMPO_REAL')}
+              className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
+                subTab === 'TIEMPO_REAL'
+                  ? 'bg-white text-zinc-900 shadow-sm font-bold'
+                  : 'text-zinc-500 hover:text-zinc-950'
+              }`}
+              id="subtab-tiemporeal-trigger"
+            >
+              Turnera de Tiempo Real
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1031,6 +1046,12 @@ export const TurnosGrid: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL HISTORIAL DE MOVIMIENTOS */}
+      <TurnosHistorialModal
+        isOpen={showHistorialModal}
+        onClose={() => setShowHistorialModal(false)}
+      />
     </div>
   );
 };

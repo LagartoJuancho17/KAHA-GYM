@@ -135,11 +135,18 @@ export interface Novedad {
 
 export interface AlertaNotificacion {
   id: string;
-  tipo: 'PAGO_REALIZADO' | 'SISTEMA' | 'DEUDA_VENCIDA';
+  tipo: 'PAGO_REALIZADO' | 'SISTEMA' | 'DEUDA_VENCIDA' | 'WAITLIST_PROMOCION';
   titulo: string;
   mensaje: string;
   fecha: string; // ISO string
   leido: boolean;
+  cliente_id?: string;
+  metadata?: {
+    turno_id?: string;
+    dia?: string;
+    hora?: string;
+    fecha_clase?: string;
+  };
 }
 
 export interface Gasto {

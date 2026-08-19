@@ -72,6 +72,7 @@ interface GymContextType {
   asignarClienteFijo: (clienteId: string, turnoId: string) => { success: boolean; message: string; putInWaitlist?: boolean };
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
   notificarBajaClase: (clienteId: string, turnoId: string, fecha?: string) => boolean;
+  notificarAltaWaitlist: (clienteId: string, turnoId: string, fecha?: string) => boolean;
   asignarTurnoVariable: (clienteId: string, turnoId: string | null) => { success: boolean; message: string };
   checkInFlexible: (clienteId: string, turnoId: string) => { success: boolean; message: string };
   agregarRecupero: (recupero: Omit<RecuperoTurno, 'id' | 'estado' | 'fecha_limite'> & { fecha_limite?: string }) => { success: boolean; message: string };
@@ -1619,6 +1620,80 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  // Aviso por email y notificación al socio cuando es promovido de Lista de Espera a turno confirmado.
+  const notificarAltaWaitlist = (clienteId: string, turnoId: string, fecha?: string): boolean => {
+    const socio = clientes.find(c => c.id === clienteId);
+    if (!socio) return false;
+    const email = (socio.email || '').trim().toLowerCase();
+    const esInvitado = email.startsWith('invitado-') && email.endsWith('@kaha.com');
+    const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && !esInvitado;
+    const tieneTelefono = (socio.telefono || '').replace(/\D/g, '').length >= 8;
+    const turno = turnos.find(t => t.id === turnoId);
+    const dia = turno?.dia || turnoId.split('-')[0] || '';
+    const hora = turno?.hora || turnoId.split('-')[1] || '';
+
+    // 1. Guardar aviso en localStorage para el modal llamativo del socio cuando ingrese a la app
+    try {
+      const pendingKey = `kaha_waitlist_promocion_${socio.id}`;
+      const existing = JSON.parse(localStorage.getItem(pendingKey) || '[]');
+      const newPromo = {
+        id: `promo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        clienteId: socio.id,
+        nombre: socio.nombre,
+        turnoId,
+        dia,
+        hora,
+        fecha: fecha || '',
+        timestamp: Date.now()
+      };
+      localStorage.setItem(pendingKey, JSON.stringify([newPromo, ...existing]));
+    } catch(e) {
+      console.error("Error al guardar aviso de promoción de lista de espera:", e);
+    }
+
+    // 2. Crear notificación en el buzón interno
+    const notifText = fecha 
+      ? `¡Se liberó tu lugar! Fuiste confirmado/a para el turno del ${dia} ${fecha} a las ${hora} hs.`
+      : `¡Se liberó tu lugar fijo! Fuiste confirmado/a para el turno semanal de los ${dia} a las ${hora} hs.`;
+
+    const newNotif: AlertaNotificacion = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      tipo: 'WAITLIST_PROMOCION',
+      titulo: '🎉 ¡Lugar Confirmado por Lista de Espera!',
+      mensaje: notifText,
+      fecha: new Date().toISOString(),
+      leido: false,
+      cliente_id: socio.id,
+      metadata: { turno_id: turnoId, dia, hora, fecha_clase: fecha }
+    };
+
+    try {
+      const storedNotifs = localStorage.getItem('gym_notificaciones');
+      const parsedNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
+      localStorage.setItem('gym_notificaciones', JSON.stringify([newNotif, ...parsedNotifs]));
+      setNotificaciones([newNotif, ...parsedNotifs]);
+    } catch(e) {}
+
+    // 3. Enviar mail vía backend
+    if (emailValido || tieneTelefono) {
+      fetch('/api/notify-waitlist-alta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: socio.email,
+          telefono: socio.telefono || '',
+          nombre: socio.nombre,
+          apellido: socio.apellido,
+          dia,
+          hora,
+          fecha: fecha || ''
+        })
+      }).catch(() => {});
+    }
+
+    return true;
+  };
+
   const removerAsignacionFija = (clienteId: string, turnoId: string) => {
     let waitlistClientLiberado: string | null = null;
     let waitlistClientNombre = '';
@@ -1691,9 +1766,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Aviso automático al socio dado de baja de este horario fijo (WhatsApp o email).
     const avisado = notificarBajaClase(clienteId, turnoId);
 
+    // Aviso automático al socio promovido desde lista de espera (Email + Modal en App)
+    if (waitlistClientLiberado) {
+      notificarAltaWaitlist(waitlistClientLiberado, turnoId);
+    }
+
     addToast('delete', avisado
       ? 'Asignación removida. Se le avisó al socio de la baja.'
       : 'Asignación de turno removida.');
+    
+    if (waitlistClientLiberado) {
+      addToast('success', `¡Cupo liberado! Se promovió y notificó por email a ${waitlistClientNombre}.`);
+    }
   };
 
   const asignarTurnoVariable = (clienteId: string, turnoId: string | null) => {
@@ -2129,6 +2213,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       turno_id: turnoId,
       fecha
     });
+
+    // Notificar al socio promovido (Email + Modal en App)
+    notificarAltaWaitlist(candidateClient.id, turnoId, fecha);
 
     return updatedList;
   };
@@ -3443,7 +3530,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
-      asignarClienteFijo, removerAsignacionFija, notificarBajaClase, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
+      asignarClienteFijo, removerAsignacionFija, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
       registrarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,

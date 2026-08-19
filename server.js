@@ -310,6 +310,74 @@ async function enviarEmailBaja({ email, nombreSocio, claseTxt, motivo }) {
   return { ok: true, id: data.id };
 }
 
+// Envía el aviso de confirmación de turno desde Lista de Espera por email vía Resend.
+async function enviarEmailAltaWaitlist({ email, nombreSocio, claseTxt }) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const esInvitado = cleanEmail.startsWith('invitado-') && cleanEmail.endsWith('@kaha.com');
+  const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail);
+  if (!emailValido || esInvitado) return { ok: false, reason: 'sin_email_valido' };
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, reason: 'sin_api_key' };
+
+  const from = process.env.RESEND_FROM || 'KAHA BOX <onboarding@resend.dev>';
+
+  const html = `<!doctype html><html><body style="margin:0;background:#09090b;font-family:Inter,Arial,sans-serif;color:#f4f4f5;">
+      <div style="max-width:540px;margin:0 auto;padding:24px;">
+        <div style="background:#18181b;border:1px solid #27272a;border-radius:24px 24px 0 0;padding:32px 28px 24px;text-align:center;">
+          <div style="display:inline-block;background:#c8f63e;color:#09090b;font-size:11px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;padding:4px 12px;border-radius:9999px;margin-bottom:12px;font-family:monospace;">KAHA BOX</div>
+          <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:900;letter-spacing:-0.03em;">🎉 ¡Lugar Confirmado!</h1>
+          <p style="margin:8px 0 0;color:#a1a1aa;font-size:14px;">Se liberó un cupo en tu lista de espera</p>
+        </div>
+        <div style="background:#141416;border:1px solid #27272a;border-top:none;border-radius:0 0 24px 24px;padding:28px;">
+          <p style="margin:0 0 16px;color:#e4e4e7;font-size:15px;line-height:1.5;">Hola <strong>${nombreSocio}</strong>, ¡excelentes noticias! Se liberó una vacante y fuiste promovido/a al siguiente turno:</p>
+          <div style="background:#18181b;border:2px solid #c8f63e;border-radius:16px;padding:18px 20px;margin:0 0 20px;text-align:center;">
+            <div style="color:#c8f63e;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;">Turno Asignado</div>
+            <div style="color:#ffffff;font-size:20px;font-weight:900;letter-spacing:-0.02em;">${claseTxt}</div>
+          </div>
+          <p style="margin:0 0 24px;color:#a1a1aa;font-size:13px;line-height:1.6;">Ya podés ver tu turno confirmado ingresando a la app de <strong>KAHA BOX</strong>. Recordá que si por algún motivo no podés asistir, avisanos o date de baja para liberar el lugar a otro compañero.</p>
+          <div style="text-align:center;margin:0 0 24px;">
+            <a href="https://kaha.com.ar" style="display:inline-block;background:#c8f63e;color:#09090b;font-weight:900;font-size:14px;padding:12px 28px;border-radius:12px;text-decoration:none;letter-spacing:-0.01em;">Ingresar a la App</a>
+          </div>
+          <p style="margin:0;color:#71717a;font-size:12px;text-align:center;">— Equipo KAHA BOX</p>
+        </div>
+      </div>
+    </body></html>`;
+
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [cleanEmail], subject: `🎉 ¡Lugar confirmado! Turno asignado en ${claseTxt} — KAHA BOX`, html })
+  });
+
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    console.error('>> [notify-waitlist-alta] Error de Resend:', data);
+    return { ok: false, reason: 'resend_error', detail: data };
+  }
+  return { ok: true, id: data.id };
+}
+
+app.post('/api/notify-waitlist-alta', async (req, res) => {
+  try {
+    const { email, telefono = '', nombre = '', dia = '', hora = '', fecha = '' } = req.body || {};
+
+    const nombreSocio = String(nombre || '').trim() || 'Hola';
+    const horaFmt = hora ? String(hora).slice(0, 5) : '';
+    const fechaMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha || '').trim());
+    const fechaFmt = fechaMatch ? `${fechaMatch[3]}/${fechaMatch[2]}` : '';
+    const claseTxt = [dia, fechaFmt, horaFmt ? `${horaFmt} hs` : ''].filter(Boolean).join(' ') || 'tu clase';
+
+    console.log(`>> [notify-waitlist-alta] Enviando confirmación a ${email} (${nombreSocio}) para ${claseTxt}`);
+
+    const mail = await enviarEmailAltaWaitlist({ email, nombreSocio, claseTxt });
+    return res.status(200).json({ sent: mail.ok, channel: 'email', id: mail.id, reason: mail.reason });
+  } catch (err) {
+    console.error('>> [notify-waitlist-alta] Error:', err);
+    return res.status(500).json({ sent: false, reason: 'server_error', detail: err.message });
+  }
+});
+
 app.post('/api/notify-baja', async (req, res) => {
   try {
     const { email, telefono = '', nombre = '', dia = '', hora = '', fecha = '', motivo = '' } = req.body || {};

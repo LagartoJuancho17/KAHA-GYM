@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck } from 'lucide-react';
+import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History } from 'lucide-react';
+import { TurnosHistorialModal } from './TurnosHistorialModal';
 
 interface TurnoRealtimeModalProps {
   selectedSlot: { id: string; date: string };
@@ -37,6 +38,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   const [showWspModal, setShowWspModal] = useState(false);
   const [motivoPreset, setMotivoPreset] = useState<'LLUVIA' | 'CORTE_LUZ' | 'RETRASO' | 'PROFESOR' | 'CUSTOM'>('LLUVIA');
   const [customMensaje, setCustomMensaje] = useState('');
+  const [showHistorial, setShowHistorial] = useState(false);
 
   const getCellRealtimeData = (turnoId: string, fecha: string) => {
     const turno = turnos.find(t => t.id === turnoId);
@@ -276,12 +278,23 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
               </strong>
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-zinc-400 hover:text-white bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer border-none"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowHistorial(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer border border-slate-700"
+              title="Ver historial de movimientos de este turno y fecha"
+            >
+              <History className="w-3.5 h-3.5 text-lime-400" />
+              <span className="hidden sm:inline">Historial</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="text-zinc-400 hover:text-white bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer border-none"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -690,6 +703,13 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         </div>
       )}
 
+      {/* MODAL HISTORIAL DE MOVIMIENTOS PREFILTRADO */}
+      <TurnosHistorialModal
+        isOpen={showHistorial}
+        onClose={() => setShowHistorial(false)}
+        filtroTurnoIdInicial={selectedSlot.id}
+        filtroFechaInicial={selectedSlot.date}
+      />
     </div>
   );
 };

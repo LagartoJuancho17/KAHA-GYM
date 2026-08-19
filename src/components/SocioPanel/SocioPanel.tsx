@@ -13,6 +13,7 @@ import { SocioPerfil } from './SocioPerfil';
 import { SocioPagos } from './SocioPagos';
 import { SocioNovedades } from './SocioNovedades';
 import { SocioPaymentChoiceModal } from './SocioPaymentChoiceModal';
+import { SocioWaitlistPromotedModal } from './SocioWaitlistPromotedModal';
 import { OnboardingModal } from '../Onboarding/OnboardingModal';
 import { NotificationManager } from '../Notifications/NotificationManager';
 import { Footer } from '../Common/Footer';
@@ -603,6 +604,11 @@ export const SocioPanel: React.FC = () => {
           turnosFijos={socio.turnos_fijos || []}
           turnos={turnos}
         />
+      )}
+
+      {/* POPUP LLAMATIVO: LUGAR CONFIRMADO POR LISTA DE ESPERA */}
+      {socio && (
+        <SocioWaitlistPromotedModal socioId={socio.id} />
       )}
     </div>
   );
