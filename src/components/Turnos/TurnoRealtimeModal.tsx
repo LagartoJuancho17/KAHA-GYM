@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered } from 'lucide-react';
+import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 
 interface TurnoRealtimeModalProps {
@@ -127,19 +127,27 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         plan_id: 'p-none',
         exencion_cobro: 'NINGUNA',
         allowDuplicate: true,
-        initialReservaIndividual: {
+        initialReservaIndividual: isFull ? undefined : {
           turno_id: selectedSlot.id,
           fecha: selectedSlot.date
         }
       });
 
       if (newGuestResult.success) {
-        setRealtimeSuccess(`Invitado "${fullGuestName}" agendado con éxito.`);
+        if (isFull) {
+          const guestId = newGuestResult.cliente?.id;
+          if (guestId) {
+            agregarListaEsperaReserva(guestId, selectedSlot.id, selectedSlot.date);
+          }
+          setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" registrado en la LISTA DE ESPERA.`);
+        } else {
+          setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" agendado con éxito en la clase.`);
+        }
         setGuestName('');
         setRealtimeCandidateClient('');
         setSearchQuery('');
         setIsDropdownOpen(false);
-        setTimeout(() => setRealtimeSuccess(null), 3000);
+        setTimeout(() => setRealtimeSuccess(null), 5000);
       } else {
         setRealtimeError(newGuestResult.message || 'Error al agendar el socio invitado.');
       }
@@ -147,18 +155,18 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     }
 
     if (!realtimeCandidateClient) {
-      setRealtimeError('Debes elegir un alumno o escribir el nombre de un invitado.');
+      setRealtimeError('Debes elegir un alumno de la lista o escribir el nombre de un invitado.');
       return;
     }
 
     const res = crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
     if (res.success) {
-      setRealtimeSuccess(res.message);
+      setRealtimeSuccess(`✅ ¡Confirmado! ${res.message}`);
       setRealtimeCandidateClient('');
       setGuestName('');
       setSearchQuery('');
       setIsDropdownOpen(false);
-      setTimeout(() => setRealtimeSuccess(null), 3000);
+      setTimeout(() => setRealtimeSuccess(null), 5000);
     } else {
       setRealtimeError(res.message);
     }
@@ -457,156 +465,188 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             </div>
           )}
 
-          {/* Agendar Variable o Invitado Form */}
-          <form onSubmit={handleAddRealtimeVariable} className="border-t border-zinc-100 pt-4 space-y-3">
+          {/* Agendar Variable o Invitado Form con Botón de Confirmación Explícito */}
+          <div className="border-t border-zinc-200/80 pt-4 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">
+              <label className="font-bold text-[10px] text-zinc-600 uppercase tracking-widest block font-sans">
                 {isFull ? 'Anotar Alumno en Lista de Espera' : 'Agendar Alumno Variable o Invitado'}
               </label>
-              {isFull && (
-                <span className="text-[9.5px] font-bold text-amber-700 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded-full">
-                  Turno Completo ({rtData.total}/{rtData.cupo})
-                </span>
-              )}
+              <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full ${
+                isFull 
+                  ? 'text-amber-800 bg-amber-100 border border-amber-300 font-mono' 
+                  : 'text-emerald-800 bg-emerald-100 border border-emerald-300 font-mono'
+              }`}>
+                {isFull ? `Turno Completo (${rtData.total}/${rtData.cupo})` : `Lugares Disponibles (${rtData.cupo - rtData.total})`}
+              </span>
             </div>
 
-            {isFull && (
-              <div className="bg-amber-50 border border-amber-200/80 rounded-lg p-2.5 text-[11px] text-amber-800 leading-relaxed">
-                Este turno ya alcanzó su cupo máximo. Al agregar un alumno quedará registrado en la <strong>lista de espera</strong> y se le asignará el lugar automáticamente con aviso por email si alguien se da de baja.
+            {/* SELECCIONAR SOCIO REGISTRADO O ESCRIBIR INVITADO */}
+            {!selectedCandidateObj && !guestName.trim() ? (
+              <div className="space-y-3 bg-zinc-50 p-3.5 rounded-xl border border-zinc-200">
+                <div className="space-y-1 relative">
+                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">1. Elegir Socio Registrado:</span>
+                  <div className="relative">
+                    <div className="relative flex items-center">
+                      <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Escribí nombre o apellido para buscar socio..."
+                        value={searchQuery}
+                        onFocus={() => setIsDropdownOpen(true)}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setIsDropdownOpen(true);
+                        }}
+                        className="w-full pl-8 pr-8 py-2.5 border border-zinc-300 rounded-lg text-xs bg-white outline-hidden font-medium focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-colors shadow-2xs"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-2 text-zinc-400 hover:text-zinc-600 text-xs font-bold border-none bg-transparent cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {isDropdownOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-40" 
+                          onClick={() => setIsDropdownOpen(false)}
+                        />
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-lg shadow-2xl z-50 max-h-52 overflow-y-auto font-sans">
+                          {filteredCandidates.length > 0 ? (
+                            filteredCandidates.map(c => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  setRealtimeCandidateClient(c.id);
+                                  setGuestName('');
+                                  setIsDropdownOpen(false);
+                                  setSearchQuery('');
+                                }}
+                                className="w-full text-left px-3 py-2.5 text-xs text-zinc-800 hover:bg-lime-50 hover:text-zinc-950 border-b border-zinc-100 last:border-none cursor-pointer transition-colors flex items-center justify-between"
+                              >
+                                <span className="font-bold">{c.apellido}, {c.nombre}</span>
+                                <span className="text-[9px] px-2 py-0.5 rounded bg-zinc-100 text-zinc-600 font-mono font-semibold">{c.tipo}</span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-3 text-xs text-zinc-400 text-center font-sans">
+                              No se encontraron socios con &quot;{searchQuery}&quot;
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-zinc-400 text-[8.5px] font-bold uppercase tracking-wider justify-center select-none">
+                  <div className="h-px bg-zinc-200 flex-1"></div>
+                  <span>O BIEN</span>
+                  <div className="h-px bg-zinc-200 flex-1"></div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">2. Registrar Socio Invitado puntual:</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ej: Juan Pérez (Invitado)"
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      className="flex-1 border border-zinc-300 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                    />
+                  </div>
+                </div>
               </div>
-            )}
-            
-            <div className="space-y-1 relative">
-              <span className="text-[9px] text-zinc-400 font-sans block">Socio Registrado (Escribí para buscar):</span>
-              
-              {selectedCandidateObj ? (
-                <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+            ) : (
+              /* TARJETA DE CONFIRMACIÓN DESTACADA */
+              <div className="bg-zinc-900 text-white p-4 rounded-xl border border-zinc-800 shadow-lg space-y-3 animate-scale-in">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
                   <div className="flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-bold text-emerald-900">
-                      {selectedCandidateObj.apellido}, {selectedCandidateObj.nombre}
-                    </span>
+                    <div className="p-1.5 bg-lime-400/20 text-lime-400 rounded-lg">
+                      <UserCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Alumno a Confirmar</div>
+                      <div className="text-sm font-extrabold text-white">
+                        {selectedCandidateObj ? `${selectedCandidateObj.apellido}, ${selectedCandidateObj.nombre}` : `${guestName.trim()} (Invitado)`}
+                      </div>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
                       setRealtimeCandidateClient('');
+                      setGuestName('');
                       setSearchQuery('');
                     }}
-                    className="text-emerald-700 hover:text-emerald-900 text-xs font-bold px-2 py-0.5 rounded hover:bg-emerald-100 border-none cursor-pointer"
+                    className="text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border-none"
                   >
                     Cambiar
                   </button>
                 </div>
-              ) : (
-                <div className="relative">
-                  <div className="relative flex items-center">
-                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Escribí nombre o apellido para buscar..."
-                      value={searchQuery}
-                      onFocus={() => setIsDropdownOpen(true)}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setIsDropdownOpen(true);
-                        setGuestName('');
-                      }}
-                      className="w-full pl-8 pr-8 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden font-medium focus:border-slate-800 transition-colors"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2 text-zinc-400 hover:text-zinc-600 text-xs font-bold border-none bg-transparent cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
 
-                  {isDropdownOpen && (
+                {/* DESTINO DE LA ASIGNACIÓN */}
+                <div className={`p-3 rounded-lg text-xs flex items-start gap-2.5 ${
+                  isFull 
+                    ? 'bg-amber-950/70 border border-amber-500/50 text-amber-200' 
+                    : 'bg-emerald-950/70 border border-emerald-500/50 text-emerald-200'
+                }`}>
+                  {isFull ? (
                     <>
-                      {/* Overlay to close on outside click */}
-                      <div 
-                        className="fixed inset-0 z-40" 
-                        onClick={() => setIsDropdownOpen(false)}
-                      />
-                      
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto font-sans">
-                        {filteredCandidates.length > 0 ? (
-                          filteredCandidates.map(c => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => {
-                                setRealtimeCandidateClient(c.id);
-                                setGuestName('');
-                                setIsDropdownOpen(false);
-                                setSearchQuery('');
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-900 border-b border-zinc-50 last:border-none cursor-pointer transition-colors flex items-center justify-between"
-                            >
-                              <span className="font-semibold">{c.apellido}, {c.nombre}</span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 font-mono">{c.tipo}</span>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="p-3 text-xs text-zinc-400 text-center font-sans">
-                            No se encontraron socios que coincidan con &quot;{searchQuery}&quot;
-                          </div>
-                        )}
+                      <ListOrdered className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="text-[11.5px] leading-tight space-y-0.5">
+                        <strong className="text-amber-300 font-bold block">Turno Completo ({rtData.total}/{rtData.cupo})</strong>
+                        <span>Se registrará en la <strong>Lista de Espera (Prioridad P{waitlistItems.length + 1})</strong>. Cuando un alumno se dé de baja, se le asignará el lugar y se le enviará un correo automáticamente.</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="text-[11.5px] leading-tight space-y-0.5">
+                        <strong className="text-emerald-300 font-bold block">Cupo Disponible ({rtData.total}/{rtData.cupo})</strong>
+                        <span>Se confirmará la reserva individual directamente para esta fecha.</span>
                       </div>
                     </>
                   )}
                 </div>
-              )}
-            </div>
 
-            <div className="flex items-center gap-2 text-zinc-300 text-[8px] font-bold uppercase tracking-wider justify-center my-1 select-none">
-              <div className="h-px bg-zinc-200 flex-1"></div>
-              <span>O BIEN</span>
-              <div className="h-px bg-zinc-200 flex-1"></div>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-[9px] text-zinc-400 font-sans block">Registrar Socio Invitado (Nombre y Apellido):</span>
-              <input
-                type="text"
-                placeholder="Ej: Juan Pérez"
-                value={guestName}
-                onChange={(e) => {
-                  setGuestName(e.target.value);
-                  if (e.target.value) setRealtimeCandidateClient('');
-                }}
-                className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={!realtimeCandidateClient && !guestName.trim()}
-              className={`w-full font-bold text-xs px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border-none shadow-sm ${
-                !realtimeCandidateClient && !guestName.trim()
-                  ? 'bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed'
-                  : isFull
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold'
-                    : 'bg-slate-900 border border-slate-900 text-white hover:bg-slate-800'
-              }`}
-            >
-              {isFull ? (
-                <>
-                  <ListOrdered className="w-3.5 h-3.5" />
-                  Anotar en Lista de Espera {guestName.trim() ? '(Invitado)' : ''}
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" />
-                  Reservar {guestName.trim() ? 'como Invitado' : ''}
-                </>
-              )}
-            </button>
-          </form>
+                {/* BOTONES DE ACCIÓN */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRealtimeCandidateClient('');
+                      setGuestName('');
+                      setSearchQuery('');
+                    }}
+                    className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border-none"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddRealtimeVariable}
+                    className={`flex-2 py-2.5 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-md ${
+                      isFull
+                        ? 'bg-amber-400 hover:bg-amber-300 text-zinc-950 shadow-amber-500/20'
+                        : 'bg-lime-400 hover:bg-lime-300 text-zinc-950 shadow-lime-500/20'
+                    }`}
+                    id="btn-confirmar-agregado-alumno"
+                  >
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Confirmar y {isFull ? 'Anotar en Espera' : 'Agendar'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}

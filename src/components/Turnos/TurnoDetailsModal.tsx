@@ -339,22 +339,58 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
 
             {/* ASIGNAR SOCIO FIJO PERMANENTE */}
             <form onSubmit={handleAssignFijo} className="pt-2.5 space-y-2">
-              <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Reservar Horario Fijo</label>
-              <div className="flex gap-2">
+              <label className="font-bold text-[10px] text-zinc-600 uppercase tracking-widest block font-sans">Reservar Horario Fijo</label>
+              <div className="space-y-2">
                 <SearchableSelect
                   options={optionsClientToAssign}
                   value={selectedClientToAssignId}
                   onChange={setSelectedClientToAssignId}
-                  placeholder="-- Elige un socio --"
-                  noOptionsText="No se encontraron socios"
+                  placeholder="-- Buscar y seleccionar socio --"
+                  noOptionsText="No se encontraron socios disponibles"
                 />
-                <button
-                  type="submit"
-                  className="bg-black hover:bg-zinc-800 text-white font-bold text-xs px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm border-none"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Asignar
-                </button>
+
+                {selectedClientToAssignId && (
+                  <div className="bg-zinc-900 text-white p-3 rounded-xl border border-zinc-800 space-y-2 animate-scale-in">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-300 font-medium">Socio a Asignar:</span>
+                      <strong className="text-lime-400">
+                        {clientes.find(c => c.id === selectedClientToAssignId)?.apellido}, {clientes.find(c => c.id === selectedClientToAssignId)?.nombre}
+                      </strong>
+                    </div>
+
+                    <div className={`p-2 rounded-lg text-[11px] leading-tight ${
+                      selectedTurno.asignados_ids.length >= selectedTurno.cupo_maximo
+                        ? 'bg-amber-950/70 border border-amber-500/50 text-amber-200'
+                        : 'bg-emerald-950/70 border border-emerald-500/50 text-emerald-200'
+                    }`}>
+                      {selectedTurno.asignados_ids.length >= selectedTurno.cupo_maximo
+                        ? `⏳ Turno completo (${selectedTurno.asignados_ids.length}/${selectedTurno.cupo_maximo}). Se registrará en la Lista de Espera de este horario.`
+                        : `🟢 Hay cupo (${selectedTurno.asignados_ids.length}/${selectedTurno.cupo_maximo}). Se asignará como turno semanal fijo.`}
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedClientToAssignId('')}
+                        className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border-none"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className={`flex-2 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-md ${
+                          selectedTurno.asignados_ids.length >= selectedTurno.cupo_maximo
+                            ? 'bg-amber-400 hover:bg-amber-300 text-zinc-950'
+                            : 'bg-lime-400 hover:bg-lime-300 text-zinc-950'
+                        }`}
+                        id="btn-confirmar-fijo"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Confirmar Asignación</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           </div>
