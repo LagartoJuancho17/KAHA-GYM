@@ -156,10 +156,12 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
                     </span>
                     <button
                       onClick={() => {
-                        removerAsignacionFija(activeClient.id, tFid);
-                        setTurnosModalSuccess('Horario fijo removido con éxito.');
-                        setTurnosModalError('');
-                        setTimeout(() => setTurnosModalSuccess(''), 2000);
+                        if (window.confirm(`¿Está seguro que desea eliminar a este cliente de sus turnos FIJOS?`)) {
+                          removerAsignacionFija(activeClient.id, tFid);
+                          setTurnosModalSuccess('Horario fijo removido con éxito.');
+                          setTurnosModalError('');
+                          setTimeout(() => setTurnosModalSuccess(''), 2000);
+                        }
                       }}
                       className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 hover:bg-red-100 rounded-md border border-red-100 transition-colors cursor-pointer text-[10px] font-bold"
                       title="Remover turno"

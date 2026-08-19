@@ -279,7 +279,11 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                     <div key={cl.id} className="flex justify-between items-center p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
                       <span className="font-semibold text-zinc-900">{cl.apellido}, {cl.nombre}</span>
                       <button
-                        onClick={() => removerAsignacionFija(cId, turnoId)}
+                        onClick={() => {
+                          if (window.confirm(`¿Está seguro que desea eliminar a este cliente de sus turnos FIJOS?`)) {
+                            removerAsignacionFija(cId, turnoId);
+                          }
+                        }}
                         className="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded-md border border-red-100 cursor-pointer border-none"
                         title="Remover asignación permanente"
                       >
