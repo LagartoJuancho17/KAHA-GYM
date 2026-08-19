@@ -40,9 +40,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
     }
   }, [selectedTurno]);
 
-  if (!selectedTurno) return null;
-
-  const clientesActivos = clientes.filter(c => c.activo);
+  const clientesActivos = useMemo(() => clientes.filter(c => c.activo), [clientes]);
 
   const optionsClientToAssign = useMemo(() => {
     return clientesActivos
@@ -57,6 +55,8 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
         };
       });
   }, [clientesActivos, planes, turnoId]);
+
+  if (!selectedTurno) return null;
 
   // Assign Fijo handler
   const handleAssignFijo = (e: React.FormEvent) => {

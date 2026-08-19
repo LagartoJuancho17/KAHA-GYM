@@ -48,10 +48,9 @@ export const TurnosHistorialModal: React.FC<TurnosHistorialModalProps> = ({
   const [categoria, setCategoria] = useState<CategoriaLog>('TODOS');
   const [filtroFecha, setFiltroFecha] = useState(filtroFechaInicial || '');
 
-  if (!isOpen) return null;
-
   // Filtrar logs pertenecientes a turnos
   const logsTurnos = useMemo(() => {
+    if (!isOpen) return [];
     return auditLogs.filter(log => {
       // 1. Debe ser una acción de turnos o tener turno en sus detalles
       const esAccionTurno = ACCIONES_TURNOS.includes(log.accion) || 
@@ -184,6 +183,8 @@ export const TurnosHistorialModal: React.FC<TurnosHistorialModalProps> = ({
         };
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-5 backdrop-blur-xs font-sans text-xs animate-fade-in" id="modal-historial-turnos">
