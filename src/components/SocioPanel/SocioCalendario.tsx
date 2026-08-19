@@ -10,6 +10,18 @@ interface SocioCalendarioProps {
   setErrorMessage: (msg: string | null) => void;
 }
 
+const getTodayDayName = (): 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES' => {
+  const dayIndex = new Date().getDay(); // 0 = Domingo, 1 = Lunes, 2 = Martes, 3 = Miercoles, 4 = Jueves, 5 = Viernes, 6 = Sabado
+  const map: Record<number, 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'> = {
+    1: 'LUNES',
+    2: 'MARTES',
+    3: 'MIERCOLES',
+    4: 'JUEVES',
+    5: 'VIERNES',
+  };
+  return map[dayIndex] || 'LUNES'; // Si es fin de semana (sábado/domingo), inicia en LUNES
+};
+
 export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   socio,
   setSuccessMessage,
@@ -21,7 +33,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   } = useGym();
 
   const [weekOffset, setWeekOffset] = useState<number>(0);
-  const [activeDay, setActiveDay] = useState<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>('LUNES');
+  const [activeDay, setActiveDay] = useState<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>(() => getTodayDayName());
   const [bookingTurnId, setBookingTurnId] = useState<string | null>(null);
   const [reprogramTurnId, setReprogramTurnId] = useState<string | null>(null);
   // Fix 1: Inline confirm state for Reprogramar (replaces window.confirm)
@@ -246,6 +258,11 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
         <div className="grid grid-cols-5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1 lg:max-w-xl mx-auto" id="socio-agenda-tabs">
           {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const).map(dia => {
             const isActive = activeDay === dia;
+            const datesInSelectedWeek = getAvailableDatesForTurn(dia).filter(isDateInSelectedWeek);
+            const dateStr = datesInSelectedWeek[0] || '';
+            const dayNumber = dateStr ? new Date(dateStr + 'T00:00:00').getDate() : null;
+            const isToday = weekOffset === 0 && getTodayDayName() === dia;
+
             return (
               <button
                 key={dia}
@@ -254,17 +271,34 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                   setBookingTurnId(null);
                   setReprogramTurnId(null);
                 }}
-                className={`py-3.5 text-center text-xs font-bold rounded-xl transition-all cursor-pointer select-none border ${
+                className={`py-2.5 sm:py-3 text-center text-xs font-bold rounded-xl transition-all cursor-pointer select-none border relative ${
                   isActive 
                     ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 text-white border-transparent font-black scale-102 shadow-sm ring-2 ring-emerald-500/20' 
                     : 'text-slate-500 hover:text-slate-800 bg-transparent border-transparent hover:bg-white/50'
                 }`}
               >
                 <div className="flex flex-col items-center">
-                  <span className="font-mono uppercase text-[9px] tracking-wide">
-                    {dia === 'MIERCOLES' ? 'MIÉ' : dia.slice(0, 3)}
-                  </span>
-                  <span className={`text-[7px] hidden md:inline tracking-wider mt-0.5 ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>DIA</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono uppercase text-[10px] sm:text-xs tracking-wide">
+                      {dia === 'MIERCOLES' ? 'MIÉ' : dia.slice(0, 3)}
+                    </span>
+                    {dayNumber && (
+                      <span className={`text-[10px] font-mono ${isActive ? 'text-emerald-100 font-bold' : 'text-slate-400 font-semibold'}`}>
+                        {dayNumber}
+                      </span>
+                    )}
+                  </div>
+                  {isToday ? (
+                    <span className={`text-[7.5px] font-extrabold uppercase px-1.5 py-0.2 rounded-full tracking-wider mt-0.5 ${
+                      isActive ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      HOY
+                    </span>
+                  ) : (
+                    <span className={`text-[7px] hidden md:inline tracking-wider mt-0.5 ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>
+                      DÍA
+                    </span>
+                  )}
                 </div>
               </button>
             );
