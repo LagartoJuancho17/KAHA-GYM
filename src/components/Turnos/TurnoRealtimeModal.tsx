@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History } from 'lucide-react';
+import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered } from 'lucide-react';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 
 interface TurnoRealtimeModalProps {
@@ -22,7 +22,7 @@ const formatWspPhone = (phone?: string) => {
 
 export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selectedSlot, onClose }) => {
   const {
-    turnos, clientes, recuperos,
+    turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
     actualizarEstadoRecupero, addCliente, notificarBajaClase
   } = useGym();
@@ -65,15 +65,32 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   const rtData = getCellRealtimeData(selectedSlot.id, selectedSlot.date);
   const isFull = rtData.total >= rtData.cupo;
+
+  // Lista de espera para este turno y fecha
+  const waitlistItems = useMemo(() => {
+    return waitlistReservas
+      .filter(w => w.turno_id === selectedSlot.id && w.fecha === selectedSlot.date)
+      .map(w => {
+        const cl = clientes.find(c => c.id === w.cliente_id);
+        return {
+          id: w.id,
+          clienteId: w.cliente_id,
+          nombre: cl ? `${cl.apellido}, ${cl.nombre}` : 'Socio',
+          creado_at: w.creado_at
+        };
+      });
+  }, [waitlistReservas, selectedSlot.id, selectedSlot.date, clientes]);
   
-  // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date
+  // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date, and not already in waitlist
   const candidateClients = useMemo(() => {
     return clientes.filter(c => {
+      const alreadyInWaitlist = waitlistReservas.some(w => w.cliente_id === c.id && w.turno_id === selectedSlot.id && w.fecha === selectedSlot.date);
       return c.activo && 
         !c.turnos_fijos.includes(selectedSlot.id) && 
-        !(c.reservas_individuales || []).some(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date);
+        !(c.reservas_individuales || []).some(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date) &&
+        !alreadyInWaitlist;
     });
-  }, [clientes, selectedSlot.id, selectedSlot.date]);
+  }, [clientes, selectedSlot.id, selectedSlot.date, waitlistReservas]);
 
   const filteredCandidates = useMemo(() => {
     if (!searchQuery.trim()) return candidateClients;
@@ -401,9 +418,63 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             )}
           </div>
 
+          {/* LISTA DE ESPERA PARA ESTA FECHA */}
+          {waitlistItems.length > 0 && (
+            <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                  <ListOrdered className="w-4 h-4 text-amber-600" />
+                  <span>Lista de Espera ({waitlistItems.length})</span>
+                </div>
+                <span className="text-[10px] text-amber-700 font-semibold">
+                  Auto-promoción al liberarse un cupo
+                </span>
+              </div>
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
+                {waitlistItems.map((wl, idx) => (
+                  <div key={wl.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-200/80 text-xs shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                        P{idx + 1}
+                      </span>
+                      <span className="font-semibold text-zinc-900">{wl.nombre}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
+                        setRealtimeSuccess('Socio retirado de la lista de espera.');
+                        setTimeout(() => setRealtimeSuccess(null), 2500);
+                      }}
+                      className="text-zinc-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer border-none bg-transparent"
+                      title="Retirar de lista de espera"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Agendar Variable o Invitado Form */}
           <form onSubmit={handleAddRealtimeVariable} className="border-t border-zinc-100 pt-4 space-y-3">
-            <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">Agendar Alumno Variable o Invitado</label>
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">
+                {isFull ? 'Anotar Alumno en Lista de Espera' : 'Agendar Alumno Variable o Invitado'}
+              </label>
+              {isFull && (
+                <span className="text-[9.5px] font-bold text-amber-700 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded-full">
+                  Turno Completo ({rtData.total}/{rtData.cupo})
+                </span>
+              )}
+            </div>
+
+            {isFull && (
+              <div className="bg-amber-50 border border-amber-200/80 rounded-lg p-2.5 text-[11px] text-amber-800 leading-relaxed">
+                Este turno ya alcanzó su cupo máximo. Al agregar un alumno quedará registrado en la <strong>lista de espera</strong> y se le asignará el lugar automáticamente con aviso por email si alguien se da de baja.
+              </div>
+            )}
             
             <div className="space-y-1 relative">
               <span className="text-[9px] text-zinc-400 font-sans block">Socio Registrado (Escribí para buscar):</span>
@@ -514,15 +585,26 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
             <button
               type="submit"
-              disabled={(!realtimeCandidateClient && !guestName.trim()) || isFull}
-              className={`w-full font-bold text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border-none ${
-                (!realtimeCandidateClient && !guestName.trim()) || isFull
+              disabled={!realtimeCandidateClient && !guestName.trim()}
+              className={`w-full font-bold text-xs px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border-none shadow-sm ${
+                !realtimeCandidateClient && !guestName.trim()
                   ? 'bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed'
-                  : 'bg-slate-900 border border-slate-900 text-white hover:bg-slate-800 shadow-sm'
+                  : isFull
+                    ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold'
+                    : 'bg-slate-900 border border-slate-900 text-white hover:bg-slate-800'
               }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              Reservar {guestName.trim() ? 'como Invitado' : ''}
+              {isFull ? (
+                <>
+                  <ListOrdered className="w-3.5 h-3.5" />
+                  Anotar en Lista de Espera {guestName.trim() ? '(Invitado)' : ''}
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  Reservar {guestName.trim() ? 'como Invitado' : ''}
+                </>
+              )}
             </button>
           </form>
         </div>

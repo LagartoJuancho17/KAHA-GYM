@@ -2047,9 +2047,6 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ).length;
 
     const totalOccupied = fijosCount + individualCount + recuperosCount;
-    if (totalOccupied >= turno.cupo_maximo) {
-      return { success: false, message: `El turno ya está completo para esa fecha (${totalOccupied}/${turno.cupo_maximo}).` };
-    }
 
     // Check duplicate: cannot book the EXACT SAME shift twice on the same date
     const alreadyBookedThisShiftOnDate = (cliente.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === fecha) || 
@@ -2061,6 +2058,20 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (alreadyBookedThisShiftOnDate) {
       return { success: false, message: `Ya tienes este turno reservado para el día ${fecha}.` };
+    }
+
+    // Si el turno está lleno, anotar automáticamente en la lista de espera para esta fecha
+    if (totalOccupied >= turno.cupo_maximo) {
+      const wlRes = agregarListaEsperaReserva(clienteId, turnoId, fecha);
+      if (wlRes.success) {
+        addToast('add', `Turno completo (${totalOccupied}/${turno.cupo_maximo}). ${cliente.nombre} anotado/a en lista de espera.`);
+        return {
+          success: true,
+          message: `El turno está completo (${totalOccupied}/${turno.cupo_maximo}). ${cliente.nombre} ${cliente.apellido} ha sido anotado/a en la lista de espera. Si alguien se da de baja, ingresará automáticamente y se le enviará un correo de confirmación.`,
+          putInWaitlist: true
+        };
+      }
+      return wlRes;
     }
 
     const nuevaReserva: ReservaIndividual = {
