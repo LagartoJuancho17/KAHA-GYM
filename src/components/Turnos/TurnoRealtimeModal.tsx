@@ -127,18 +127,21 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         plan_id: 'p-none',
         exencion_cobro: 'NINGUNA',
         allowDuplicate: true,
+        // El alta y la anotación se resuelven en la misma llamada. Si se hiciera
+        // en dos pasos (crear y después anotar), el segundo paso no encuentra al
+        // socio: React todavía no actualizó `clientes` dentro de este handler.
         initialReservaIndividual: isFull ? undefined : {
           turno_id: selectedSlot.id,
           fecha: selectedSlot.date
-        }
+        },
+        initialWaitlistReserva: isFull ? {
+          turno_id: selectedSlot.id,
+          fecha: selectedSlot.date
+        } : undefined
       });
 
       if (newGuestResult.success) {
         if (isFull) {
-          const guestId = newGuestResult.cliente?.id;
-          if (guestId) {
-            agregarListaEsperaReserva(guestId, selectedSlot.id, selectedSlot.date);
-          }
           setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" registrado en la LISTA DE ESPERA.`);
         } else {
           setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" agendado con éxito en la clase.`);

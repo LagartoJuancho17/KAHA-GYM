@@ -57,7 +57,7 @@ interface GymContextType {
   removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
 
   // Clientes Methods
-  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean; initialReservaIndividual?: { turno_id: string; fecha: string } }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
+  addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean; initialReservaIndividual?: { turno_id: string; fecha: string }; initialWaitlistReserva?: { turno_id: string; fecha: string } }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
   updateCliente: (id: string, updates: Partial<Cliente>) => { success: boolean; message: string };
   autorizarCliente: (id: string, planId?: string, tipo?: TipoCliente) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
@@ -871,7 +871,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // así que al refrescar el mismo evento se veía duplicado o se perdía.
     const newLog: AuditLog = {
       id: nuevoLogId(),
-      usuario_id: googleUser?.id || '',
+      // googleUser no tiene `id` (es { email, name, picture?, role }), así que esto
+      // siempre fue '' en runtime. La identidad del usuario va en usuario_email.
+      usuario_id: '',
       usuario_email: emailToUse,
       accion,
       detalles: detalles || {},
@@ -962,6 +964,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deuda_acumulada?: number;
     allowDuplicate?: boolean;
     initialReservaIndividual?: { turno_id: string; fecha: string };
+    // Igual que initialReservaIndividual, pero para la lista de espera cuando el
+    // turno esta lleno. Va aca adentro porque agregarListaEsperaReserva busca el
+    // socio en el state `clientes`, y el recien creado todavia no esta ahi.
+    initialWaitlistReserva?: { turno_id: string; fecha: string };
   }) => {
     // Validar duplicados (email o nombre+apellido idénticos) salvo que allowDuplicate sea true
     if (!clientData.allowDuplicate && isDuplicateFuzzy(clientData.nombre, clientData.apellido, clientData.email, clientes)) {
@@ -1108,6 +1114,32 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })().catch((err) => {
         console.error("Error inesperado al sincronizar el alta del socio con Supabase:", err);
         addToast('error', 'Ocurrió un error al guardar el socio en la base. Verificá que se haya registrado correctamente.');
+      });
+    }
+
+    // Lista de espera para una fecha puntual (turno lleno). Se hace acá y no
+    // llamando a agregarListaEsperaReserva desde afuera, porque esa función busca
+    // al socio en el state `clientes` y el recién creado todavía no está: React no
+    // actualizó el state dentro del mismo handler. Acá tenemos newClient a mano.
+    if (clientData.initialWaitlistReserva) {
+      const { turno_id, fecha } = clientData.initialWaitlistReserva;
+      const nuevoEnEspera: WaitlistReserva = {
+        id: `wl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        cliente_id: newClient.id,
+        turno_id,
+        fecha,
+        creado_at: new Date().toISOString()
+      };
+      setWaitlistReservas(prev => {
+        const yaEsta = prev.some(w => w.cliente_id === newClient.id && w.turno_id === turno_id && w.fecha === fecha);
+        const next = yaEsta ? prev : [...prev, nuevoEnEspera];
+        localStorage.setItem('gym_waitlist_reservas', JSON.stringify(next));
+        return next;
+      });
+      addAuditLog('LISTA_ESPERA_RESERVA_AGREGADO', {
+        cliente: `${newClient.nombre} ${newClient.apellido}`,
+        turno_id,
+        fecha
       });
     }
 
