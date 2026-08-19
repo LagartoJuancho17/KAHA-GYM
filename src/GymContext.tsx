@@ -339,13 +339,15 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data: recuperosDb, error: recsErr } = await supabase.from('recupero_turnos').select('*');
       if (recsErr) throw recsErr;
 
-      // 7. Fetch Audit Logs
+      // 7. Fetch Audit Logs desde la base de datos Supabase
       const { data: logsDb, error: logsErr } = await supabase
         .from('logs_auditoria')
         .select('*')
         .order('creado_at', { ascending: false })
-        .limit(100);
-      if (logsErr) throw logsErr;
+        .limit(500);
+      if (logsErr) {
+        console.warn('Nota sobre logs de auditoría en Supabase:', logsErr);
+      }
 
       // Migración: el turno de 11:00 de Lunes/Miércoles/Viernes ya no existe.
       // generarTurnosIniciales dejó de crearlo, pero pueden quedar filas viejas
@@ -495,7 +497,28 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTurnos(shiftList);
       setPagos(mappedPagos);
       setRecuperos(mappedRecs);
-      setAuditLogs(mappedLogs);
+      if (mappedLogs.length > 0) {
+        setAuditLogs(mappedLogs);
+        localStorage.setItem('gym_audit_logs', JSON.stringify(mappedLogs));
+      } else {
+        const localLogs = localStorage.getItem('gym_audit_logs');
+        if (localLogs) {
+          try {
+            const parsed = JSON.parse(localLogs);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setAuditLogs(parsed);
+              // Backfill initial logs a Supabase
+              parsed.slice(0, 50).forEach((l: AuditLog) => {
+                supabase.from('logs_auditoria').insert({
+                  usuario_email: l.usuario_email || 'admin@gimnasio.com.ar',
+                  accion: l.accion,
+                  detalles: l.detalles || {}
+                }).then(() => {});
+              });
+            }
+          } catch(e) {}
+        }
+      }
 
       const localGoogleUser = localStorage.getItem('gym_google_user');
       if (localGoogleUser) {
@@ -826,18 +849,44 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const addAuditLog = (accion: string, detalles: any, userEmail: string = rolActivo === 'ADMIN' ? 'admin@gimnasio.com.ar' : 'operador@gimnasio.com.ar') => {
+  const addAuditLog = (accion: string, detalles: any, userEmail?: string) => {
+    const emailToUse = userEmail || googleUser?.email || (rolActivo === 'ADMIN' ? 'admin@gimnasio.com.ar' : 'operador@gimnasio.com.ar');
+    const tempId = `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const newLog: AuditLog = {
-      id: `log-${Date.now()}`,
-      usuario_id: rolActivo === 'ADMIN' ? 'usr-admin' : 'usr-operador',
-      usuario_email: userEmail,
+      id: tempId,
+      usuario_id: googleUser?.id || '',
+      usuario_email: emailToUse,
       accion,
-      detalles,
+      detalles: detalles || {},
       creado_at: new Date().toISOString()
     };
-    const updated = [newLog, ...auditLogs];
-    setAuditLogs(updated);
-    localStorage.setItem('gym_audit_logs', JSON.stringify(updated));
+    
+    setAuditLogs(prev => [newLog, ...prev]);
+
+    // Persistir en la base de datos Supabase
+    if (supabase) {
+      supabase
+        .from('logs_auditoria')
+        .insert({
+          usuario_email: emailToUse,
+          accion,
+          detalles: detalles || {}
+        })
+        .select()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error al insertar log de auditoría en Supabase:', error);
+          } else if (data && data[0]) {
+            setAuditLogs(prev => prev.map(l => l.id === tempId ? { ...l, id: data[0].id } : l));
+          }
+        });
+    }
+
+    try {
+      const stored = localStorage.getItem('gym_audit_logs');
+      const parsed = stored ? JSON.parse(stored) : [];
+      localStorage.setItem('gym_audit_logs', JSON.stringify([newLog, ...parsed].slice(0, 500)));
+    } catch(e) {}
   };
 
   const handleSetRolActivo = (rol: RolUsuario) => {
