@@ -12,6 +12,7 @@ import {
 } from './initialMockData';
 import { supabase } from './supabaseClient';
 import { mergeLogs, logsFaltantesEnDb, parsearLogsGuardados, normalizarIdsLegacy, nuevoLogId, MAX_LOGS } from './lib/auditLogs';
+import { calcularOcupacion, conflictosAlAgregarFijo, reservasPropiasDuplicadas } from './lib/ocupacion';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -70,7 +71,7 @@ interface GymContextType {
   updatePrecioPlan: (planId: string, nuevoPrecio: number, userEmail: string) => void;
 
   // Turnos Methods
-  asignarClienteFijo: (clienteId: string, turnoId: string) => { success: boolean; message: string; putInWaitlist?: boolean };
+  asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }> };
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
   notificarBajaClase: (clienteId: string, turnoId: string, fecha?: string) => boolean;
   notificarAltaWaitlist: (clienteId: string, turnoId: string, fecha?: string) => boolean;
@@ -1565,7 +1566,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // TURNOS
-  const asignarClienteFijo = (clienteId: string, turnoId: string) => {
+  const asignarClienteFijo = (clienteId: string, turnoId: string, opciones?: { forzar?: boolean }) => {
     const cliente = clientes.find(c => c.id === clienteId);
     const turno = turnos.find(t => t.id === turnoId);
 
@@ -1588,7 +1589,25 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: `Límite alcanzado: El plan del socio (${plan?.nombre || 'Sin Plan'}) permite como máximo ${maxDias} días distintos por semana.` };
     }
 
-    // Verificar cupo máximo
+    // Un fijo entra TODAS las semanas, así que no alcanza con mirar cuántos fijos hay:
+    // hay que mirar cada fecha futura de este turno que ya tenga reservas puntuales o
+    // recuperos. Antes esto sólo miraba `asignados_ids.length` y era ciego a las fechas,
+    // por eso la matriz fija se veía prolija (7 de 7) y la turnera del día mostraba 8.
+    const hoyStr = new Date().toISOString().slice(0, 10);
+    const conflictos = conflictosAlAgregarFijo(turno, clientes, recuperos, hoyStr, clienteId);
+    if (conflictos.length > 0 && !opciones?.forzar) {
+      const detalle = conflictos
+        .map(c => `${c.fecha.slice(8, 10)}/${c.fecha.slice(5, 7)} (${c.ocupacionConElFijo}/${c.cupo})`)
+        .join(', ');
+      return {
+        success: false,
+        requiereConfirmacion: true,
+        conflictos,
+        message: `Este turno ya tiene reservas puntuales de otros socios que quedarían por encima del cupo: ${detalle}. Podés asignarlo igual y esas reservas pasarán a lista de espera.`
+      };
+    }
+
+    // Verificar cupo máximo semanal (los fijos entre sí)
     const ocupadoActualmente = turno.asignados_ids.length;
     if (ocupadoActualmente >= turno.cupo_maximo) {
       // Mandar a lista de espera automática
@@ -1622,13 +1641,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Asignación limpia exitosa — quitar de lista de espera si ya estaba anotado ahí
+    // El socio pasa a ser fijo de este turno: sus reservas SUELTAS futuras del MISMO
+    // turno ya no tienen sentido y lo duplicarían (contaría como fijo y como reserva).
+    // Es el flujo normal del gimnasio: prueba clases sueltas y después se hace fijo.
+    // Verificado en producción: los 10 casos de duplicación venían de acá.
+    const fechasDuplicadas = reservasPropiasDuplicadas(cliente, turnoId, hoyStr);
+
     const updatedClientes = clientes.map(c => {
       if (c.id === clienteId) {
-        return { 
-          ...c, 
+        return {
+          ...c,
           tipo: 'FIJO' as TipoCliente,
           turnos_fijos: [...c.turnos_fijos, turnoId],
-          turno_variable: c.turno_variable === turnoId ? undefined : c.turno_variable 
+          turno_variable: c.turno_variable === turnoId ? undefined : c.turno_variable,
+          reservas_individuales: (c.reservas_individuales || []).filter(
+            r => !(r.turno_id === turnoId && r.fecha >= hoyStr)
+          )
         };
       }
       return c;
@@ -1663,6 +1691,25 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+    // Persistir la limpieza de las reservas duplicadas del propio socio.
+    if (supabase && fechasDuplicadas.length > 0) {
+      const target = updatedClientes.find(c => c.id === clienteId);
+      if (target) {
+        supabase.from('clientes')
+          .update({ reservas_individuales: target.reservas_individuales || [] })
+          .eq('id', clienteId)
+          .then(({ error }) => {
+            if (error) console.error('Error al limpiar reservas duplicadas al asignar fijo:', error);
+          });
+      }
+      addAuditLog('RESERVAS_DUPLICADAS_LIMPIADAS', {
+        cliente: `${cliente.nombre} ${cliente.apellido}`,
+        turno_id: turnoId,
+        fechas: fechasDuplicadas,
+        motivo: 'El socio pasó a ser fijo de este turno; sus reservas sueltas lo duplicaban.'
+      });
+    }
 
     if (supabase) {
       resolveTurnoUuid(turnoId).then(async (turnoUuid) => {
@@ -2124,27 +2171,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const turno = turnos.find(t => t.id === turnoId);
     if (!turno) return { success: false, message: 'Turno no encontrado.' };
 
-    // Check capacity: fijos ACTIVOS (excluyendo los que suspendieron su clase ese
-    // día, que liberan lugar) + reservas individuales de esa fecha. Debe coincidir
-    // con getOccupiedCountOnDate del panel del socio; si no, la grilla muestra un
-    // cupo libre pero la reserva se rechaza por "turno completo" (falla silenciosa).
-    const fijosCount = turno.asignados_ids.filter(fid => {
-      const fijoCliente = clientes.find(c => c.id === fid);
-      return !((fijoCliente?.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha));
-    }).length;
-    // Count individual bookings on this date for this turn
-    const individualCount = clientes.reduce((acc, c) => {
-      const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha);
-      return acc + bookingsOnDate.length;
-    }, 0);
-    // Los recuperos agendados en este slot/fecha también ocupan lugar. Sin contarlos
-    // se podía reservar por encima del cupo (ej.: 8 anotados en un turno de 7 cuando
-    // había un recupero agendado que este chequeo no veía).
-    const recuperosCount = recuperos.filter(
-      r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turnoId && r.fecha_recupero === fecha
-    ).length;
-
-    const totalOccupied = fijosCount + individualCount + recuperosCount;
+    // Ocupación por la función canónica (src/lib/ocupacion.ts). Antes esta fórmula
+    // estaba copiada acá y en otros 5 lugares, y 3 de esas copias contaban distinto.
+    const totalOccupied = calcularOcupacion(turno, fecha, clientes, recuperos).total;
 
     // Check duplicate: cannot book the EXACT SAME shift twice on the same date
     const alreadyBookedThisShiftOnDate = (cliente.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === fecha) || 
@@ -2476,17 +2505,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const turno = turnos.find(t => t.id === turnoId);
     if (turno) {
-      const fijos = (turno.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
-      const suspendidosCount = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha)).length;
-      const fijosActivosCount = Math.max(0, fijos.length - suspendidosCount);
-      const individualCount = clientes.reduce((acc, c) => {
-        const bookingsOnDate = (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha);
-        return acc + bookingsOnDate.length;
-      }, 0);
-      const occupiedCount = fijosActivosCount + individualCount;
-
-      if (occupiedCount >= turno.cupo_maximo) {
-        return { success: false, message: `El turno se encuentra completo para retomar en esta fecha (${occupiedCount}/${turno.cupo_maximo}).` };
+      // Este socio está suspendido ese día, así que hoy NO cuenta en la ocupación.
+      // Retomar lo suma de nuevo: hay que ver si entra. Antes esta copia de la
+      // fórmula se olvidaba de los recuperos y dejaba retomar por encima del cupo.
+      const o = calcularOcupacion(turno, fecha, clientes, recuperos);
+      if (o.total >= turno.cupo_maximo) {
+        return { success: false, message: `El turno se encuentra completo para retomar en esta fecha (${o.total}/${turno.cupo_maximo}).` };
       }
     }
 

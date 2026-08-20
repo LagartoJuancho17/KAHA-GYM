@@ -40,9 +40,14 @@ export function contarReservas(turnoId: string, clientes: Cliente[], fecha: stri
   }, 0);
 }
 
+// PENDIENTE y COMPLETADO ocupan lugar: COMPLETADO significa que ya le hicieron
+// check-in, o sea que la persona está físicamente en la clase. Contar sólo
+// PENDIENTE (como hacía crearReservaIndividual) dejaba un lugar fantasma libre
+// apenas se marcaba la asistencia. EXPIRADO no ocupa: esa clase ya se perdió.
 export function contarRecuperos(turnoId: string, recuperos: RecuperoTurno[], fecha: string): number {
   return (recuperos || []).filter(
-    r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turnoId && r.fecha_recupero === fecha
+    r => (r.estado === 'PENDIENTE' || r.estado === 'COMPLETADO') &&
+         r.turno_recupero_id === turnoId && r.fecha_recupero === fecha
   ).length;
 }
 
@@ -110,7 +115,8 @@ export function conflictosAlAgregarFijo(
   turno: Turno,
   clientes: Cliente[],
   recuperos: RecuperoTurno[],
-  desde: string
+  desde: string,
+  clienteId?: string
 ): ConflictoFecha[] {
   // Fechas candidatas: las que tienen alguna reserva o recupero en este turno.
   const fechas = new Set<string>();
@@ -126,9 +132,17 @@ export function conflictosAlAgregarFijo(
     }
   }
 
+  // Las reservas del PROPIO socio que se está por hacer fijo no son gente extra:
+  // son la misma persona y se limpian al asignarlo. No deben generar conflicto.
+  const clientesParaContar = clienteId
+    ? clientes.map(c => c.id === clienteId
+        ? { ...c, reservas_individuales: (c.reservas_individuales || []).filter(r => r.turno_id !== turno.id) }
+        : c)
+    : clientes;
+
   const conflictos: ConflictoFecha[] = [];
   for (const fecha of Array.from(fechas).sort()) {
-    const o = calcularOcupacion(turno, fecha, clientes, recuperos);
+    const o = calcularOcupacion(turno, fecha, clientesParaContar, recuperos);
     // El fijo nuevo suma 1 salvo que ya estuviera suspendido ese día (no puede estarlo:
     // recién se lo asigna), así que la proyección es total + 1.
     const conElFijo = o.total + 1;
@@ -137,6 +151,28 @@ export function conflictosAlAgregarFijo(
     }
   }
   return conflictos;
+}
+
+/**
+ * Reservas sueltas que un socio tiene para ESTE MISMO turno en fechas futuras.
+ *
+ * Por qué importa: el flujo real del gimnasio es "primero prueba clases sueltas,
+ * después se hace fijo". Al asignarlo como fijo, esas reservas viejas quedan y la
+ * misma persona pasa a contarse DOS veces en cada una de esas fechas (una como
+ * fijo, otra como reserva). Es un cuerpo, no dos: hay que limpiarlas.
+ *
+ * Verificado en producción: 10 de 10 socios con esta duplicación habían reservado
+ * ANTES de que un admin los hiciera fijos.
+ */
+export function reservasPropiasDuplicadas(
+  cliente: Cliente,
+  turnoId: string,
+  desde: string
+): string[] {
+  return (cliente.reservas_individuales || [])
+    .filter(r => r.turno_id === turnoId && r.fecha >= desde)
+    .map(r => r.fecha)
+    .sort();
 }
 
 /**

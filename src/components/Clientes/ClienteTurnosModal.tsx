@@ -22,6 +22,12 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
   const [turnosModalError, setTurnosModalError] = useState<string>('');
   const [turnosModalSuccess, setTurnosModalSuccess] = useState<string>('');
   const [turnosModalWaitlist, setTurnosModalWaitlist] = useState<string>('');
+  // Conflicto de cupo: reservas puntuales de otros socios que quedarian por encima
+  // del limite si se asigna este fijo. El admin decide, no el sistema.
+  const [conflictoCupo, setConflictoCupo] = useState<{
+    mensaje: string;
+    fechas: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,7 +53,7 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
       return a.hora.localeCompare(b.hora);
     });
 
-  const handleAssignTurno = () => {
+  const handleAssignTurno = (forzar = false) => {
     setTurnosModalError('');
     setTurnosModalSuccess('');
     setTurnosModalWaitlist('');
@@ -57,7 +63,16 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
       return;
     }
 
-    const res = asignarClienteFijo(activeClient.id, selectedTurnoToAssign);
+    const res = asignarClienteFijo(activeClient.id, selectedTurnoToAssign, { forzar });
+
+    // El turno tiene reservas puntuales de OTROS socios que quedarían sobre el cupo.
+    // No se decide solo: se le muestra al admin y él elige.
+    if (!res.success && res.requiereConfirmacion) {
+      setConflictoCupo({ mensaje: res.message, fechas: res.conflictos || [] });
+      return;
+    }
+    setConflictoCupo(null);
+
     if (res.success) {
       if (res.putInWaitlist) {
         setTurnosModalWaitlist(res.message);
@@ -116,6 +131,46 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
             <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg flex items-center gap-2 border border-emerald-200">
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{turnosModalSuccess}</span>
+            </div>
+          )}
+
+          {/* Conflicto de cupo: el turno tiene reservas puntuales de otros socios.
+              Se le muestra al admin con las fechas exactas y decide él. */}
+          {conflictoCupo && (
+            <div className="bg-orange-50 border border-orange-300 p-3 rounded-lg space-y-2.5">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-orange-900 text-[11px]">Este turno quedaría por encima del cupo</p>
+                  <p className="text-[11px] text-orange-800">
+                    Hay reservas puntuales de otros socios en estas fechas:
+                  </p>
+                </div>
+              </div>
+              <ul className="space-y-1 pl-6">
+                {conflictoCupo.fechas.map(f => (
+                  <li key={f.fecha} className="text-[11px] text-orange-900 font-mono">
+                    {f.fecha.slice(8, 10)}/{f.fecha.slice(5, 7)} — quedaría <strong>{f.ocupacionConElFijo}</strong> sobre un cupo de {f.cupo}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2 pt-0.5">
+                <button
+                  onClick={() => setConflictoCupo(null)}
+                  className="flex-1 bg-white border border-zinc-300 text-zinc-700 text-[11px] font-bold py-2 rounded-lg hover:bg-zinc-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleAssignTurno(true)}
+                  className="flex-1 bg-orange-600 text-white text-[11px] font-bold py-2 rounded-lg hover:bg-orange-700 transition-colors cursor-pointer border-none"
+                >
+                  Asignar igual
+                </button>
+              </div>
+              <p className="text-[10px] text-orange-600 pl-6">
+                Si asignás igual, esas fechas quedan sobre el cupo. Después podés cancelarle la reserva puntual al socio desde la Turnera de Tiempo Real.
+              </p>
             </div>
           )}
 
@@ -194,7 +249,7 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
                 ))}
               </select>
               <button
-                onClick={handleAssignTurno}
+                onClick={() => handleAssignTurno(false)}
                 className="bg-zinc-900 hover:bg-zinc-800 text-white px-3.5 py-2 rounded-lg font-bold flex items-center gap-1 cursor-pointer shrink-0 transition-colors border border-transparent shadow-2xs"
               >
                 <Plus className="w-4 h-4" />

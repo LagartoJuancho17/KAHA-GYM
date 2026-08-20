@@ -24,6 +24,11 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   const [cellActionError, setCellActionError] = useState('');
   const [cellActionSuccess, setCellActionSuccess] = useState('');
   const [cellActionWaitlist, setCellActionWaitlist] = useState('');
+  // Reservas puntuales de otros socios que quedarian sobre el cupo al asignar un fijo.
+  const [conflictoCupo, setConflictoCupo] = useState<{
+    mensaje: string;
+    fechas: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>;
+  } | null>(null);
   const [flexCheckInClientId, setFlexCheckInClientId] = useState('');
   const [localProfesor, setLocalProfesor] = useState('');
   const [mostrarOtroProfeInput, setMostrarOtroProfeInput] = useState(false);
@@ -59,8 +64,8 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   if (!selectedTurno) return null;
 
   // Assign Fijo handler
-  const handleAssignFijo = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAssignFijo = (e: React.FormEvent | null, forzar = false) => {
+    if (e) e.preventDefault();
     setCellActionError('');
     setCellActionSuccess('');
     setCellActionWaitlist('');
@@ -70,7 +75,15 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
       return;
     }
 
-    const res = asignarClienteFijo(selectedClientToAssignId, turnoId);
+    const res = asignarClienteFijo(selectedClientToAssignId, turnoId, { forzar });
+
+    // Reservas puntuales de otros socios quedarian sobre el cupo: decide el admin.
+    if (!res.success && res.requiereConfirmacion) {
+      setConflictoCupo({ mensaje: res.message, fechas: res.conflictos || [] });
+      return;
+    }
+    setConflictoCupo(null);
+
     if (res.success) {
       if (res.putInWaitlist) {
         setCellActionWaitlist(res.message);
@@ -173,6 +186,41 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                 <p className="font-bold text-amber-900">⏳ Turno completo — agregado a lista de espera</p>
                 <p>{cellActionWaitlist}</p>
                 <p className="text-[10px] text-amber-600 mt-1">Podés revisar la lista de espera en el detalle del turno y resolver manualmente cuando se libere un lugar.</p>
+              </div>
+            </div>
+          )}
+
+          {conflictoCupo && (
+            <div className="bg-orange-50 border border-orange-300 p-3 rounded-lg space-y-2.5 text-[11px]">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-orange-900">Este turno quedaría por encima del cupo</p>
+                  <p className="text-orange-800">Hay reservas puntuales de otros socios en estas fechas:</p>
+                </div>
+              </div>
+              <ul className="space-y-1 pl-6">
+                {conflictoCupo.fechas.map(f => (
+                  <li key={f.fecha} className="text-orange-900 font-mono">
+                    {f.fecha.slice(8, 10)}/{f.fecha.slice(5, 7)} — quedaría <strong>{f.ocupacionConElFijo}</strong> sobre un cupo de {f.cupo}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConflictoCupo(null)}
+                  className="flex-1 bg-white border border-zinc-300 text-zinc-700 font-bold py-2 rounded-lg hover:bg-zinc-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAssignFijo(null, true)}
+                  className="flex-1 bg-orange-600 text-white font-bold py-2 rounded-lg hover:bg-orange-700 transition-colors cursor-pointer border-none"
+                >
+                  Asignar igual
+                </button>
               </div>
             </div>
           )}

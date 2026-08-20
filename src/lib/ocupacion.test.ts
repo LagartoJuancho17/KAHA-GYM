@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcularOcupacion, conflictosAlAgregarFijo, conflictosAlBajarCupo,
-  contarFijosActivos, contarReservas, contarRecuperos, estaSuspendido
+  contarFijosActivos, contarReservas, contarRecuperos, estaSuspendido, reservasPropiasDuplicadas
 } from './ocupacion';
 import { Cliente, Turno, RecuperoTurno } from '../types';
 
@@ -111,14 +111,17 @@ test('un socio dado de baja no ocupa lugar con su reserva', () => {
   assert.equal(calcularOcupacion(turno(), '2026-08-26', cs).total, 0);
 });
 
-test('suma los recuperos PENDIENTES y ignora los demás estados', () => {
+test('los recuperos PENDIENTE y COMPLETADO ocupan lugar; EXPIRADO no', () => {
+  // Regresión: crearReservaIndividual contaba sólo PENDIENTE mientras la turnera
+  // contaba PENDIENTE+COMPLETADO. Apenas se marcaba la asistencia de un recupero,
+  // su lugar quedaba libre para el chequeo de reservas y entraba uno de más.
   const t = turno();
   const recs = [
     recupero('MIERCOLES-19:00', '2026-08-26', 'PENDIENTE'),
     recupero('MIERCOLES-19:00', '2026-08-26', 'COMPLETADO'),
     recupero('MIERCOLES-19:00', '2026-08-26', 'EXPIRADO')
   ];
-  assert.equal(calcularOcupacion(t, '2026-08-26', [], recs).total, 1);
+  assert.equal(calcularOcupacion(t, '2026-08-26', [], recs).total, 2);
 });
 
 test('lleno usa >= y no >', () => {
@@ -242,4 +245,56 @@ test('tolera turnos y listas vacías o indefinidas', () => {
   const o = calcularOcupacion(t, '2026-08-26', []);
   assert.equal(o.total, 0);
   assert.equal(o.fijos, 0);
+});
+
+// --- duplicación fijo + reserva propia (el caso real de produccion) ---------
+
+test('REGRESION: detecta las reservas propias del socio que se hace fijo', () => {
+  // Caso real: Jesica Corruega reservó MIERCOLES-19:00 para 26/08, 02/09 y 09/09
+  // el 17/08, y el 18/08 un admin la asignó como FIJA de ese mismo turno.
+  // Sus reservas quedaron y pasó a contarse dos veces en esas tres fechas.
+  const jesica = socio('jesica', {
+    reservas_individuales: [
+      reserva('MIERCOLES-19:00', '2026-08-26'),
+      reserva('MIERCOLES-19:00', '2026-09-02'),
+      reserva('MIERCOLES-19:00', '2026-09-09'),
+      reserva('MARTES-17:00', '2026-08-25')   // otro turno: no se toca
+    ] as any
+  });
+  const dups = reservasPropiasDuplicadas(jesica, 'MIERCOLES-19:00', '2026-08-20');
+  assert.deepEqual(dups, ['2026-08-26', '2026-09-02', '2026-09-09']);
+});
+
+test('reservasPropiasDuplicadas ignora fechas pasadas', () => {
+  const c = socio('x', { reservas_individuales: [
+    reserva('MIERCOLES-19:00', '2026-08-05'),
+    reserva('MIERCOLES-19:00', '2026-08-26')
+  ] as any });
+  assert.deepEqual(reservasPropiasDuplicadas(c, 'MIERCOLES-19:00', '2026-08-20'), ['2026-08-26']);
+});
+
+test('las reservas propias NO cuentan como conflicto al hacerse fijo', () => {
+  // 6 fijos de 7, y el septimo es alguien que ya tenia su propia reserva ese dia.
+  // Como su reserva se limpia al asignarlo, no hay sobrecupo: sigue siendo 7.
+  const t = turno({ cupo_maximo: 7, asignados_ids: ['f1','f2','f3','f4','f5','f6'] });
+  const cs = [
+    ...['f1','f2','f3','f4','f5','f6'].map(id => socio(id)),
+    socio('jesica', { reservas_individuales: [reserva('MIERCOLES-19:00', '2026-08-26')] as any })
+  ];
+  // Sin pasar el clienteId, la reserva propia se ve como gente extra (falso conflicto):
+  assert.equal(conflictosAlAgregarFijo(t, cs, [], '2026-08-20').length, 1);
+  // Pasando el clienteId, se descuenta correctamente y no hay conflicto:
+  assert.deepEqual(conflictosAlAgregarFijo(t, cs, [], '2026-08-20', 'jesica'), []);
+});
+
+test('reserva de OTRA persona sí sigue siendo conflicto real', () => {
+  const t = turno({ cupo_maximo: 7, asignados_ids: ['f1','f2','f3','f4','f5','f6'] });
+  const cs = [
+    ...['f1','f2','f3','f4','f5','f6'].map(id => socio(id)),
+    socio('otro', { reservas_individuales: [reserva('MIERCOLES-19:00', '2026-08-26')] as any }),
+    socio('nuevo')
+  ];
+  const conflictos = conflictosAlAgregarFijo(t, cs, [], '2026-08-20', 'nuevo');
+  assert.equal(conflictos.length, 1, 'la reserva de otro socio sí ocupa un lugar real');
+  assert.equal(conflictos[0].ocupacionConElFijo, 8);
 });
