@@ -21,7 +21,7 @@ export const TurnosGrid: React.FC = () => {
     suspenderClaseFija, programarRecuperoPendiente
   } = useGym();
 
-  const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('GRILLA');
+  const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('TIEMPO_REAL');
   const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(0);
   
   // Real-time week helper notifications
@@ -267,17 +267,6 @@ export const TurnosGrid: React.FC = () => {
 
           <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 flex-wrap gap-1">
             <button
-              onClick={() => setSubTab('GRILLA')}
-              className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
-                subTab === 'GRILLA'
-                  ? 'bg-white text-zinc-950 shadow-sm font-semibold'
-                  : 'text-zinc-500 hover:text-zinc-950'
-              }`}
-              id="subtab-grilla-trigger"
-            >
-              Matriz Fija Semanal
-            </button>
-            <button
               onClick={() => setSubTab('TIEMPO_REAL')}
               className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
                 subTab === 'TIEMPO_REAL'
@@ -287,6 +276,17 @@ export const TurnosGrid: React.FC = () => {
               id="subtab-tiemporeal-trigger"
             >
               Turnera de Tiempo Real
+            </button>
+            <button
+              onClick={() => setSubTab('GRILLA')}
+              className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
+                subTab === 'GRILLA'
+                  ? 'bg-white text-zinc-950 shadow-sm font-semibold'
+                  : 'text-zinc-500 hover:text-zinc-950'
+              }`}
+              id="subtab-grilla-trigger"
+            >
+              Matriz Fija Semanal
             </button>
           </div>
         </div>
