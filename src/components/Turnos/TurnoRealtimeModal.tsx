@@ -29,6 +29,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [guestNameConfirmed, setGuestNameConfirmed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
@@ -47,7 +48,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     const fijos = (turno.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
     const suspendidos = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha));
     const fijosActivos = fijos.filter(c => !suspendidos.some(s => s.id === c.id));
-    const vars = clientes.filter(c => c.activo && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));
+    const fijoIds = new Set((turno.asignados_ids || []));
+    const vars = clientes.filter(c => c.activo && !fijoIds.has(c.id) && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));
     const recs = recuperos.filter(r => (r.estado === 'PENDIENTE' || r.estado === 'COMPLETADO') && r.turno_recupero_id === turno.id && r.fecha_recupero === fecha);
 
     return {
@@ -484,7 +486,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             </div>
 
             {/* SELECCIONAR SOCIO REGISTRADO O ESCRIBIR INVITADO */}
-            {!selectedCandidateObj && !guestName.trim() ? (
+            {!selectedCandidateObj && !(guestName.trim() && guestNameConfirmed) ? (
               <div className="space-y-3 bg-zinc-50 p-3.5 rounded-xl border border-zinc-200">
                 <div className="space-y-1 relative">
                   <span className="text-[10px] text-zinc-600 font-bold font-sans block">1. Elegir Socio Registrado:</span>
@@ -561,9 +563,18 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                       type="text"
                       placeholder="Ej: Juan Pérez (Invitado)"
                       value={guestName}
-                      onChange={(e) => setGuestName(e.target.value)}
+                      onChange={(e) => { setGuestName(e.target.value); setGuestNameConfirmed(false); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && guestName.trim()) { e.preventDefault(); setGuestNameConfirmed(true); } }}
                       className="flex-1 border border-zinc-300 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
                     />
+                    <button
+                      type="button"
+                      disabled={!guestName.trim()}
+                      onClick={() => setGuestNameConfirmed(true)}
+                      className="px-3 py-2 bg-zinc-900 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border-none shrink-0"
+                    >
+                      Usar
+                    </button>
                   </div>
                 </div>
               </div>
@@ -587,6 +598,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     onClick={() => {
                       setRealtimeCandidateClient('');
                       setGuestName('');
+                      setGuestNameConfirmed(false);
                       setSearchQuery('');
                     }}
                     className="text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border-none"
@@ -627,6 +639,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     onClick={() => {
                       setRealtimeCandidateClient('');
                       setGuestName('');
+                      setGuestNameConfirmed(false);
                       setSearchQuery('');
                     }}
                     className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border-none"
