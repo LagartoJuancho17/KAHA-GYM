@@ -32,11 +32,14 @@ export function contarFijosActivos(turno: Turno, clientes: Cliente[], fecha: str
   }).length;
 }
 
-export function contarReservas(turnoId: string, clientes: Cliente[], fecha: string): number {
+export function contarReservas(turno: Turno, clientes: Cliente[], fecha: string): number {
+  const fijoIds = new Set(turno.asignados_ids || []);
   return clientes.reduce((acc, c) => {
     // Un socio dado de baja no ocupa lugar.
     if (c.activo === false) return acc;
-    return acc + (c.reservas_individuales || []).filter(r => r.turno_id === turnoId && r.fecha === fecha).length;
+    // Un fijo ya se cuenta en fijosActivos; no duplicarlo.
+    if (fijoIds.has(c.id)) return acc;
+    return acc + (c.reservas_individuales || []).filter(r => r.turno_id === turno.id && r.fecha === fecha).length;
   }, 0);
 }
 
@@ -72,7 +75,7 @@ export function calcularOcupacion(
 ): Ocupacion {
   const fijos = (turno.asignados_ids || []).length;
   const fijosActivos = contarFijosActivos(turno, clientes, fecha);
-  const reservas = contarReservas(turno.id, clientes, fecha);
+  const reservas = contarReservas(turno, clientes, fecha);
   const recs = contarRecuperos(turno.id, recuperos, fecha);
   const total = fijosActivos + reservas + recs;
   const cupo = turno.cupo_maximo;

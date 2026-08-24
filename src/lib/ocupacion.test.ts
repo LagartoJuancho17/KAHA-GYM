@@ -236,7 +236,7 @@ test('helpers sueltos', () => {
   assert.equal(estaSuspendido(cs[0], 'T', 'OTRA'), false);
   assert.equal(estaSuspendido(undefined, 'T', 'F'), false);
   assert.equal(contarFijosActivos(turno({ asignados_ids: ['a'] }), cs, 'X'), 1);
-  assert.equal(contarReservas('T', [], 'F'), 0);
+  assert.equal(contarReservas(turno({ id: 'T' }), [], 'F'), 0);
   assert.equal(contarRecuperos('T', [], 'F'), 0);
 });
 
