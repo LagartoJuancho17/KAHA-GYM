@@ -69,6 +69,17 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
       });
   }, [clientesActivos, planes, turnoId]);
 
+  const optionsCheckInClient = useMemo(() => {
+    return clientesActivos.map(cl => {
+      const pl = planes.find(p => p.id === cl.plan_id);
+      return {
+        value: cl.id,
+        label: `${cl.apellido}, ${cl.nombre} (${pl ? pl.nombre : 'Sin plan'})`,
+        searchString: `${cl.nombre} ${cl.apellido}`
+      };
+    });
+  }, [clientesActivos, planes]);
+
   if (!selectedTurno) return null;
 
   const handleAssignFijo = (e: React.FormEvent | null, forzar = false) => {
@@ -589,18 +600,13 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
               <label className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest block font-sans">Asistencia de Alumno (Check-In Diario)</label>
               <p className="text-[10px] text-zinc-400 leading-normal">Permite registrar una asistencia libre/check-in para el día de hoy si hay vacantes físicas en este turno.</p>
               <div className="flex gap-2">
-                <select
+                <SearchableSelect
+                  options={optionsCheckInClient}
                   value={flexCheckInClientId}
-                  onChange={(e) => setFlexCheckInClientId(e.target.value)}
-                  className="flex-1 border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
-                >
-                  <option value="">-- Elige alumno --</option>
-                  {clientesActivos.map(cl => (
-                    <option key={cl.id} value={cl.id}>
-                      {cl.apellido}, {cl.nombre} ({planes.find(p => p.id === cl.plan_id)?.nombre})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFlexCheckInClientId}
+                  placeholder="-- Buscar y seleccionar alumno --"
+                  noOptionsText="No se encontraron socios"
+                />
                 <button
                   type="submit"
                   className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 font-bold text-xs px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"

@@ -14,6 +14,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   noOptionsText?: string;
   className?: string;
+  theme?: 'light' | 'dark';
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -23,11 +24,14 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder = '-- Selecciona --',
   noOptionsText = 'No se encontraron resultados',
   className = '',
+  theme = 'light'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isDark = theme === 'dark';
 
   // Find currently selected option
   const selectedOption = useMemo(() => {
@@ -122,14 +126,20 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             }
           }}
           placeholder={selectedOption ? selectedOption.label : placeholder}
-          className="w-full border border-zinc-200 rounded-lg p-2 pr-12 text-xs bg-white outline-hidden font-medium cursor-text focus:border-zinc-400 transition-colors"
+          className={`w-full rounded-lg p-2 pr-12 text-xs outline-hidden font-medium cursor-text transition-colors ${
+            isDark
+              ? 'bg-zinc-900 border border-zinc-800 text-white placeholder:text-zinc-500 focus:border-zinc-500'
+              : 'bg-white border border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400'
+          }`}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
           {value && (
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 hover:bg-zinc-100 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors cursor-pointer border-none bg-transparent"
+              className={`p-1 rounded-md transition-colors cursor-pointer border-none bg-transparent ${
+                isDark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'
+              }`}
               title="Limpiar selección"
             >
               <X className="w-3.5 h-3.5" />
@@ -138,7 +148,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           <button
             type="button"
             onClick={toggleDropdown}
-            className="p-1 hover:bg-zinc-100 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors cursor-pointer border-none bg-transparent"
+            className={`p-1 rounded-md transition-colors cursor-pointer border-none bg-transparent ${
+              isDark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'
+            }`}
           >
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -146,9 +158,13 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg max-h-60 overflow-y-auto font-medium">
+        <div className={`absolute z-50 w-full mt-1 rounded-lg shadow-xl max-h-60 overflow-y-auto font-medium border ${
+          isDark
+            ? 'bg-zinc-900 border-zinc-800 text-white'
+            : 'bg-white border border-zinc-200 text-zinc-900'
+        }`}>
           {filteredOptions.length === 0 ? (
-            <div className="p-2.5 text-xs text-zinc-400 italic text-center">
+            <div className={`p-2.5 text-xs italic text-center ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
               {noOptionsText}
             </div>
           ) : (
@@ -159,8 +175,14 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   key={opt.value}
                   type="button"
                   onClick={() => handleSelectOption(opt)}
-                  className={`w-full text-left px-3 py-2 text-xs hover:bg-zinc-50 transition-colors cursor-pointer border-none block ${
-                    isSelected ? 'bg-zinc-100 font-bold text-black border-l-2 border-black' : 'text-zinc-700'
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors cursor-pointer border-none block ${
+                    isDark
+                      ? isSelected
+                        ? 'bg-zinc-800 font-bold text-white border-l-2 border-lime-400'
+                        : 'text-zinc-300 hover:bg-zinc-800/70'
+                      : isSelected
+                      ? 'bg-zinc-100 font-bold text-black border-l-2 border-black'
+                      : 'text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
                   {opt.label}

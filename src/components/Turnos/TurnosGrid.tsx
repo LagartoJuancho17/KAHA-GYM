@@ -11,6 +11,7 @@ import {
 import { TurnoDetailsModal } from './TurnoDetailsModal';
 import { TurnoRealtimeModal } from './TurnoRealtimeModal';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
+import { SearchableSelect } from '../Common/SearchableSelect';
 import { History } from 'lucide-react';
 
 export const TurnosGrid: React.FC = () => {
@@ -105,6 +106,14 @@ export const TurnosGrid: React.FC = () => {
   ];
 
   const clientesActivos = useMemo(() => clientes.filter(c => c.activo), [clientes]);
+
+  const optionsSocios = useMemo(() => {
+    return clientesActivos.map(cl => ({
+      value: cl.id,
+      label: `${cl.apellido}, ${cl.nombre}`,
+      searchString: `${cl.nombre} ${cl.apellido}`
+    }));
+  }, [clientesActivos]);
 
   // Bulk Dar de Baja (Absence registration and cupos release)
   const handleBulkDarDeBaja = (e: React.FormEvent) => {
@@ -709,11 +718,11 @@ export const TurnosGrid: React.FC = () => {
                       <form onSubmit={handleBulkDarDeBaja} className="space-y-4">
                         <div className="space-y-1">
                           <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">Seleccionar Alumno</label>
-                          <select
-                            required
+                          <SearchableSelect
+                            theme="dark"
+                            options={optionsSocios}
                             value={recuperoForm.cliente_id}
-                            onChange={(e) => {
-                              const id = e.target.value;
+                            onChange={(id) => {
                               setRecuperoForm({ 
                                 cliente_id: id,
                                 turno_original_id: '',
@@ -726,13 +735,9 @@ export const TurnosGrid: React.FC = () => {
                               setRecIndexError('');
                               setRecIndexSuccess('');
                             }}
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white text-xs outline-hidden focus:border-zinc-500 font-medium"
-                          >
-                            <option value="">-- Elige un socio --</option>
-                            {clientesActivos.map(cl => (
-                              <option key={cl.id} value={cl.id}>{cl.apellido}, {cl.nombre}</option>
-                            ))}
-                          </select>
+                            placeholder="-- Buscar y seleccionar alumno --"
+                            noOptionsText="No se encontraron socios"
+                          />
                         </div>
 
                         {recuperoForm.cliente_id && (() => {
@@ -997,17 +1002,14 @@ export const TurnosGrid: React.FC = () => {
                       <form onSubmit={handleSaveVacaciones} className="space-y-4">
                         <div className="space-y-1">
                           <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">Seleccionar Socio</label>
-                          <select
-                            required
+                          <SearchableSelect
+                            theme="dark"
+                            options={optionsSocios}
                             value={vacacionesForm.cliente_id}
-                            onChange={(e) => setVacacionesForm(prev => ({ ...prev, cliente_id: e.target.value }))}
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white text-xs outline-hidden focus:border-zinc-500 font-medium"
-                          >
-                            <option value="">-- Elige un socio --</option>
-                            {clientesActivos.map(cl => (
-                              <option key={cl.id} value={cl.id}>{cl.apellido}, {cl.nombre}</option>
-                            ))}
-                          </select>
+                            onChange={(id) => setVacacionesForm(prev => ({ ...prev, cliente_id: id }))}
+                            placeholder="-- Buscar y seleccionar socio --"
+                            noOptionsText="No se encontraron socios"
+                          />
                         </div>
 
                         <div className="space-y-1">
