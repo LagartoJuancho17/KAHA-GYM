@@ -71,7 +71,7 @@ interface GymContextType {
   updatePrecioPlan: (planId: string, nuevoPrecio: number, userEmail: string) => void;
 
   // Turnos Methods
-  asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }> };
+  asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>; excedePlan?: boolean; turnosFijosActuales?: string[]; maxDias?: number; clienteNombre?: string };
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
   notificarBajaClase: (clienteId: string, turnoId: string, fecha?: string) => boolean;
   notificarAltaWaitlist: (clienteId: string, turnoId: string, fecha?: string) => boolean;
@@ -90,7 +90,7 @@ interface GymContextType {
 
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
-  actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO') => void;
+  actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
   eliminarPago: (pagoId: string) => void;
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
 
@@ -1566,7 +1566,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // TURNOS
-  const asignarClienteFijo = (clienteId: string, turnoId: string, opciones?: { forzar?: boolean }) => {
+  const asignarClienteFijo = (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string }) => {
     const cliente = clientes.find(c => c.id === clienteId);
     const turno = turnos.find(t => t.id === turnoId);
 
@@ -1579,14 +1579,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'El socio ya tiene asignado este turno fijo.' };
     }
 
-    // Límite estricto de acuerdo al plan seleccionado para el socio
+    // Límite estricto de acuerdo al plan seleccionado para el socio.
+    // Si viene reemplazarTurnoId se salta esta validación: el admin decidió hacer swap.
     const plan = planes.find(p => p.id === cliente.plan_id);
-    // Verificar límite de días únicos según el plan (2 turnos el mismo día = 1 día)
     const diasUnicos = new Set(cliente.turnos_fijos.map(tId => tId.split('-')[0]));
     const maxDias = cliente.dias_personalizados ?? (plan ? plan.dias_por_semana : 2);
     const esMismoDia = turno.dia && diasUnicos.has(turno.dia);
-    if (!esMismoDia && diasUnicos.size >= maxDias) {
-      return { success: false, message: `Límite alcanzado: El plan del socio (${plan?.nombre || 'Sin Plan'}) permite como máximo ${maxDias} días distintos por semana.` };
+    if (!esMismoDia && diasUnicos.size >= maxDias && !opciones?.reemplazarTurnoId) {
+      return {
+        success: false,
+        excedePlan: true,
+        turnosFijosActuales: [...cliente.turnos_fijos],
+        maxDias,
+        clienteNombre: `${cliente.nombre} ${cliente.apellido}`,
+        message: `Límite alcanzado: El plan del socio (${plan?.nombre || 'Sin Plan'}) permite como máximo ${maxDias} días distintos por semana.`
+      };
     }
 
     // Un fijo entra TODAS las semanas, así que no alcanza con mirar cuántos fijos hay:
@@ -1649,10 +1656,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedClientes = clientes.map(c => {
       if (c.id === clienteId) {
+        // Si es un swap, quitar el turno viejo y agregar el nuevo
+        const turnosFijosBase = opciones?.reemplazarTurnoId
+          ? c.turnos_fijos.filter(tId => tId !== opciones.reemplazarTurnoId)
+          : c.turnos_fijos;
         return {
           ...c,
           tipo: 'FIJO' as TipoCliente,
-          turnos_fijos: [...c.turnos_fijos, turnoId],
+          turnos_fijos: [...turnosFijosBase, turnoId],
           turno_variable: c.turno_variable === turnoId ? undefined : c.turno_variable,
           reservas_individuales: (c.reservas_individuales || []).filter(
             r => !(r.turno_id === turnoId && r.fecha >= hoyStr)
@@ -1665,6 +1676,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const clienteYaEnEspera = turno.lista_espera_ids.includes(clienteId);
 
     const updatedTurnos = turnos.map(t => {
+      // Si es un swap, quitar al cliente del turno viejo
+      if (opciones?.reemplazarTurnoId && t.id === opciones.reemplazarTurnoId) {
+        return {
+          ...t,
+          asignados_ids: t.asignados_ids.filter(id => id !== clienteId),
+          lista_espera_ids: t.lista_espera_ids.filter(id => id !== clienteId)
+        };
+      }
       if (t.id === turnoId) {
         return {
           ...t,
@@ -1725,6 +1744,20 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (error) {
           console.error("Error al asignar turno fijo en Supabase:", error);
           addToast('error', 'La asignación no se guardó en la base de datos. Reintentá la asignación.');
+        }
+
+        // Si es un swap, eliminar la asignación vieja de Supabase
+        if (opciones?.reemplazarTurnoId) {
+          const turnoViejoUuid = await resolveTurnoUuid(opciones.reemplazarTurnoId);
+          if (turnoViejoUuid) {
+            supabase.from('asignaciones_turnos')
+              .delete()
+              .eq('cliente_id', clienteId)
+              .eq('turno_id', turnoViejoUuid)
+              .then(({ error: errDel }) => {
+                if (errDel) console.error('Error al eliminar asignación vieja en swap:', errDel);
+              });
+          }
         }
       });
     }
@@ -2897,7 +2930,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ACTUALIZAR DESTINO (JUANCHI / RULO) DE UN PAGO EXISTENTE
-  const actualizarDestinoPago = (pagoId: string, destino: 'JUANCHI' | 'RULO') => {
+  const actualizarDestinoPago = (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => {
     const updatedPagos = pagos.map(p =>
       p.id === pagoId ? { ...p, destino_transferencia: destino } : p
     );

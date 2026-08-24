@@ -30,7 +30,7 @@ interface PagosTableProps {
   onOpenReceipt: (pago: Pago) => void;
   onAddPagoClick: () => void;
   onConciliarCSVClick: () => void;
-  onActualizarDestino: (pagoId: string, destino: 'JUANCHI' | 'RULO') => void;
+  onActualizarDestino: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
   onEliminarPago: (pago: Pago) => void;
 }
 
@@ -57,15 +57,22 @@ export const PagosTable: React.FC<PagosTableProps> = ({
       .reduce((sum, p) => sum + p.monto, 0);
   }, [pagosFiltrados]);
 
-  const cajaFinal = useMemo(() => {
-    return pagosFiltrados.reduce((sum, p) => sum + p.monto, 0);
+  const cajaEfectivo = useMemo(() => {
+    return pagosFiltrados
+      .filter(p => p.destino_transferencia === 'EFECTIVO')
+      .reduce((sum, p) => sum + p.monto, 0);
   }, [pagosFiltrados]);
 
   const cajaJuanchi = useMemo(() => {
     return pagosFiltrados
-      .filter(p => !p.destino_transferencia || p.destino_transferencia === 'JUANCHI')
+      .filter(p => p.destino_transferencia === 'JUANCHI' || !p.destino_transferencia)
       .reduce((sum, p) => sum + p.monto, 0);
   }, [pagosFiltrados]);
+
+  const cajaFinal = useMemo(() => {
+    return pagosFiltrados.reduce((sum, p) => sum + p.monto, 0);
+  }, [pagosFiltrados]);
+
 
   return (
     <div className="space-y-4">
@@ -165,15 +172,18 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                           {/* Select Juanchi / Rulo */}
                           <select
                             value={p.destino_transferencia || 'JUANCHI'}
-                            onChange={e => onActualizarDestino(p.id, e.target.value as 'JUANCHI' | 'RULO')}
+                            onChange={e => onActualizarDestino(p.id, e.target.value as 'JUANCHI' | 'RULO' | 'EFECTIVO')}
                             className={`text-[9px] font-extrabold uppercase tracking-wide border rounded px-1.5 py-0.5 cursor-pointer outline-none transition-colors ${
                               (p.destino_transferencia || 'JUANCHI') === 'JUANCHI'
                                 ? 'bg-violet-100 text-violet-800 border-violet-300'
+                                : (p.destino_transferencia === 'EFECTIVO')
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                 : 'bg-amber-100 text-amber-800 border-amber-300'
                             }`}
                           >
                             <option value="JUANCHI">🟣 Juanchi</option>
                             <option value="RULO">🟡 Rulo</option>
+                            <option value="EFECTIVO">💵 Efectivo</option>
                           </select>
                         </div>
                       </td>
@@ -213,6 +223,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                     <div className="flex flex-col text-[10px] font-mono gap-0.5">
                       <span className="text-violet-700 font-bold">Juanchi: ${cajaJuanchi.toLocaleString('es-AR')}</span>
                       <span className="text-amber-700 font-bold">Rulo: ${cajaRulo.toLocaleString('es-AR')}</span>
+                      <span className="text-emerald-700 font-bold">Efectivo: ${cajaEfectivo.toLocaleString('es-AR')}</span>
                     </div>
                   </td>
                   <td colSpan={4} className="p-4 text-right font-mono font-black text-emerald-700 text-sm">
@@ -239,7 +250,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             {/* CAJA JUANCHI */}
             <div className="bg-violet-50/60 border border-violet-200 rounded-xl p-3.5 flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs">
@@ -266,15 +277,28 @@ export const PagosTable: React.FC<PagosTableProps> = ({
               </div>
             </div>
 
-            {/* CAJA FINAL */}
-            <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5 flex flex-col justify-between shadow-3xs">
+            {/* CAJA EFECTIVO */}
+            <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-900">Caja Final (Suma Total)</span>
-                <span className="text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
-                  Juanchi + Rulo
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Caja Efectivo</span>
+                <span className="text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                  Efectivo
                 </span>
               </div>
-              <div className="mt-2 font-mono font-bold text-2xl text-emerald-800">
+              <div className="mt-2 font-mono font-bold text-2xl text-emerald-900">
+                ${cajaEfectivo.toLocaleString('es-AR')}
+              </div>
+            </div>
+
+            {/* CAJA FINAL */}
+            <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-200">Caja Final (Total)</span>
+                <span className="text-[9px] font-mono font-bold bg-zinc-700 text-zinc-200 px-2 py-0.5 rounded border border-zinc-600">
+                  Juanchi + Rulo + Efvo
+                </span>
+              </div>
+              <div className="mt-2 font-mono font-bold text-2xl text-white">
                 ${cajaFinal.toLocaleString('es-AR')}
               </div>
             </div>

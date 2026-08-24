@@ -228,7 +228,8 @@ export const TurnosGrid: React.FC = () => {
     const fijos = (turno.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
     const suspendidos = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha));
     const fijosActivos = fijos.filter(c => !suspendidos.some(s => s.id === c.id));
-    const vars = clientes.filter(c => c.activo && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));
+    const fijoIds = new Set(turno.asignados_ids || []);
+    const vars = clientes.filter(c => c.activo && !fijoIds.has(c.id) && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));
     const recs = recuperos.filter(r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turno.id && r.fecha_recupero === fecha);
 
     return {

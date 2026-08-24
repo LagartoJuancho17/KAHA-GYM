@@ -14,10 +14,10 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
 
   const [pagoForm, setPagoForm] = useState({
     cliente_id: '',
-    medio_pago: 'MERCADO_PAGO' as MedioPago,
+    medio_pago: 'TRANSFERENCIA' as MedioPago,
     mes_correspondiente: new Date().toISOString().slice(0, 7),
     hash_transaccion: '',
-    destino_transferencia: 'RULO' as 'JUANCHI' | 'RULO'
+    destino_transferencia: 'RULO' as 'JUANCHI' | 'RULO' | 'EFECTIVO'
   });
   
   const [esPagoMultiple, setEsPagoMultiple] = useState(false);
@@ -173,7 +173,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
       setFormErr(failed.message);
     } else {
       setFormSuccess('Cobro registrado exitosamente.');
-      setPagoForm({ cliente_id: '', medio_pago: 'MERCADO_PAGO', mes_correspondiente: new Date().toISOString().slice(0, 7), hash_transaccion: '', destino_transferencia: 'RULO' });
+      setPagoForm({ cliente_id: '', medio_pago: 'TRANSFERENCIA', mes_correspondiente: new Date().toISOString().slice(0, 7), hash_transaccion: '', destino_transferencia: 'RULO' });
       setBeneficiarios([]);
       setSearchPagadorText('');
       setSearchBeneficiarioText('');
@@ -398,9 +398,9 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
             </div>
 
             <div className="space-y-1">
-              <label className="text-violet-700 font-bold block text-[10px] uppercase">Destino (Juanchi / Rulo)</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {(['RULO', 'JUANCHI'] as const).map(dest => (
+              <label className="text-violet-700 font-bold block text-[10px] uppercase">Destino (Juanchi / Rulo / Efectivo)</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['RULO', 'JUANCHI', 'EFECTIVO'] as const).map(dest => (
                   <button
                     key={dest}
                     type="button"
@@ -409,12 +409,14 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                       pagoForm.destino_transferencia === dest
                         ? dest === 'JUANCHI'
                           ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : dest === 'EFECTIVO'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                           : 'bg-amber-500 text-white border-amber-500 shadow-sm'
                         : 'bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50'
                     }`}
                     id={`btn-destino-${dest.toLowerCase()}`}
                   >
-                    {dest === 'JUANCHI' ? '🟣 Juanchi' : '🟡 Rulo'}
+                    {dest === 'JUANCHI' ? '🟣 Juanchi' : dest === 'EFECTIVO' ? '💵 Efectivo' : '🟡 Rulo'}
                   </button>
                 ))}
               </div>

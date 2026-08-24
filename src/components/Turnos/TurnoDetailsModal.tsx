@@ -1,7 +1,7 @@
 // src/components/Turnos/TurnoDetailsModal.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
-import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle, History } from 'lucide-react';
+import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle, History, ArrowLeftRight, ChevronUp } from 'lucide-react';
 import { SearchableSelect } from '../Common/SearchableSelect';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 
@@ -15,7 +15,7 @@ const PROFE_PRESETS = ['Juanchi', 'Rulo', 'Lucas', 'Denise'];
 export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, onClose }) => {
   const { 
     turnos, clientes, planes, profesores,
-    asignarClienteFijo, removerAsignacionFija, checkInFlexible, 
+    asignarClienteFijo, removerAsignacionFija, checkInFlexible, updateCliente,
     modificarPrecioOCupoTurno, asignarProfesorTurno
   } = useGym();
 
@@ -29,6 +29,14 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
     mensaje: string;
     fechas: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>;
   } | null>(null);
+  const [conflictoPlan, setConflictoPlan] = useState<{
+    clienteId: string;
+    clienteNombre: string;
+    turnosFijosActuales: string[];
+    maxDias: number;
+    nuevoMaxDias: number;
+  } | null>(null);
+  const [reemplazarTurnoId, setReemplazarTurnoId] = useState('');
   const [flexCheckInClientId, setFlexCheckInClientId] = useState('');
   const [localProfesor, setLocalProfesor] = useState('');
   const [mostrarOtroProfeInput, setMostrarOtroProfeInput] = useState(false);
@@ -63,7 +71,6 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
 
   if (!selectedTurno) return null;
 
-  // Assign Fijo handler
   const handleAssignFijo = (e: React.FormEvent | null, forzar = false) => {
     if (e) e.preventDefault();
     setCellActionError('');
@@ -76,6 +83,20 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
     }
 
     const res = asignarClienteFijo(selectedClientToAssignId, turnoId, { forzar });
+
+    // El plan del socio no permite más días: mostramos el popup de resolución.
+    if (!res.success && res.excedePlan) {
+      setConflictoPlan({
+        clienteId: selectedClientToAssignId,
+        clienteNombre: res.clienteNombre || '',
+        turnosFijosActuales: res.turnosFijosActuales || [],
+        maxDias: res.maxDias || 0,
+        nuevoMaxDias: (res.maxDias || 0) + 1
+      });
+      setReemplazarTurnoId('');
+      return;
+    }
+    setConflictoPlan(null);
 
     // Reservas puntuales de otros socios quedarian sobre el cupo: decide el admin.
     if (!res.success && res.requiereConfirmacion) {
@@ -94,6 +115,38 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
         setSelectedClientToAssignId('');
         setTimeout(() => setCellActionSuccess(''), 2000);
       }
+    } else {
+      setCellActionError(res.message);
+    }
+  };
+
+  /** Ampliar plan y asignar directamente */
+  const handleAmpliarPlan = () => {
+    if (!conflictoPlan) return;
+    // 1. Actualizar dias_personalizados del socio
+    updateCliente(conflictoPlan.clienteId, { dias_personalizados: conflictoPlan.nuevoMaxDias });
+    // 2. Asignar el turno (ya no va a exceder el límite)
+    const res = asignarClienteFijo(conflictoPlan.clienteId, turnoId, {});
+    setConflictoPlan(null);
+    if (res.success) {
+      setCellActionSuccess(`Plan ampliado a ${conflictoPlan.nuevoMaxDias} días y turno asignado exitosamente.`);
+      setSelectedClientToAssignId('');
+      setTimeout(() => setCellActionSuccess(''), 3000);
+    } else {
+      setCellActionError(res.message);
+    }
+  };
+
+  /** Swap: reemplazar un fijo existente por el nuevo */
+  const handleReemplazarTurno = () => {
+    if (!conflictoPlan || !reemplazarTurnoId) return;
+    const res = asignarClienteFijo(conflictoPlan.clienteId, turnoId, { reemplazarTurnoId });
+    setConflictoPlan(null);
+    setReemplazarTurnoId('');
+    if (res.success) {
+      setCellActionSuccess(`Turno reemplazado y ${turnoId} asignado exitosamente.`);
+      setSelectedClientToAssignId('');
+      setTimeout(() => setCellActionSuccess(''), 3000);
     } else {
       setCellActionError(res.message);
     }
@@ -221,6 +274,93 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                 >
                   Asignar igual
                 </button>
+              </div>
+            </div>
+          )}
+
+          {conflictoPlan && (
+            <div className="bg-violet-50 border border-violet-300 p-4 rounded-xl space-y-3 text-[11px] animate-scale-in">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-violet-900 text-xs">Plan insuficiente para este turno</p>
+                  <p className="text-violet-700 mt-0.5">
+                    <strong>{conflictoPlan.clienteNombre}</strong> tiene un plan de {conflictoPlan.maxDias} día(s) semanal(es) y ya los tiene completos.
+                  </p>
+                </div>
+              </div>
+
+              {/* OPCIÓN 1: Ampliar plan */}
+              <div className="bg-white border border-violet-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-violet-800 font-bold text-[10px] uppercase tracking-wider">
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  Opción 1 — Ampliar plan a {conflictoPlan.nuevoMaxDias} días
+                </div>
+                <p className="text-violet-600 text-[10px] leading-snug">
+                  Se le actualizará <code className="bg-violet-100 px-1 rounded font-mono">dias_personalizados</code> a {conflictoPlan.nuevoMaxDias} y el turno quedará asignado inmediatamente.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleAmpliarPlan}
+                  className="w-full py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border-none"
+                >
+                  Ampliar a {conflictoPlan.nuevoMaxDias} días y Asignar
+                </button>
+              </div>
+
+              {/* OPCIÓN 2: Reemplazar turno fijo */}
+              <div className="bg-white border border-violet-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-violet-800 font-bold text-[10px] uppercase tracking-wider">
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                  Opción 2 — Reemplazar un turno fijo existente
+                </div>
+                <p className="text-violet-600 text-[10px] leading-snug">
+                  Elegí cuál turno fijo querés quitar. Se asignará <strong>{turnoId.replace('-', ' ')}hs</strong> en su lugar.
+                </p>
+                <div className="space-y-1.5">
+                  {conflictoPlan.turnosFijosActuales.map(tId => {
+                    const t = turnos.find(x => x.id === tId);
+                    const label = t ? `${t.dia} — ${t.hora}hs` : tId;
+                    return (
+                      <label
+                        key={tId}
+                        className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all ${
+                          reemplazarTurnoId === tId
+                            ? 'bg-violet-100 border-violet-400 font-bold'
+                            : 'bg-zinc-50 border-zinc-200 hover:bg-violet-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="reemplazar-turno"
+                          value={tId}
+                          checked={reemplazarTurnoId === tId}
+                          onChange={() => setReemplazarTurnoId(tId)}
+                          className="accent-violet-600"
+                        />
+                        <span className="text-xs text-zinc-800">{label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setConflictoPlan(null); setReemplazarTurnoId(''); }}
+                    className="flex-1 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-zinc-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!reemplazarTurnoId}
+                    onClick={handleReemplazarTurno}
+                    className="flex-1 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border-none"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5 inline mr-1" />
+                    Reemplazar y Asignar
+                  </button>
+                </div>
               </div>
             </div>
           )}
