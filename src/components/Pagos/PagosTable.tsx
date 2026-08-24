@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Pago, Cliente, Plan } from '../../types';
-import { Search, Plus, Upload, DollarSign, Trash2 } from 'lucide-react';
+import { Search, Plus, Upload, DollarSign, Trash2, Pencil } from 'lucide-react';
 
 // Genera los últimos N meses dinámicamente
 function generarUltimosMeses(n = 12) {
@@ -31,6 +31,7 @@ interface PagosTableProps {
   onAddPagoClick: () => void;
   onConciliarCSVClick: () => void;
   onActualizarDestino: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
+  onEditarPago: (pago: Pago) => void;
   onEliminarPago: (pago: Pago) => void;
 }
 
@@ -48,6 +49,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
   onAddPagoClick,
   onConciliarCSVClick,
   onActualizarDestino,
+  onEditarPago,
   onEliminarPago
 }) => {
   // Cálculo de Cajas: por destino_transferencia (aplica a todos los medios de pago)
@@ -147,7 +149,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                 <th className="p-4">Ref. / ID</th>
                 <th className="p-4">Registrado por</th>
                 <th className="p-4 text-center">Recibo</th>
-                <th className="p-4 text-center">Borrar</th>
+                <th className="p-4 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 text-zinc-700 font-medium">
@@ -200,13 +202,24 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                         </button>
                       </td>
                       <td className="p-4 text-center">
-                        <button
-                          onClick={() => onEliminarPago(p)}
-                          className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 border border-red-200 transition-colors cursor-pointer mx-auto flex"
-                          title="Eliminar pago"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => onEditarPago(p)}
+                            className="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-950 border border-zinc-200 transition-colors cursor-pointer flex items-center justify-center"
+                            title="Editar datos del pago"
+                            id={`btn-edit-pago-${p.id}`}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onEliminarPago(p)}
+                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 border border-red-200 transition-colors cursor-pointer flex items-center justify-center"
+                            title="Eliminar pago"
+                            id={`btn-delete-pago-${p.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

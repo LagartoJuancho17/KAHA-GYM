@@ -12,6 +12,7 @@ import { PagoCSVImportModal } from './PagoCSVImportModal';
 import { PagoReceiptModal } from './PagoReceiptModal';
 import { PagosTable } from './PagosTable';
 import { PagoDeleteModal } from './PagoDeleteModal';
+import { PagoEditModal } from './PagoEditModal';
 
 interface PagosLogProps {
   showAddPagoModal: boolean;
@@ -75,6 +76,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   const [recibosMultiples, setRecibosMultiples] = useState<Array<{ cliente_nombre: string, messageText: string, telefono: string, copiado: boolean }>>([]);
   const [showRecibosModal, setShowRecibosModal] = useState(false);
   const [pagoParaEliminar, setPagoParaEliminar] = useState<import('../../types').Pago | null>(null);
+  const [pagoParaEditar, setPagoParaEditar] = useState<import('../../types').Pago | null>(null);
 
   // ─── EGRESOS STATE ───────────────────────────────────────────────
   const [filtroMesGastos, setFiltroMesGastos] = useState<string>(new Date().toISOString().slice(0, 7));
@@ -331,6 +333,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             onAddPagoClick={() => setShowAddPagoModal(true)}
             onConciliarCSVClick={() => setShowImportStatementModal(true)}
             onActualizarDestino={actualizarDestinoPago}
+            onEditarPago={(p) => setPagoParaEditar(p)}
             onEliminarPago={(p) => setPagoParaEliminar(p)}
           />
         </div>
@@ -766,6 +769,13 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
           return cl ? `${cl.apellido}, ${cl.nombre}` : pagoParaEliminar.cliente_nombre_completo;
         })()}
         onConfirmDelete={(id) => { eliminarPago(id); setPagoParaEliminar(null); }}
+      />
+
+      {/* PAGO EDIT MODAL */}
+      <PagoEditModal
+        isOpen={!!pagoParaEditar}
+        onClose={() => setPagoParaEditar(null)}
+        pago={pagoParaEditar}
       />
     </div>
   );

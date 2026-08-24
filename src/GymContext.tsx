@@ -90,6 +90,7 @@ interface GymContextType {
 
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
+  actualizarPago: (pagoId: string, updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia'>>, userEmail?: string) => { success: boolean; message: string };
   actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
   eliminarPago: (pagoId: string) => void;
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
@@ -2929,13 +2930,68 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
   };
 
-  // ACTUALIZAR DESTINO (JUANCHI / RULO) DE UN PAGO EXISTENTE
-  const actualizarDestinoPago = (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => {
+  // ACTUALIZAR PAGO EXISTENTE (MONTO, CLIENTE, MES, MEDIO, DESTINO, ETC)
+  const actualizarPago = (
+    pagoId: string,
+    updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia'>>,
+    userEmail: string = 'admin@gimnasio.com.ar'
+  ) => {
+    const prevPago = pagos.find(p => p.id === pagoId);
+    if (!prevPago) return { success: false, message: 'Pago no encontrado.' };
+
+    let clienteNombre = prevPago.cliente_nombre_completo;
+    if (updates.cliente_id) {
+      const cli = clientes.find(c => c.id === updates.cliente_id);
+      if (cli) {
+        clienteNombre = `${cli.nombre} ${cli.apellido}`;
+      }
+    }
+
     const updatedPagos = pagos.map(p =>
-      p.id === pagoId ? { ...p, destino_transferencia: destino } : p
+      p.id === pagoId ? { ...p, ...updates, cliente_nombre_completo: clienteNombre } : p
     );
     setPagos(updatedPagos);
     localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
+
+    if (supabase) {
+      const payload: any = {};
+      if (updates.cliente_id !== undefined) payload.cliente_id = updates.cliente_id;
+      if (updates.monto !== undefined) payload.monto = updates.monto;
+      if (updates.medio_pago !== undefined) payload.medio_pago = updates.medio_pago;
+      if (updates.mes_correspondiente !== undefined) payload.mes_correspondiente = updates.mes_correspondiente;
+      if (updates.hash_transaccion !== undefined) payload.hash_transaccion = updates.hash_transaccion;
+      if (updates.destino_transferencia !== undefined) payload.destino_transferencia = updates.destino_transferencia;
+
+      supabase.from('pagos').update(payload).eq('id', pagoId).then(({ error }) => {
+        if (error) {
+          console.error('[Supabase] Error al actualizar pago:', error.message);
+          if (error.code === '42703' || error.message?.includes('destino_transferencia')) {
+            const safe = { ...payload };
+            delete safe.destino_transferencia;
+            supabase.from('pagos').update(safe).eq('id', pagoId);
+          }
+        }
+      });
+    }
+
+    addAuditLog('PAGO_MODIFICADO', {
+      pago_id: pagoId,
+      monto_anterior: prevPago.monto,
+      monto_nuevo: updates.monto ?? prevPago.monto,
+      mes_anterior: prevPago.mes_correspondiente,
+      mes_nuevo: updates.mes_correspondiente ?? prevPago.mes_correspondiente,
+      cliente_anterior: prevPago.cliente_id,
+      cliente_nuevo: updates.cliente_id ?? prevPago.cliente_id,
+      modificado_por: userEmail
+    }, userEmail);
+
+    addToast('success', 'Pago actualizado exitosamente.');
+    return { success: true, message: 'Pago actualizado exitosamente.' };
+  };
+
+  // ACTUALIZAR DESTINO (JUANCHI / RULO) DE UN PAGO EXISTENTE
+  const actualizarDestinoPago = (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => {
+    actualizarPago(pagoId, { destino_transferencia: destino });
   };
 
   // ELIMINAR UN PAGO REGISTRADO
@@ -2943,6 +2999,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedPagos = pagos.filter(p => p.id !== pagoId);
     setPagos(updatedPagos);
     localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
+    if (supabase) {
+      supabase.from('pagos').delete().eq('id', pagoId).then(({ error }) => {
+        if (error) console.error("Error al eliminar pago de Supabase:", error);
+      });
+    }
     addToast('delete', 'Pago eliminado.');
   };
 
@@ -3699,7 +3760,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarClienteFijo, removerAsignacionFija, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
-      registrarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
+      registrarPago, actualizarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
       pagosEnRevision,
       solicitarPagoTransferencia,
       aprobarPagoTransferencia,
