@@ -4,7 +4,8 @@ import { useGym } from '../GymContext';
 import { 
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
-  TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2
+  TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2,
+  Eye, EyeOff
 } from 'lucide-react';
 import { Gasto, PagoEnRevision } from '../types';
 
@@ -43,6 +44,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
   });
   const [gastoErr, setGastoErr] = useState('');
   const [gastoOk, setGastoOk] = useState('');
+
+  // Privacy / Visibilidad de Balance (sincronizado con localStorage)
+  const [mostrarBalance, setMostrarBalance] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gym_mostrar_balance');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'gym_mostrar_balance' && e.newValue !== null) {
+        setMostrarBalance(e.newValue === 'true');
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const handleToggleBalance = () => {
+    setMostrarBalance(prev => {
+      const next = !prev;
+      localStorage.setItem('gym_mostrar_balance', String(next));
+      return next;
+    });
+  };
 
   // Mes corriente de análisis (dinámico)
   const mesActual = new Date().toISOString().slice(0, 7);
@@ -397,7 +422,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         >
           <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-lime-300/10 rounded-full blur-3xl pointer-events-none" />
           <div className="flex items-center justify-between relative z-10">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Balance del mes</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Balance del mes</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleBalance();
+                }}
+                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer border-none bg-transparent"
+                title={mostrarBalance ? "Ocultar balance" : "Mostrar balance"}
+                id="btn-toggle-dashboard-balance"
+              >
+                {mostrarBalance ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-zinc-500" />}
+              </button>
+            </div>
             <span className="w-8 h-8 rounded-full bg-lime-300 flex items-center justify-center shrink-0">
               <DollarSign className="w-4 h-4 text-zinc-900" />
             </span>
@@ -405,7 +444,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="relative z-10">
             <div className={`font-display text-3xl sm:text-5xl xl:text-6xl font-bold leading-none tracking-tight ${balanceNeto >= 0 ? 'text-lime-300' : 'text-rose-400'}`}>
-              {balanceNeto >= 0 ? '' : '−'}${Math.abs(balanceNeto).toLocaleString('es-AR')}
+              {mostrarBalance
+                ? `${balanceNeto >= 0 ? '' : '−'}$${Math.abs(balanceNeto).toLocaleString('es-AR')}`
+                : '$ •••••••'}
             </div>
             <p className="text-zinc-400 text-xs mt-2 capitalize">{mesNombre} · Ingresos − Egresos</p>
           </div>
@@ -413,11 +454,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-2.5 relative z-10">
             <div className="flex justify-between items-center text-xs">
               <span className="text-zinc-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-lime-300" />Ingresos</span>
-              <span className="font-mono font-semibold text-white">${ingresosReales.toLocaleString('es-AR')}</span>
+              <span className="font-mono font-semibold text-white">
+                {mostrarBalance ? `$${ingresosReales.toLocaleString('es-AR')}` : '$ •••••••'}
+              </span>
             </div>
             <div className="flex justify-between items-center text-xs">
               <span className="text-zinc-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Gastos</span>
-              <span className="font-mono font-semibold text-white">${gastosTotal.toLocaleString('es-AR')}</span>
+              <span className="font-mono font-semibold text-white">
+                {mostrarBalance ? `$${gastosTotal.toLocaleString('es-AR')}` : '$ •••••••'}
+              </span>
             </div>
             <div className="pt-3 border-t border-white/10">
               <div className="flex justify-between text-[10px] text-zinc-400 mb-1.5">
@@ -593,7 +638,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       style={{ top: `${topPercent - 32}%` }}
                     >
                       <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                      <span>${val.toLocaleString('es-AR')} ARS</span>
+                      <span>{mostrarBalance ? `$${val.toLocaleString('es-AR')} ARS` : '$ ••••••'}</span>
                     </div>
 
                     {/* Glowing Node Dot */}
@@ -604,7 +649,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     {/* Month Label */}
                     <div className="mt-auto pt-2 text-center">
-                      <span className="font-bold text-zinc-900 block font-mono text-[10.5px]">${Math.round(val / 1000)}k</span>
+                      <span className="font-bold text-zinc-900 block font-mono text-[10.5px]">
+                        {mostrarBalance ? `$${Math.round(val / 1000)}k` : '••••'}
+                      </span>
                       <span className="text-[10px] text-zinc-400 font-sans font-medium capitalize">{mesLabel}</span>
                     </div>
                   </div>
