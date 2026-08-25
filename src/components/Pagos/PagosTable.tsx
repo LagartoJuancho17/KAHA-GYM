@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Pago, Cliente, Plan } from '../../types';
-import { Search, Plus, Upload, DollarSign, Trash2, Pencil } from 'lucide-react';
+import { Search, Plus, Upload, DollarSign, Trash2, Pencil, Eye, EyeOff } from 'lucide-react';
 
 // Genera los últimos N meses dinámicamente
 function generarUltimosMeses(n = 12) {
@@ -33,6 +33,8 @@ interface PagosTableProps {
   onActualizarDestino: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
   onEditarPago: (pago: Pago) => void;
   onEliminarPago: (pago: Pago) => void;
+  mostrarBalance?: boolean;
+  onToggleBalance?: () => void;
 }
 
 export const PagosTable: React.FC<PagosTableProps> = ({
@@ -50,7 +52,9 @@ export const PagosTable: React.FC<PagosTableProps> = ({
   onConciliarCSVClick,
   onActualizarDestino,
   onEditarPago,
-  onEliminarPago
+  onEliminarPago,
+  mostrarBalance = true,
+  onToggleBalance
 }) => {
   // Cálculo de Cajas: por destino_transferencia (aplica a todos los medios de pago)
   const cajaRulo = useMemo(() => {
@@ -234,13 +238,13 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                   </td>
                   <td className="p-4">
                     <div className="flex flex-col text-[10px] font-mono gap-0.5">
-                      <span className="text-violet-700 font-bold">Juanchi: ${cajaJuanchi.toLocaleString('es-AR')}</span>
-                      <span className="text-amber-700 font-bold">Rulo: ${cajaRulo.toLocaleString('es-AR')}</span>
-                      <span className="text-emerald-700 font-bold">Efectivo: ${cajaEfectivo.toLocaleString('es-AR')}</span>
+                      <span className="text-violet-700 font-bold">Juanchi: {mostrarBalance ? `$${cajaJuanchi.toLocaleString('es-AR')}` : '$ •••••••'}</span>
+                      <span className="text-amber-700 font-bold">Rulo: {mostrarBalance ? `$${cajaRulo.toLocaleString('es-AR')}` : '$ •••••••'}</span>
+                      <span className="text-emerald-700 font-bold">Efectivo: {mostrarBalance ? `$${cajaEfectivo.toLocaleString('es-AR')}` : '$ •••••••'}</span>
                     </div>
                   </td>
                   <td colSpan={4} className="p-4 text-right font-mono font-black text-emerald-700 text-sm">
-                    Caja Final: ${cajaFinal.toLocaleString('es-AR')}
+                    Caja Final: {mostrarBalance ? `$${cajaFinal.toLocaleString('es-AR')}` : '$ •••••••'}
                   </td>
                 </tr>
               </tfoot>
@@ -254,10 +258,22 @@ export const PagosTable: React.FC<PagosTableProps> = ({
       {pagosFiltrados.length > 0 && (
         <div className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b border-zinc-100 pb-2.5">
-            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
-              Resumen de Cajas (Período Seleccionado)
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+                <DollarSign className="w-4 h-4 text-emerald-600" />
+                Resumen de Cajas (Período Seleccionado)
+              </span>
+              {onToggleBalance && (
+                <button
+                  type="button"
+                  onClick={onToggleBalance}
+                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer border-none bg-transparent"
+                  title={mostrarBalance ? "Ocultar balance" : "Mostrar balance"}
+                >
+                  {mostrarBalance ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                </button>
+              )}
+            </div>
             <span className="text-[10px] font-mono text-zinc-400">
               {pagosFiltrados.length} registro(s)
             </span>
@@ -272,8 +288,8 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                   Juanchi
                 </span>
               </div>
-              <div className="mt-2 font-mono font-bold text-2xl text-violet-900">
-                ${cajaJuanchi.toLocaleString('es-AR')}
+              <div className="mt-2 font-mono font-bold text-2xl text-violet-900 truncate">
+                {mostrarBalance ? `$${cajaJuanchi.toLocaleString('es-AR')}` : '$ •••••••'}
               </div>
             </div>
 
@@ -285,8 +301,8 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                   Rulo
                 </span>
               </div>
-              <div className="mt-2 font-mono font-bold text-2xl text-amber-900">
-                ${cajaRulo.toLocaleString('es-AR')}
+              <div className="mt-2 font-mono font-bold text-2xl text-amber-900 truncate">
+                {mostrarBalance ? `$${cajaRulo.toLocaleString('es-AR')}` : '$ •••••••'}
               </div>
             </div>
 
@@ -298,8 +314,8 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                   Efectivo
                 </span>
               </div>
-              <div className="mt-2 font-mono font-bold text-2xl text-emerald-900">
-                ${cajaEfectivo.toLocaleString('es-AR')}
+              <div className="mt-2 font-mono font-bold text-2xl text-emerald-900 truncate">
+                {mostrarBalance ? `$${cajaEfectivo.toLocaleString('es-AR')}` : '$ •••••••'}
               </div>
             </div>
 
@@ -311,8 +327,8 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                   Juanchi + Rulo + Efvo
                 </span>
               </div>
-              <div className="mt-2 font-mono font-bold text-2xl text-white">
-                ${cajaFinal.toLocaleString('es-AR')}
+              <div className="mt-2 font-mono font-bold text-2xl text-white truncate">
+                {mostrarBalance ? `$${cajaFinal.toLocaleString('es-AR')}` : '$ •••••••'}
               </div>
             </div>
           </div>

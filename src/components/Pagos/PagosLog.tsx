@@ -4,7 +4,8 @@ import { useGym } from '../../GymContext';
 import { Pago, MedioPago, Gasto } from '../../types';
 import { 
   Plus, DollarSign, ArrowDownRight, ArrowUpRight, X, Trash2,
-  TrendingDown, Calendar, ChevronRight, AlertCircle, Receipt, Check
+  TrendingDown, Calendar, ChevronRight, AlertCircle, Receipt, Check,
+  Eye, EyeOff
 } from 'lucide-react';
 
 import { PagoFormModal } from './PagoFormModal';
@@ -77,6 +78,20 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   const [showRecibosModal, setShowRecibosModal] = useState(false);
   const [pagoParaEliminar, setPagoParaEliminar] = useState<import('../../types').Pago | null>(null);
   const [pagoParaEditar, setPagoParaEditar] = useState<import('../../types').Pago | null>(null);
+
+  // ─── PRIVACY / VISIBILIDAD DE BALANCE ─────────────────────────────
+  const [mostrarBalance, setMostrarBalance] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gym_mostrar_balance');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const handleToggleBalance = () => {
+    setMostrarBalance(prev => {
+      const next = !prev;
+      localStorage.setItem('gym_mostrar_balance', String(next));
+      return next;
+    });
+  };
 
   // ─── EGRESOS STATE ───────────────────────────────────────────────
   const [filtroMesGastos, setFiltroMesGastos] = useState<string>(new Date().toISOString().slice(0, 7));
@@ -288,7 +303,19 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex items-center justify-between text-xs font-sans">
               <div className="min-w-0">
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Facturado Mes</span>
-                <div className="text-2xl font-mono font-bold text-zinc-950 mt-1 truncate">${comparativaFinanciera.esteMes.toLocaleString('es-AR')}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="text-2xl font-mono font-bold text-zinc-950 truncate">
+                    {mostrarBalance ? `$${comparativaFinanciera.esteMes.toLocaleString('es-AR')}` : '$ •••••••'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleBalance}
+                    className="p-1 rounded-lg text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 transition-colors cursor-pointer border-none bg-transparent"
+                    title={mostrarBalance ? "Ocultar balance" : "Mostrar balance"}
+                  >
+                    {mostrarBalance ? <Eye className="w-4 h-4 text-zinc-500" /> : <EyeOff className="w-4 h-4 text-zinc-400" />}
+                  </button>
+                </div>
               </div>
               <div className="p-2.5 bg-zinc-100 text-zinc-900 rounded-lg shrink-0"><DollarSign className="w-5 h-5" /></div>
             </div>
@@ -296,7 +323,9 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             <div className="bg-white border border-zinc-200 p-4 sm:p-5 rounded-xl flex items-center justify-between text-xs font-sans">
               <div className="min-w-0">
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block truncate">Mes Anterior ({comparativaFinanciera.mesAnteriorLabel})</span>
-                <div className="text-2xl font-mono font-bold text-zinc-500 mt-1 truncate">${comparativaFinanciera.mesAnterior.toLocaleString('es-AR')}</div>
+                <div className="text-2xl font-mono font-bold text-zinc-500 mt-1 truncate">
+                  {mostrarBalance ? `$${comparativaFinanciera.mesAnterior.toLocaleString('es-AR')}` : '$ •••••••'}
+                </div>
               </div>
               <div className="p-2.5 bg-zinc-50 text-zinc-400 rounded-lg shrink-0"><DollarSign className="w-5 h-5" /></div>
             </div>
@@ -309,7 +338,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                     {comparativaFinanciera.porcent >= 0 ? '+' : ''}{comparativaFinanciera.porcent}%
                   </span>
                   <span className="text-[10px] bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-mono text-zinc-500 truncate">
-                    ${comparativaFinanciera.diferencia.toLocaleString('es-AR')}
+                    {mostrarBalance ? `$${comparativaFinanciera.diferencia.toLocaleString('es-AR')}` : '$ ••••••'}
                   </span>
                 </div>
               </div>
@@ -335,6 +364,8 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             onActualizarDestino={actualizarDestinoPago}
             onEditarPago={(p) => setPagoParaEditar(p)}
             onEliminarPago={(p) => setPagoParaEliminar(p)}
+            mostrarBalance={mostrarBalance}
+            onToggleBalance={handleToggleBalance}
           />
         </div>
       )}
@@ -347,7 +378,9 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
               <div>
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Total Egresos</span>
-                <div className="text-2xl font-mono font-bold text-rose-600 mt-1">${gastosTotalFiltrado.toLocaleString('es-AR')}</div>
+                <div className="text-2xl font-mono font-bold text-rose-600 mt-1">
+                  {mostrarBalance ? `$${gastosTotalFiltrado.toLocaleString('es-AR')}` : '$ •••••••'}
+                </div>
               </div>
               <TrendingDown className="w-6 h-6 text-rose-300" />
             </div>
@@ -362,7 +395,9 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
               <div>
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Promedio por Gasto</span>
                 <div className="text-2xl font-mono font-bold text-zinc-700 mt-1">
-                  ${gastosFiltrados.length > 0 ? Math.round(gastosTotalFiltrado / gastosFiltrados.length).toLocaleString('es-AR') : 0}
+                  {mostrarBalance
+                    ? `$${gastosFiltrados.length > 0 ? Math.round(gastosTotalFiltrado / gastosFiltrados.length).toLocaleString('es-AR') : 0}`
+                    : '$ •••••••'}
                 </div>
               </div>
               <DollarSign className="w-6 h-6 text-zinc-300" />
