@@ -1876,16 +1876,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const removerAsignacionFija = (clienteId: string, turnoId: string) => {
     let waitlistClientLiberado: string | null = null;
     let waitlistClientNombre = '';
+    let estabaEnAsignados = false;
+    let estabaEnWaitlist = false;
 
     // Modificar el turno
     const updatedTurnos = turnos.map(t => {
       if (t.id === turnoId) {
-        const filtradoAsignados = t.asignados_ids.filter(cid => cid !== clienteId);
-        let nuevosAsignados = [...filtradoAsignados];
-        let nuevaWaitlist = [...t.lista_espera_ids];
+        estabaEnAsignados = t.asignados_ids.includes(clienteId);
+        estabaEnWaitlist = t.lista_espera_ids.includes(clienteId);
 
-        // Promover de forma automática desde la lista de espera si hay lugar liberado!
-        if (nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
+        // Si estaba en asignados, lo quitamos de asignados
+        const filtradoAsignados = t.asignados_ids.filter(cid => cid !== clienteId);
+        // Si estaba en waitlist, lo quitamos de waitlist
+        let nuevaWaitlist = t.lista_espera_ids.filter(cid => cid !== clienteId);
+        let nuevosAsignados = [...filtradoAsignados];
+
+        // Promover de forma automática desde la lista de espera SOLO SI se liberó un lugar de un asignado fijo y hay cupo libre!
+        if (estabaEnAsignados && nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
           const promovidoId = nuevaWaitlist[0];
           waitlistClientLiberado = promovidoId;
           nuevosAsignados.push(promovidoId);
@@ -1901,14 +1908,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return t;
     });
 
-    // Modificar clientes (Remover del saliente, e integrar al promovido de waitlist si hubiere)
+    // Modificar clientes (Remover del saliente si era asignado fijo, e integrar al promovido de waitlist si hubiere)
     const updatedClientes = clientes.map(c => {
-      if (c.id === clienteId) {
+      if (c.id === clienteId && estabaEnAsignados) {
         return { ...c, turnos_fijos: c.turnos_fijos.filter(tid => tid !== turnoId) };
       }
       if (waitlistClientLiberado && c.id === waitlistClientLiberado) {
         waitlistClientNombre = `${c.nombre} ${c.apellido}`;
-        return { ...c, turnos_fijos: [...c.turnos_fijos, turnoId] };
+        return { ...c, tipo: 'FIJO' as TipoCliente, turnos_fijos: [...c.turnos_fijos, turnoId] };
       }
       return c;
     });
@@ -1918,9 +1925,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (supabase) {
       resolveTurnoUuid(turnoId).then((turnoUuid) => {
         if (turnoUuid) {
-          supabase.from('asignaciones_turnos').delete().eq('cliente_id', clienteId).eq('turno_id', turnoUuid).then(({ error }) => {
-            if (error) console.error("Error al remover asignación fija en Supabase:", error);
-          });
+          if (estabaEnAsignados) {
+            supabase.from('asignaciones_turnos').delete().eq('cliente_id', clienteId).eq('turno_id', turnoUuid).then(({ error }) => {
+              if (error) console.error("Error al remover asignación fija en Supabase:", error);
+            });
+          }
+          if (estabaEnWaitlist) {
+            supabase.from('lista_espera_turnos').delete().eq('cliente_id', clienteId).eq('turno_id', turnoUuid).then(({ error }) => {
+              if (error) console.error("Error al remover de lista de espera en Supabase:", error);
+            });
+          }
           if (waitlistClientLiberado) {
             supabase.from('lista_espera_turnos').delete().eq('cliente_id', waitlistClientLiberado).eq('turno_id', turnoUuid).then(({ error }) => {
               if (error) console.error("Error al remover de lista de espera en Supabase:", error);
@@ -1936,25 +1950,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    addAuditLog('TURNO_ASIGNACION_REMOCION', {
+    addAuditLog(estabaEnAsignados ? 'TURNO_ASIGNACION_REMOCION' : 'TURNO_WAITLIST_REMOCION', {
       cliente_id: clienteId,
       turno_id: turnoId,
+      tipo_remocion: estabaEnAsignados ? 'ASIGNADO_FIJO' : 'LISTA_DE_ESPERA',
       promocion_automatica: waitlistClientLiberado ? `Se promovió automáticamente de lista de espera a ${waitlistClientNombre}` : 'Ninguno'
     });
 
-    // Aviso automático al socio dado de baja de este horario fijo (WhatsApp o email).
-    const avisado = notificarBajaClase(clienteId, turnoId);
-
-    // Aviso automático al socio promovido desde lista de espera (Email + Modal en App)
-    if (waitlistClientLiberado) {
-      notificarAltaWaitlist(waitlistClientLiberado, turnoId);
+    if (estabaEnAsignados) {
+      // Aviso automático al socio dado de baja de este horario fijo (WhatsApp o email).
+      const avisado = notificarBajaClase(clienteId, turnoId);
+      addToast('delete', avisado
+        ? 'Asignación removida. Se le avisó al socio de la baja.'
+        : 'Asignación de turno removida.');
+    } else if (estabaEnWaitlist) {
+      addToast('delete', 'Socio removido de la lista de espera.');
+    } else {
+      addToast('delete', 'Registro de turno actualizado.');
     }
-
-    addToast('delete', avisado
-      ? 'Asignación removida. Se le avisó al socio de la baja.'
-      : 'Asignación de turno removida.');
     
     if (waitlistClientLiberado) {
+      notificarAltaWaitlist(waitlistClientLiberado, turnoId);
       addToast('success', `¡Cupo liberado! Se promovió y notificó por email a ${waitlistClientNombre}.`);
     }
   };

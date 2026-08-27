@@ -4,10 +4,11 @@ import { useGym } from '../../GymContext';
 import { Shield, User, Dumbbell, ChevronDown, Check, Sparkles } from 'lucide-react';
 import logoKaha from '../../assets/logokaha.png';
 import { OnboardingModal } from '../Onboarding/OnboardingModal';
+import { SocioSimulatorSelector } from './SocioSimulatorSelector';
 
 export const RoleSwitcher: React.FC = () => {
   const {
-    rolActivo, setRolActivo, clientes,
+    rolActivo, setRolActivo, clientes, planes,
     selectedSocioId, setSelectedSocioId, googleUser
   } = useGym();
 
@@ -146,24 +147,14 @@ export const RoleSwitcher: React.FC = () => {
         </button>
       </div>
 
-      {/* Selected Socio Dropdown (Only visible if SOCIO is active) */}
+      {/* Selected Socio Dropdown (Searchable Simulator) */}
       {rolActivo === 'SOCIO' && (
-        <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs min-w-0">
-          <User className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="text-[10px] text-slate-500 font-semibold hidden sm:inline">Simular:</span>
-          <select
-            value={selectedSocioId || ''}
-            onChange={(e) => setSelectedSocioId(e.target.value || null)}
-            className="bg-transparent text-slate-800 text-[10px] outline-hidden font-bold cursor-pointer truncate max-w-[140px] sm:max-w-[180px]"
-          >
-            <option value="" disabled>Elegir socio...</option>
-            {clientes.filter(c => c.activo && c.autorizado !== false).map(c => (
-              <option key={c.id} value={c.id}>
-                {c.apellido}, {c.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SocioSimulatorSelector
+          clientes={clientes}
+          planes={planes}
+          selectedSocioId={selectedSocioId}
+          onSelectSocio={setSelectedSocioId}
+        />
       )}
 
       {/* ONBOARDING MODAL */}

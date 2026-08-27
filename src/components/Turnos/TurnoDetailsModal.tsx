@@ -523,9 +523,13 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                         <span className="font-mono text-[10px] bg-amber-100 text-amber-800 px-1 rounded-sm font-bold">P{idx + 1}</span>
                         <span className="font-semibold text-zinc-800 flex-1 ml-2">{cl.nombre} {cl.apellido}</span>
                         <button
-                          onClick={() => removerAsignacionFija(cId, turnoId)}
-                          className="text-zinc-400 hover:text-zinc-800 cursor-pointer border-none bg-transparent"
-                          title="Retirar de waitlist"
+                          onClick={() => {
+                            if (window.confirm(`¿Está seguro que desea retirar a ${cl.nombre} ${cl.apellido} de la lista de espera de este turno?`)) {
+                              removerAsignacionFija(cId, turnoId);
+                            }
+                          }}
+                          className="text-zinc-400 hover:text-red-600 p-1 hover:bg-amber-100/70 rounded transition-colors cursor-pointer border-none bg-transparent"
+                          title="Retirar de la lista de espera"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
