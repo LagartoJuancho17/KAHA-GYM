@@ -102,7 +102,7 @@ interface GymContextType {
   rechazarPagoTransferencia: (revisionId: string) => { success: boolean; message: string };
   
   // Novedades Methods
-  addNovedad: (novedad: Omit<Novedad, 'id' | 'fecha'>) => { success: boolean; message: string };
+  addNovedad: (novedad: Omit<Novedad, 'id' | 'fecha'>) => { success: boolean; message: string; id?: string };
   updateNovedad: (id: string, updates: Partial<Novedad>) => { success: boolean; message: string };
   deleteNovedad: (id: string) => void;
 
@@ -3000,6 +3000,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `El socio ${cli.nombre} ${cli.apellido} abonó $${pagoData.monto.toLocaleString('es-AR')} ARS por el mes de ${pagoData.mes_correspondiente} (${pagoData.medio_pago === 'MERCADO_PAGO' ? 'Mercado Pago' : pagoData.medio_pago}).`
     );
 
+    // ── Novedad privada de agradecimiento para el socio ──────────────────────
+    // Solo aparece en la cartelera del socio que pagó (gracias al campo socio_id)
+    const GRACIAS_PAGO = `Ya lo registramos y tus turnos fijos se renovaron correctamente 🙌\n\nRecordá que, si algún día vas a ausentarte, podés avisarlo directamente desde la app. De esta manera liberamos ese lugar para que otra persona pueda aprovecharlo y facilitamos la organización de recuperaciones para todos.\n\nEntre todos hacemos que KAHA funcione cada vez mejor 🤝💚`;
+    addNovedad({
+      titulo: '💚 ¡Gracias por tu pago!',
+      contenido: GRACIAS_PAGO,
+      categoria: 'INFORMACION',
+      destacado: false,
+      creado_por: 'KAHA GYM',
+      socio_id: cli.id
+    });
+
     addToast('add', 'Pago registrado exitosamente.');
 
     return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
@@ -3774,15 +3786,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fecha: newNov.fecha,
         categoria: newNov.categoria,
         creado_por: newNov.creado_por,
-        destacado: newNov.destacado
+        destacado: newNov.destacado,
+        ...(newNov.socio_id ? { socio_id: newNov.socio_id } : {})
       }).then(({ error }) => {
         if (error) console.warn('[KAHA] Error al subir novedad a Supabase:', error.message);
       });
     }
 
-    addAuditLog('NOVEDAD_CREADA', { id: newNov.id, titulo: newNov.titulo });
-    addToast('add', 'Novedad publicada exitosamente.');
-    return { success: true, message: 'Novedad publicada exitosamente.' };
+    addAuditLog('NOVEDAD_CREADA', { id: newNov.id, titulo: newNov.titulo, privada: !!newNov.socio_id });
+    // No mostrar toast para novedades privadas (evitar ruido en el admin cuando se registra un pago)
+    if (!newNov.socio_id) {
+      addToast('add', 'Novedad publicada exitosamente.');
+    }
+    return { success: true, message: 'Novedad publicada exitosamente.', id: newNov.id };
   };
 
   const updateNovedad = (id: string, updates: Partial<Novedad>) => {

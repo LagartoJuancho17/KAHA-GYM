@@ -19,6 +19,10 @@ const stateStorageKey = (yyyy: number, mm: number) =>
 const snoozeStorageKey = (yyyy: number, mm: number) =>
   `kaha-recordatorio-snooze-${yyyy}-${String(mm).padStart(2, '0')}`;
 
+/** Clave de localStorage para guardar el id de la novedad publicada del mes */
+const novedadIdStorageKey = (yyyy: number, mm: number) =>
+  `kaha-recordatorio-novedad-id-${yyyy}-${String(mm).padStart(2, '0')}`;
+
 // ─── Mensaje predefinido ──────────────────────────────────────────────────────
 
 const MENSAJE_MENSUAL = `💚 ¡Se viene un nuevo mes en KAHA!
@@ -59,7 +63,7 @@ interface MensajeMensualReminderProps {
 }
 
 export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ visible = true }) => {
-  const { addNovedad, googleUser } = useGym();
+  const { addNovedad, deleteNovedad } = useGym();
   const [shouldRender, setShouldRender] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -72,13 +76,29 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
       return;
     }
 
+    const hoy = new Date();
+    const diaHoy = hoy.getDate();
+    const { yyyy, mm } = getMesActual();
+
+    // ── Auto-borrado el día 5 del mes ──────────────────────────────────────
+    // Si ya pasó el 1ro del mes siguiente al que se publicó, borramos la novedad
+    // Ej: si publicamos en agosto (mm=8), borramos el 5 de septiembre (mm=9)
+    // Buscamos el ID guardado del mes ANTERIOR (el que se publicó 3 días antes)
+    const mesAnterior = mm === 1 ? 12 : mm - 1;
+    const yyyyAnterior = mm === 1 ? yyyy - 1 : yyyy;
+    const novedadIdMesAnterior = localStorage.getItem(novedadIdStorageKey(yyyyAnterior, mesAnterior));
+    if (novedadIdMesAnterior && diaHoy >= 5) {
+      // Borrar la novedad del mes anterior de la cartelera
+      deleteNovedad(novedadIdMesAnterior);
+      localStorage.removeItem(novedadIdStorageKey(yyyyAnterior, mesAnterior));
+      console.log('[KAHA] Novedad mensual auto-borrada el día 5:', novedadIdMesAnterior);
+    }
+
     const diasRestantes = diasRestantesDelMes();
     if (diasRestantes > DIAS_ANTICIPACION) {
       setShouldRender(false);
       return;
     }
-
-    const { yyyy, mm } = getMesActual();
 
     // ¿Está en snooze?
     const snoozedUntil = localStorage.getItem(snoozeStorageKey(yyyy, mm));
@@ -105,7 +125,7 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     } else {
       setIsOpen(true);
     }
-  }, [visible]);
+  }, [visible, deleteNovedad]);
 
   useEffect(() => {
     checkStatus();
@@ -149,17 +169,22 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
 
     try {
       const proximoMes = getProximoMesNombre();
-      const autor = googleUser?.name || 'Administración';
 
-      addNovedad({
+      const result = addNovedad({
         titulo: proximoMes,
         contenido: MENSAJE_MENSUAL,
         categoria: 'INFORMACION',
         destacado: true,
-        creado_por: autor
+        creado_por: 'Administración KAHA'
       });
 
       const { yyyy, mm } = getMesActual();
+
+      // Guardar el id de la novedad para auto-borrarla el día 5 del mes siguiente
+      if (result?.success && result.id) {
+        localStorage.setItem(novedadIdStorageKey(yyyy, mm), result.id);
+      }
+
       localStorage.setItem(stateStorageKey(yyyy, mm), 'done');
       setShouldRender(false);
       setIsOpen(false);

@@ -131,6 +131,8 @@ export interface Novedad {
   categoria: 'ARANCELES' | 'TURNOS' | 'INFORMACION' | 'EVENTOS';
   creado_por: string;
   destacado: boolean;
+  /** Si está presente, la novedad es privada y solo la ve ese socio en su cartelera */
+  socio_id?: string;
 }
 
 export interface AlertaNotificacion {

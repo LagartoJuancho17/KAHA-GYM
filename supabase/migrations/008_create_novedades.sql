@@ -1,6 +1,7 @@
 -- supabase/migrations/008_create_novedades.sql
 -- Tabla de Novedades / Comunicados del Gimnasio
 -- Permite persistir anuncios, novedades y comunicados para socios
+-- socio_id: si está presente, la novedad es privada y solo la ve ese socio
 
 CREATE TABLE IF NOT EXISTS novedades (
     id TEXT PRIMARY KEY,                -- ID local tipo 'nov-1234567890'
@@ -11,11 +12,15 @@ CREATE TABLE IF NOT EXISTS novedades (
         CHECK (categoria IN ('ARANCELES', 'TURNOS', 'INFORMACION', 'EVENTOS')),
     creado_por TEXT NOT NULL DEFAULT 'admin@gimnasio.com.ar',
     destacado BOOLEAN NOT NULL DEFAULT FALSE,
+    socio_id TEXT NULL,                 -- NULL = novedad global; UUID del cliente = novedad privada
     creado_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 -- Índice para ordenar por fecha descendente (novedades más recientes primero)
 CREATE INDEX IF NOT EXISTS idx_novedades_fecha ON novedades (creado_at DESC);
+
+-- Índice para buscar novedades privadas por socio
+CREATE INDEX IF NOT EXISTS idx_novedades_socio ON novedades (socio_id) WHERE socio_id IS NOT NULL;
 
 -- RLS: habilitar seguridad a nivel de fila
 ALTER TABLE novedades ENABLE ROW LEVEL SECURITY;
