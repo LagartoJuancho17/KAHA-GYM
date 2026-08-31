@@ -5,9 +5,10 @@ import {
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
   TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2,
-  Eye, EyeOff
+  Eye, EyeOff, Mail, Send
 } from 'lucide-react';
 import { Gasto, PagoEnRevision } from '../types';
+import { EmailInicioMesModal } from './Notifications/EmailInicioMesModal';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -48,12 +49,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Privacy / Visibilidad de Balance: SIEMPRE OCULTO por defecto al abrir el Dashboard
   const [mostrarBalance, setMostrarBalance] = useState<boolean>(false);
 
+  // Modal Email de Inicio de Mes a socios
+  const [showEmailMesModal, setShowEmailMesModal] = useState(false);
+
   const handleToggleBalance = () => {
     setMostrarBalance(prev => !prev);
   };
 
   // Mes corriente de análisis (dinámico)
   const mesActual = new Date().toISOString().slice(0, 7);
+  const diaHoy = new Date().getDate();
+  const mailEnviadoEsteMes = !!localStorage.getItem(`kaha-mail-inicio-mes-enviado-${mesActual}`);
 
   // --- CALCULOS DE KPIs ---
   const clientesActivosFicha = clientes.filter(c => c.activo);
@@ -255,8 +261,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <Grid className="w-3.5 h-3.5 text-zinc-500" />
             Grilla Horarios
           </button>
+
+          <button
+            onClick={() => setShowEmailMesModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            id="quick-email-mes-btn"
+            title="Enviar email de inicio de mes a todos los socios"
+          >
+            <Mail className="w-3.5 h-3.5 text-emerald-200" />
+            Mail de Mes
+            {!mailEnviadoEsteMes && diaHoy <= 5 && (
+              <span className="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* BANNER AVISO INICIO DE MES (DÍAS 1 A 5 SI NO SE ENVIÓ AÚN) */}
+      {diaHoy <= 5 && !mailEnviadoEsteMes && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in mb-2" id="monthly-email-reminder-banner">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Mail className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-emerald-950">
+                ¡Nuevo mes en marcha! Recordá enviar el email informativo a los socios
+              </p>
+              <p className="text-[11px] text-emerald-800/80 mt-0.5">
+                Aviso de asignación de turnos fijos durante los primeros 5 días y canales de contacto.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowEmailMesModal(true)}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer transition-all"
+            id="banner-open-monthly-email-btn"
+          >
+            <Send className="w-3.5 h-3.5" />
+            Revisar y Enviar Mail
+          </button>
+        </div>
+      )}
 
       {/* TRANSFERENCIAS PENDIENTES DE REVISIÓN */}
       {transferenciasPendientes.length > 0 && (
@@ -1101,6 +1147,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL EMAIL DE INICIO DE MES A SOCIOS */}
+      <EmailInicioMesModal 
+        isOpen={showEmailMesModal} 
+        onClose={() => setShowEmailMesModal(false)} 
+      />
     </div>
   );
 };

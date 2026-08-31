@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, X, Bell, Calendar, ChevronDown, ChevronUp, MessageCircle, Send } from 'lucide-react';
+import { Copy, Check, X, Bell, Calendar, ChevronDown, ChevronUp, MessageCircle, Send, EyeOff } from 'lucide-react';
 import { useGym } from '../../GymContext';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ const MESES_ES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-/** Clave de localStorage para guardar estado: 'open' | 'closed' | 'done' */
+/** Clave de localStorage para guardar estado: 'open' | 'closed' | 'done' | 'dismissed' */
 const stateStorageKey = (yyyy: number, mm: number) =>
   `kaha-recordatorio-state-${yyyy}-${String(mm).padStart(2, '0')}`;
 
@@ -112,8 +112,8 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
 
     // Leer estado guardado en localStorage
     const savedState = localStorage.getItem(stateStorageKey(yyyy, mm));
-    if (savedState === 'done') {
-      // Si ya lo marcó como enviado, no se muestra automáticamente a menos que no esté 'done'
+    if (savedState === 'done' || savedState === 'dismissed') {
+      // Si ya lo marcó como enviado o lo quitó de la vista, no mostrar
       setShouldRender(false);
       return;
     }
@@ -155,6 +155,13 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     const { yyyy, mm } = getMesActual();
     setIsOpen(false);
     localStorage.setItem(stateStorageKey(yyyy, mm), 'closed');
+  };
+
+  const handleQuitarDeLaVista = () => {
+    const { yyyy, mm } = getMesActual();
+    setShouldRender(false);
+    setIsOpen(false);
+    localStorage.setItem(stateStorageKey(yyyy, mm), 'dismissed');
   };
 
   const handleAbrir = () => {
@@ -214,7 +221,7 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     <>
       {/* ── BOTÓN FLOTANTE COMPACTO (cuando está cerrado/minimizado) ── */}
       {!isOpen && (
-        <div className="fixed bottom-20 sm:bottom-5 right-3 sm:right-5 z-[9990] animate-in fade-in zoom-in duration-200">
+        <div className="fixed bottom-20 sm:bottom-5 right-3 sm:right-5 z-[9990] animate-in fade-in zoom-in duration-200 flex items-center gap-1.5">
           <button
             onClick={handleAbrir}
             className="group flex items-center gap-2 rounded-full pl-3 pr-4 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white text-xs font-bold shadow-lg shadow-emerald-950/30 border border-emerald-300/30 backdrop-blur-md transition-all hover:scale-105 hover:shadow-emerald-500/25 active:scale-95 cursor-pointer"
@@ -230,6 +237,14 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
             <span className="bg-emerald-900/60 text-[10px] text-emerald-200 px-1.5 py-0.2 rounded-full border border-emerald-400/20 font-mono">
               {urgente ? '¡Hoy!' : `${diasRestantes}d`}
             </span>
+          </button>
+          <button
+            onClick={handleQuitarDeLaVista}
+            className="h-8 w-8 rounded-full bg-emerald-950/80 hover:bg-rose-600/90 text-emerald-200/80 hover:text-white border border-emerald-400/30 shadow-lg flex items-center justify-center transition-all cursor-pointer"
+            title="Quitar de la vista este mes"
+            id="mensual-reminder-dismiss-pill-btn"
+          >
+            <X size={13} />
           </button>
         </div>
       )}
@@ -385,6 +400,17 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
                   <span>Mañana</span>
                 </button>
               </div>
+
+              {/* Botón Quitar de la vista */}
+              <button
+                onClick={handleQuitarDeLaVista}
+                className="w-full flex items-center justify-center gap-1.5 py-1 text-[10px] sm:text-[11px] font-medium text-emerald-300/70 hover:text-rose-200 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-400/30 mt-0.5"
+                title="Quitar este recordatorio de la vista por este mes"
+                id="mensual-reminder-dismiss-btn"
+              >
+                <EyeOff size={11} />
+                <span>Quitar de la vista</span>
+              </button>
             </div>
           </div>
         </div>

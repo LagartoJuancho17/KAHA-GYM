@@ -109,6 +109,7 @@ interface GymContextType {
   // Morosidad Simulation
   ejecutarCronMorosidad: (simularFecha: string) => { procesados: number; nuevosMorosos: number; deudaTotal: number; suspendidosSemanaCount: number; dadosBajaCount: number; logLineas: string[] };
   borrarHistorial: () => void;
+  addAuditLog: (accion: string, detalles: any, userEmail?: string) => void;
 
   // Toasts / Feedback Methods
   toasts: ToastMessage[];
@@ -3901,6 +3902,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNovedad, updateNovedad, deleteNovedad,
       ejecutarCronMorosidad,
       borrarHistorial,
+      addAuditLog,
       toasts,
       addToast,
       removeToast,
