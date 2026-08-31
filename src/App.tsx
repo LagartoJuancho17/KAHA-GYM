@@ -17,6 +17,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { SocioRegistrationForm } from './components/Auth/SocioRegistrationForm';
 import { AuthorizeClientModal } from './components/Clientes/AuthorizeClientModal';
 import { Footer } from './components/Common/Footer';
+import { MensajeMensualReminder } from './components/Notifications/MensajeMensualReminder';
 import logoKaha from './assets/logokaha.png';
 
 import { 
@@ -740,6 +741,9 @@ function InnerApp() {
           <span className="text-[9px] uppercase tracking-wider font-sans">Más</span>
         </button>
       </nav>
+
+      {/* Recordatorio mensual: solo para ADMIN y OPERADOR */}
+      <MensajeMensualReminder visible={rolActivo === 'ADMIN' || rolActivo === 'OPERADOR'} />
 
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
