@@ -1,12 +1,15 @@
-// src/components/Notifications/MensajeMensualReminder.tsx
-// Banner de recordatorio mensual para admins: aparece 3 días antes del fin de mes.
-// Estado abierto/cerrado persistido en localStorage para mantener la preferencia entre recargas.
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, X, Bell, Calendar, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
+import { Copy, Check, X, Bell, Calendar, ChevronDown, ChevronUp, MessageCircle, Send } from 'lucide-react';
+import { useGym } from '../../GymContext';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 const DIAS_ANTICIPACION = 3; // Días antes del fin de mes para mostrar el recordatorio
+
+const MESES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
 
 /** Clave de localStorage para guardar estado: 'open' | 'closed' | 'done' */
 const stateStorageKey = (yyyy: number, mm: number) =>
@@ -42,6 +45,12 @@ function getMesActual(): { yyyy: number; mm: number } {
   return { yyyy: hoy.getFullYear(), mm: hoy.getMonth() + 1 };
 }
 
+function getProximoMesNombre(): string {
+  const hoy = new Date();
+  const proximoMesIndex = (hoy.getMonth() + 1) % 12;
+  return MESES_ES[proximoMesIndex];
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 interface MensajeMensualReminderProps {
@@ -50,10 +59,12 @@ interface MensajeMensualReminderProps {
 }
 
 export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ visible = true }) => {
+  const { addNovedad, googleUser } = useGym();
   const [shouldRender, setShouldRender] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const checkStatus = useCallback(() => {
     if (!visible) {
@@ -132,11 +143,31 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     localStorage.setItem(stateStorageKey(yyyy, mm), 'open');
   };
 
-  const handleYaEnvie = () => {
-    const { yyyy, mm } = getMesActual();
-    localStorage.setItem(stateStorageKey(yyyy, mm), 'done');
-    setShouldRender(false);
-    setIsOpen(false);
+  const handleEnviar = () => {
+    if (isPublishing) return;
+    setIsPublishing(true);
+
+    try {
+      const proximoMes = getProximoMesNombre();
+      const autor = googleUser?.name || 'Administración';
+
+      addNovedad({
+        titulo: proximoMes,
+        contenido: MENSAJE_MENSUAL,
+        categoria: 'INFORMACION',
+        destacado: true,
+        creado_por: autor
+      });
+
+      const { yyyy, mm } = getMesActual();
+      localStorage.setItem(stateStorageKey(yyyy, mm), 'done');
+      setShouldRender(false);
+      setIsOpen(false);
+    } catch (e) {
+      console.error('Error al publicar novedad mensual:', e);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleSnooze = () => {
@@ -227,7 +258,7 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
                     </span>
                   </div>
                   <p className="text-[10px] sm:text-[11px] text-emerald-300/90 truncate">
-                    Para enviar por WhatsApp a socios
+                    Próximo mes: <span className="font-semibold text-emerald-200">{getProximoMesNombre()}</span>
                   </p>
                 </div>
               </div>
@@ -292,7 +323,7 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
                 {copied ? (
                   <>
                     <Check size={14} />
-                    <span>¡Copiado!</span>
+                    <span>¡Copiado al portapapeles!</span>
                   </>
                 ) : (
                   <>
@@ -305,17 +336,14 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
               {/* Acciones secundarias */}
               <div className="flex gap-1.5">
                 <button
-                  onClick={handleYaEnvie}
-                  className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] sm:text-[11px] font-semibold text-emerald-200 hover:text-white transition-colors cursor-pointer"
-                  style={{
-                    background: 'rgba(0,0,0,0.18)',
-                    border: '1px solid rgba(52,211,153,0.15)',
-                  }}
+                  onClick={handleEnviar}
+                  disabled={isPublishing}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[10px] sm:text-[11px] font-bold text-white bg-emerald-500/30 hover:bg-emerald-500/50 border border-emerald-400/40 transition-colors cursor-pointer disabled:opacity-50"
                   id="mensual-reminder-sent-btn"
-                  title="Marcar como enviado este mes"
+                  title={`Publicar en Novedades (${getProximoMesNombre()}, Destacado, Información General)`}
                 >
-                  <Check size={11} />
-                  <span>Ya lo envié</span>
+                  <Send size={11} className={isPublishing ? 'animate-spin' : ''} />
+                  <span>{isPublishing ? 'Publicando...' : 'Enviar'}</span>
                 </button>
 
                 <button

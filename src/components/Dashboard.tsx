@@ -45,28 +45,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [gastoErr, setGastoErr] = useState('');
   const [gastoOk, setGastoOk] = useState('');
 
-  // Privacy / Visibilidad de Balance (sincronizado con localStorage)
-  const [mostrarBalance, setMostrarBalance] = useState<boolean>(() => {
-    const saved = localStorage.getItem('gym_mostrar_balance');
-    return saved !== null ? saved === 'true' : true;
-  });
-
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'gym_mostrar_balance' && e.newValue !== null) {
-        setMostrarBalance(e.newValue === 'true');
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  // Privacy / Visibilidad de Balance: SIEMPRE OCULTO por defecto al abrir el Dashboard
+  const [mostrarBalance, setMostrarBalance] = useState<boolean>(false);
 
   const handleToggleBalance = () => {
-    setMostrarBalance(prev => {
-      const next = !prev;
-      localStorage.setItem('gym_mostrar_balance', String(next));
-      return next;
-    });
+    setMostrarBalance(prev => !prev);
   };
 
   // Mes corriente de análisis (dinámico)
@@ -227,37 +210,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => {
-              if (setShowAddClienteModal) setShowAddClienteModal(true);
-              setActiveTab('CLIENTES');
-            }}
-            className="bg-zinc-900 hover:bg-black text-white pl-4 pr-1.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
-            id="quick-add-client-btn"
-          >
-            Nuevo Socio
-            <span className="w-6 h-6 rounded-full bg-lime-300 flex items-center justify-center">
-              <Plus className="w-4 h-4 text-zinc-900" />
-            </span>
-          </button>
-          
-          <button
-            onClick={() => {
               if (setShowAddPagoModal) setShowAddPagoModal(true);
               setActiveTab('PAGOS');
             }}
-            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="bg-zinc-900 hover:bg-black text-white pl-4 pr-1.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:shadow-md cursor-pointer"
             id="quick-add-payment-btn"
           >
-            <Receipt className="w-4 h-4 text-zinc-500" />
             Registrar Pago
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('TURNOS')}
-            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-            id="quick-schedule-btn"
-          >
-            <Grid className="w-4 h-4 text-zinc-500" />
-            Grilla Horarios
+            <span className="w-6 h-6 rounded-full bg-lime-400 flex items-center justify-center">
+              <Receipt className="w-3.5 h-3.5 text-zinc-950 font-bold" />
+            </span>
           </button>
 
           <button
@@ -266,11 +228,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setGastoOk('');
               setShowGastoModal(true);
             }}
-            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md cursor-pointer"
             id="quick-add-expense-btn"
           >
-            <Minus className="w-4 h-4" />
+            <Minus className="w-3.5 h-3.5 text-white" />
             Añadir Gasto
+          </button>
+
+          <button
+            onClick={() => {
+              if (setShowAddClienteModal) setShowAddClienteModal(true);
+              setActiveTab('CLIENTES');
+            }}
+            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            id="quick-add-client-btn"
+          >
+            <Plus className="w-3.5 h-3.5 text-zinc-500" />
+            Nuevo Socio
+          </button>
+
+          <button
+            onClick={() => setActiveTab('TURNOS')}
+            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            id="quick-schedule-btn"
+          >
+            <Grid className="w-3.5 h-3.5 text-zinc-500" />
+            Grilla Horarios
           </button>
         </div>
       </div>

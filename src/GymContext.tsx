@@ -529,6 +529,65 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
+      // --- NOVEDADES: cargar de Supabase (con fallback a localStorage si la tabla no existe aún) ---
+      try {
+        const { data: novedadesDb, error: novedadesErr } = await supabase
+          .from('novedades')
+          .select('*')
+          .order('creado_at', { ascending: false });
+
+        if (novedadesErr) {
+          // Tabla no existe todavía: cargar desde localStorage como fallback
+          console.warn('[KAHA] Tabla novedades no encontrada en Supabase, usando localStorage:', novedadesErr.message);
+          const localNov = localStorage.getItem('gym_novedades');
+          const localNovedades: Novedad[] = localNov ? JSON.parse(localNov) : INITIAL_NOVEDADES;
+          setNovedades(localNovedades);
+          localStorage.setItem('gym_novedades', JSON.stringify(localNovedades));
+        } else {
+          const mappedNovedades: Novedad[] = (novedadesDb || []).map(n => ({
+            id: n.id,
+            titulo: n.titulo,
+            contenido: n.contenido,
+            fecha: n.fecha,
+            categoria: n.categoria as Novedad['categoria'],
+            creado_por: n.creado_por,
+            destacado: n.destacado
+          }));
+
+          // Merge: si hay novedades locales que no están en la DB, subirlas
+          const localNov = localStorage.getItem('gym_novedades');
+          const localNovedades: Novedad[] = localNov ? JSON.parse(localNov) : [];
+          const dbIds = new Set(mappedNovedades.map(n => n.id));
+          const localFaltantes = localNovedades.filter(n => !dbIds.has(n.id));
+
+          if (localFaltantes.length > 0) {
+            const toUpsert = localFaltantes.map(n => ({
+              id: n.id,
+              titulo: n.titulo,
+              contenido: n.contenido,
+              fecha: n.fecha,
+              categoria: n.categoria,
+              creado_por: n.creado_por,
+              destacado: n.destacado
+            }));
+            supabase.from('novedades').upsert(toUpsert, { onConflict: 'id' }).then(({ error }) => {
+              if (error) console.warn('[KAHA] No se pudieron subir novedades locales a Supabase:', error.message);
+              else console.log(`✅ Novedades: ${toUpsert.length} novedad(es) local(es) sincronizadas a Supabase`);
+            });
+          }
+
+          const merged = [...localFaltantes, ...mappedNovedades];
+          setNovedades(merged);
+          localStorage.setItem('gym_novedades', JSON.stringify(merged));
+        }
+      } catch (novErr) {
+        // Error inesperado: usar localStorage
+        console.warn('[KAHA] Error al cargar novedades de Supabase:', novErr);
+        const localNov = localStorage.getItem('gym_novedades');
+        const fallback: Novedad[] = localNov ? JSON.parse(localNov) : INITIAL_NOVEDADES;
+        setNovedades(fallback);
+      }
+
       const localGoogleUser = localStorage.getItem('gym_google_user');
       if (localGoogleUser) {
         try {
@@ -3703,8 +3762,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const updated = [newNov, ...novedades];
-    // Para no pisar ni truncar otros datos, pasamos la llamada completa con los estados persistentes actuales
-    saveState(clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, updated);
+    setNovedades(updated);
+    localStorage.setItem('gym_novedades', JSON.stringify(updated));
+
+    // Sincronizar a Supabase en paralelo
+    if (supabase) {
+      supabase.from('novedades').insert({
+        id: newNov.id,
+        titulo: newNov.titulo,
+        contenido: newNov.contenido,
+        fecha: newNov.fecha,
+        categoria: newNov.categoria,
+        creado_por: newNov.creado_por,
+        destacado: newNov.destacado
+      }).then(({ error }) => {
+        if (error) console.warn('[KAHA] Error al subir novedad a Supabase:', error.message);
+      });
+    }
+
     addAuditLog('NOVEDAD_CREADA', { id: newNov.id, titulo: newNov.titulo });
     addToast('add', 'Novedad publicada exitosamente.');
     return { success: true, message: 'Novedad publicada exitosamente.' };
@@ -3712,7 +3787,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateNovedad = (id: string, updates: Partial<Novedad>) => {
     const updated = novedades.map(n => n.id === id ? { ...n, ...updates } : n);
-    saveState(clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, updated);
+    setNovedades(updated);
+    localStorage.setItem('gym_novedades', JSON.stringify(updated));
+
+    // Sincronizar a Supabase en paralelo
+    if (supabase) {
+      supabase.from('novedades').update({
+        titulo: updates.titulo,
+        contenido: updates.contenido,
+        categoria: updates.categoria,
+        destacado: updates.destacado,
+        creado_por: updates.creado_por
+      }).eq('id', id).then(({ error }) => {
+        if (error) console.warn('[KAHA] Error al actualizar novedad en Supabase:', error.message);
+      });
+    }
+
     addAuditLog('NOVEDAD_MODIFICADA', { id, titulo_nuevo: updates.titulo });
     return { success: true, message: 'Novedad modificada exitosamente.' };
   };
@@ -3720,7 +3810,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteNovedad = (id: string) => {
     const matched = novedades.find(n => n.id === id);
     const updated = novedades.filter(n => n.id !== id);
-    saveState(clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, updated);
+    setNovedades(updated);
+    localStorage.setItem('gym_novedades', JSON.stringify(updated));
+
+    // Sincronizar a Supabase en paralelo
+    if (supabase) {
+      supabase.from('novedades').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('[KAHA] Error al eliminar novedad en Supabase:', error.message);
+      });
+    }
+
     addAuditLog('NOVEDAD_ELIMINADA', { id, titulo: matched?.titulo });
     addToast('delete', 'Novedad eliminada exitosamente.');
   };
