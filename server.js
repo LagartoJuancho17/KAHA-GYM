@@ -409,6 +409,88 @@ app.post('/api/notify-baja', async (req, res) => {
   }
 });
 
+// Envía el correo mensual a un socio vía Resend
+async function enviarEmailInicioMes({ email, nombreSocio, asunto, mensaje }) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const esInvitado = cleanEmail.startsWith('invitado-') && cleanEmail.endsWith('@kaha.com');
+  const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail);
+  if (!emailValido || esInvitado) return { ok: false, reason: 'sin_email_valido' };
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, reason: 'sin_api_key' };
+
+  const from = process.env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>';
+  const subject = asunto || '💚 ¡Comenzamos un nuevo mes en KAHA!';
+
+  const html = `<!doctype html><html><body style="margin:0;background:#062319;font-family:Inter,Arial,sans-serif;color:#f4f4f5;">
+    <div style="max-width:540px;margin:0 auto;padding:24px;">
+      <div style="background:#043d2f;border:1px solid #059669;border-radius:24px 24px 0 0;padding:32px 28px 24px;text-align:center;">
+        <div style="display:inline-block;background:#10b981;color:#043d2f;font-size:11px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;padding:4px 12px;border-radius:9999px;margin-bottom:12px;font-family:monospace;">KAHA GYM</div>
+        <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:900;letter-spacing:-0.03em;">¡Nuevo Mes de Entrenamiento! 💚</h1>
+      </div>
+      <div style="background:#064e3b;border:1px solid #059669;border-top:none;border-radius:0 0 24px 24px;padding:28px;">
+        <div style="color:#ecfdf5;font-size:14px;line-height:1.7;white-space:pre-line;">
+${mensaje}
+        </div>
+        <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(52,211,153,0.2);text-align:center;">
+          <p style="margin:0;color:#6ee7b7;font-size:12px;">Equipo KAHA GYM — Entrená con nosotros</p>
+        </div>
+      </div>
+    </div>
+  </body></html>`;
+
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [cleanEmail], subject, html })
+  });
+
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    console.error('>> [send-monthly-email] Error de Resend para', cleanEmail, data);
+    return { ok: false, reason: 'resend_error', detail: data };
+  }
+  return { ok: true, id: data.id };
+}
+
+// Endpoint para envío masivo de email de inicio de mes
+app.post('/api/send-monthly-email', async (req, res) => {
+  try {
+    const { asunto, mensaje, destinatarios = [] } = req.body || {};
+
+    let targets = destinatarios;
+    if ((!targets || targets.length === 0) && supabase) {
+      const { data: clients } = await supabase
+        .from('clientes')
+        .select('id, nombre, apellido, email')
+        .eq('activo', true);
+      targets = (clients || []).map(c => ({ email: c.email, nombre: `${c.nombre} ${c.apellido}`.trim() }));
+    }
+
+    console.log(`>> [send-monthly-email] Iniciando envío de correos a ${targets.length} socios...`);
+
+    let enviados = 0;
+    let errores = 0;
+    for (const target of targets) {
+      if (!target.email) continue;
+      const resMail = await enviarEmailInicioMes({
+        email: target.email,
+        nombreSocio: target.nombre || 'Socio',
+        asunto,
+        mensaje
+      });
+      if (resMail.ok) enviados++;
+      else errores++;
+    }
+
+    console.log(`>> [send-monthly-email] Envío finalizado: ${enviados} enviados, ${errores} errores.`);
+    return res.status(200).json({ ok: true, enviados, errores, total: targets.length });
+  } catch (err) {
+    console.error('>> [send-monthly-email] Error general:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Serve static assets from build output folder
 app.use(express.static(path.join(__dirname, 'dist')));
 

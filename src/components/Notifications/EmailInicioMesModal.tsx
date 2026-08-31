@@ -123,25 +123,60 @@ export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen
     setResultadoEnvio(null);
 
     try {
-      if (!supabase) {
-        throw new Error('Supabase no está configurado.');
+      let sentSuccess = false;
+      let responseDetail: any = null;
+
+      // 1. Intentar a través del servidor Express /api/send-monthly-email (que usa process.env.RESEND_API_KEY)
+      try {
+        const res = await fetch('/api/send-monthly-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            asunto,
+            mensaje,
+            destinatarios: destinatarios.map(d => ({
+              id: d.id,
+              nombre: `${d.nombre} ${d.apellido}`.trim(),
+              email: d.email.trim()
+            }))
+          })
+        });
+
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.ok) {
+            sentSuccess = true;
+            responseDetail = resData;
+          }
+        }
+      } catch (e) {
+        console.warn('API local /api/send-monthly-email no respondió, probando Supabase:', e);
       }
 
-      // Invocar Edge Function send-monthly-email
-      const { data, error } = await supabase.functions.invoke('send-monthly-email', {
-        body: {
-          asunto,
-          mensaje,
-          destinatarios: destinatarios.map(d => ({
-            id: d.id,
-            nombre: `${d.nombre} ${d.apellido}`.trim(),
-            email: d.email.trim()
-          }))
-        }
-      });
+      // 2. Si no respondió la API local, intentar con Supabase Edge Function
+      if (!sentSuccess && supabase) {
+        const { data, error } = await supabase.functions.invoke('send-monthly-email', {
+          body: {
+            asunto,
+            mensaje,
+            destinatarios: destinatarios.map(d => ({
+              id: d.id,
+              nombre: `${d.nombre} ${d.apellido}`.trim(),
+              email: d.email.trim()
+            }))
+          }
+        });
 
-      if (error) {
-        throw error;
+        if (!error) {
+          sentSuccess = true;
+          responseDetail = data;
+        } else {
+          throw error;
+        }
+      }
+
+      if (!sentSuccess) {
+        throw new Error('No se pudo contactar al servidor de correo.');
       }
 
       const fechaStr = new Date().toLocaleString('es-AR');
@@ -150,7 +185,7 @@ export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen
         cantidad: destinatarios.length,
         mes: mesKey,
         fecha: fechaStr,
-        detalle: data
+        detalle: responseDetail
       }, googleUser?.email || 'admin@gimnasio.com.ar');
 
       setResultadoEnvio({
@@ -159,7 +194,7 @@ export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen
       });
       addToast('add', `Correos de inicio de mes enviados a ${destinatarios.length} socios.`);
     } catch (err: any) {
-      console.error('Error al invocar Edge Function:', err);
+      console.error('Error al enviar correos:', err);
       setResultadoEnvio({
         tipo: 'info',
         texto: `No se pudo conectar con el servicio automatizado (${err?.message || 'clave Resend no configurada'}). Podés usar el botón "Abrir en Gmail / Mailto" para enviarlo directamente.`
