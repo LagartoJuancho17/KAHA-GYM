@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, PagoEnRevision,
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
-  ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, Profesor, NovedadProfesor, WaitlistReserva,
+  ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, OrigenGasto, Profesor, NovedadProfesor, WaitlistReserva,
   ToastMessage
 } from './types';
 import { 
@@ -618,6 +618,66 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setNovedades(fallback);
       }
 
+      // --- GASTOS: cargar de Supabase (con fallback a localStorage y sincronización) ---
+      try {
+        const { data: gastosDb, error: gastosErr } = await supabase
+          .from('gastos')
+          .select('*')
+          .order('fecha', { ascending: false });
+
+        if (gastosErr) {
+          console.warn('[KAHA] Tabla gastos no encontrada en Supabase, usando localStorage:', gastosErr.message);
+          const localG = localStorage.getItem('gym_gastos');
+          const fallbackG: Gasto[] = localG ? JSON.parse(localG) : INITIAL_GASTOS;
+          setGastos(fallbackG);
+          localStorage.setItem('gym_gastos', JSON.stringify(fallbackG));
+        } else {
+          const mappedGastos: Gasto[] = (gastosDb || []).map(g => ({
+            id: g.id,
+            concepto: g.concepto,
+            monto: Number(g.monto),
+            categoria: g.categoria as Gasto['categoria'],
+            efectuado_por: (g.efectuado_por as OrigenGasto) || 'EFECTIVO_CAJA',
+            fecha: typeof g.fecha === 'string' ? g.fecha.slice(0, 10) : g.fecha,
+            registrado_por: g.registrado_por || 'admin@gimnasio.com.ar',
+            creado_at: g.creado_at
+          }));
+
+          // Merge: si hay gastos locales que no están en la DB, subirlos
+          const localG = localStorage.getItem('gym_gastos');
+          const localGastos: Gasto[] = localG ? JSON.parse(localG) : [];
+          const dbIds = new Set(mappedGastos.map(g => g.id));
+          const localFaltantes = localGastos.filter(g => !dbIds.has(g.id));
+
+          if (localFaltantes.length > 0) {
+            const toUpsert = localFaltantes.map(g => ({
+              id: g.id,
+              concepto: g.concepto,
+              monto: g.monto,
+              categoria: g.categoria,
+              efectuado_por: g.efectuado_por || 'EFECTIVO_CAJA',
+              fecha: g.fecha,
+              registrado_por: g.registrado_por || 'admin@gimnasio.com.ar',
+              creado_at: g.creado_at || new Date().toISOString()
+            }));
+            supabase.from('gastos').upsert(toUpsert, { onConflict: 'id' }).then(({ error }) => {
+              if (error) console.warn('[KAHA] No se pudieron sincronizar gastos locales a Supabase:', error.message);
+              else console.log(`✅ Gastos: ${toUpsert.length} gasto(s) local(es) sincronizados a Supabase`);
+            });
+          }
+
+          const merged = [...localFaltantes, ...mappedGastos];
+          setGastos(merged);
+          localStorage.setItem('gym_gastos', JSON.stringify(merged));
+        }
+      } catch (gErr) {
+        console.warn('[KAHA] Error al cargar gastos de Supabase:', gErr);
+        const localG = localStorage.getItem('gym_gastos');
+        const fallback: Gasto[] = localG ? JSON.parse(localG) : INITIAL_GASTOS;
+        setGastos(fallback);
+        localStorage.setItem('gym_gastos', JSON.stringify(fallback));
+      }
+
       const localGoogleUser = localStorage.getItem('gym_google_user');
       if (localGoogleUser) {
         try {
@@ -752,11 +812,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (localGastos) {
-        const parsedG = JSON.parse(localGastos);
-        const hasJulG = parsedG.some((g: any) => g.fecha?.startsWith('2026-07'));
-        if (hasJulG) {
+        try {
+          const parsedG = JSON.parse(localGastos);
           setGastos(parsedG);
-        } else {
+        } catch {
           setGastos(INITIAL_GASTOS as Gasto[]);
           localStorage.setItem('gym_gastos', JSON.stringify(INITIAL_GASTOS));
         }
@@ -3784,6 +3843,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('gym_gastos', JSON.stringify(updated));
       return updated;
     });
+
+    if (supabase) {
+      supabase.from('gastos').insert({
+        id: nuevoGasto.id,
+        concepto: nuevoGasto.concepto,
+        monto: nuevoGasto.monto,
+        categoria: nuevoGasto.categoria,
+        efectuado_por: nuevoGasto.efectuado_por,
+        fecha: nuevoGasto.fecha,
+        registrado_por: nuevoGasto.registrado_por || 'admin@gimnasio.com.ar',
+        creado_at: nuevoGasto.creado_at
+      }).then(({ error }) => {
+        if (error) console.warn('[KAHA] Error al insertar gasto en Supabase:', error.message);
+      });
+    }
+
     addAuditLog('GASTO_REGISTRADO', { 
       concepto: gastoData.concepto, 
       monto: gastoData.monto,
@@ -3799,6 +3874,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('gym_gastos', JSON.stringify(updated));
       return updated;
     });
+
+    if (supabase) {
+      supabase.from('gastos').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('[KAHA] Error al eliminar gasto en Supabase:', error.message);
+      });
+    }
+
     addAuditLog('GASTO_ELIMINADO', { id });
     addToast('delete', 'Gasto eliminado exitosamente.');
   };
