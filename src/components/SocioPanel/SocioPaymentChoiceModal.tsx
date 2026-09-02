@@ -27,8 +27,9 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   const now = new Date();
   const hasDebt = socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
   const planSocio = planes.find(p => p.id === socio.plan_id);
+  const planPrecio = socio.precio_personalizado ?? (planSocio ? planSocio.precio : 0);
 
-  const montoBase = hasDebt ? socio.deuda_acumulada : (planSocio ? planSocio.precio : 0);
+  const montoBase = hasDebt ? socio.deuda_acumulada : planPrecio;
   const amountMP = Math.round(montoBase * 1.10); // 10% surcharge
   const feeMP = Math.round(montoBase * 0.10);
 
@@ -78,7 +79,7 @@ export const SocioPaymentChoiceModal: React.FC<SocioPaymentChoiceModalProps> = (
   };
 
   const handleConfirmTransfer = () => {
-    const res = solicitarPagoTransferencia(socio.id);
+    const res = solicitarPagoTransferencia(socio.id, montoBase, targetMonthStr);
     if (res.success) {
       setSimulatedSuccessData({
         clientName: `${socio.nombre} ${socio.apellido}`,

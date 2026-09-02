@@ -5,10 +5,12 @@ import {
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
   TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2,
-  Eye, EyeOff, Mail, Send
+  Eye, EyeOff, Mail, Send, UserMinus
 } from 'lucide-react';
-import { Gasto, PagoEnRevision } from '../types';
+import { Gasto, PagoEnRevision, OrigenGasto } from '../types';
 import { EmailInicioMesModal } from './Notifications/EmailInicioMesModal';
+import { AdminBajasReviewModal } from './Morosos/AdminBajasReviewModal';
+import { EmailReporteMorososAdminModal } from './Notifications/EmailReporteMorososAdminModal';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -20,6 +22,12 @@ interface DashboardProps {
 }
 
 const CATEGORIAS_GASTO = ['ALQUILER', 'SERVICIOS', 'INSUMOS', 'PROFESORES', 'OTROS'] as const;
+
+export const ORIGENES_GASTO: { id: OrigenGasto; label: string; shortLabel: string; emoji: string; badgeColor: string }[] = [
+  { id: 'JUANCHI_TRANSFERENCIA', label: 'Juanchi con transferencia', shortLabel: 'Juanchi (Transf.)', emoji: '👤', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { id: 'RULO_TRANSFERENCIA', label: 'Rulo con transferencia', shortLabel: 'Rulo (Transf.)', emoji: '👤', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { id: 'EFECTIVO_CAJA', label: 'Efectivo de Caja', shortLabel: 'Efectivo Caja', emoji: '💵', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+];
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
   setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal, setOpenTurnosModalForId, onStartAuthorization 
@@ -37,10 +45,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showGastoModal, setShowGastoModal] = useState(false);
   const [transferToApprove, setTransferToApprove] = useState<PagoEnRevision | null>(null);
   const [destinoSeleccionado, setDestinoSeleccionado] = useState<'JUANCHI' | 'RULO'>('JUANCHI');
+
+  const getTransferMonto = (p: PagoEnRevision) => {
+    if (p.monto > 0) return p.monto;
+    const cli = clientes.find(c => c.id === p.cliente_id);
+    const plan = cli ? planes.find(pl => pl.id === cli.plan_id) : null;
+    return cli?.precio_personalizado ?? plan?.precio ?? (cli?.deuda_acumulada || 0);
+  };
   const [gastoForm, setGastoForm] = useState({
     concepto: '',
     monto: '',
     categoria: 'OTROS' as Gasto['categoria'],
+    efectuado_por: 'JUANCHI_TRANSFERENCIA' as OrigenGasto,
     fecha: new Date().toISOString().slice(0, 10)
   });
   const [gastoErr, setGastoErr] = useState('');
@@ -51,6 +67,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Modal Email de Inicio de Mes a socios
   const [showEmailMesModal, setShowEmailMesModal] = useState(false);
+  // Modal de Revisión de Bajas Día 10+
+  const [showBajasModal, setShowBajasModal] = useState(false);
+  const [showEmailReporteModal, setShowEmailReporteModal] = useState(false);
 
   const handleToggleBalance = () => {
     setMostrarBalance(prev => !prev);
@@ -70,6 +89,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const porcentajeMorosidad = totalActivosCount > 0 
     ? Math.round((morososCount / totalActivosCount) * 100) 
     : 0;
+
+  // Candidatos a baja de turno fijo (Día 10 en adelante): socios activos con turnos fijos asignados y sin pagar este mes
+  const candidatosBajaFijos = clientesActivosFicha.filter(c => {
+    if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
+    const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual;
+    return noPago;
+  });
 
   // Ingresos reales de este mes
   const pagosDeEsteMes = pagos.filter(p => p.mes_correspondiente === mesActual);
@@ -182,13 +208,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
       concepto: gastoForm.concepto.trim(),
       monto,
       categoria: gastoForm.categoria,
+      efectuado_por: gastoForm.efectuado_por,
       fecha: gastoForm.fecha,
       registrado_por: 'admin@gimnasio.com.ar'
     });
 
     if (res.success) {
       setGastoOk('¡Gasto registrado exitosamente!');
-      setGastoForm({ concepto: '', monto: '', categoria: 'OTROS', fecha: new Date().toISOString().slice(0, 10) });
+      setGastoForm({ concepto: '', monto: '', categoria: 'OTROS', efectuado_por: 'JUANCHI_TRANSFERENCIA', fecha: new Date().toISOString().slice(0, 10) });
       setTimeout(() => {
         setShowGastoModal(false);
         setGastoOk('');
@@ -274,8 +301,55 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span>
             )}
           </button>
+
+          {diaHoy >= 10 && candidatosBajaFijos.length > 0 && (
+            <button
+              onClick={() => setShowBajasModal(true)}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer animate-pulse"
+              id="quick-bajas-dia-10-btn"
+              title="Revisar socios con turno fijo sin pagar (Día 10+)"
+            >
+              <UserMinus className="w-3.5 h-3.5" />
+              Bajas Día 10 ({candidatosBajaFijos.length})
+            </button>
+          )}
         </div>
       </div>
+
+      {/* BANNER REVISIÓN DE BAJAS DE TURNO FIJO (DÍA 10 EN ADELANTE) */}
+      {diaHoy >= 10 && candidatosBajaFijos.length > 0 && (
+        <div className="bg-gradient-to-r from-red-50 via-amber-50 to-red-50 border border-red-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in mb-2" id="day-10-bajas-reminder-banner">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <AlertTriangle className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-red-950">
+                ⚠️ Revisión de Bajas (Día 10+): {candidatosBajaFijos.length} socio(s) con turno fijo sin abonar
+              </p>
+              <p className="text-[11px] text-red-800/80 mt-0.5">
+                Los turnos no se dan de baja automáticamente. Revisá cada caso para confirmar la liberación del cupo o mantener la vacante.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowEmailReporteModal(true)}
+              className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+            >
+              <Mail className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Enviar Reporte</span>
+            </button>
+            <button
+              onClick={() => setShowBajasModal(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all border-none"
+            >
+              <UserMinus className="w-3.5 h-3.5" />
+              <span>Revisar Bajas</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* BANNER AVISO INICIO DE MES (DÍAS 1 A 5 SI NO SE ENVIÓ AÚN) */}
       {diaHoy <= 5 && !mailEnviadoEsteMes && (
@@ -332,7 +406,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-zinc-900 text-xs truncate leading-none mb-1">{p.cliente_nombre_completo}</p>
                     <p className="text-[10px] text-emerald-700 font-mono font-bold leading-none mb-2">
-                      Monto: ${p.monto.toLocaleString('es-AR')} ARS
+                      Monto: ${getTransferMonto(p).toLocaleString('es-AR')} ARS
                     </p>
                     <div className="flex flex-col gap-0.5 text-[9px] text-zinc-500">
                       <span>Mes: {p.mes_correspondiente}</span>
@@ -920,13 +994,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 PROFESORES: 'bg-emerald-50 text-emerald-700 border-emerald-100',
                 OTROS: 'bg-zinc-50 text-zinc-600 border-zinc-200'
               };
+              const origenObj = ORIGENES_GASTO.find(o => o.id === g.efectuado_por) || ORIGENES_GASTO[2];
               return (
                 <div key={g.id} className="flex justify-between items-center p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
                   <div className="min-w-0">
                     <p className="font-semibold text-zinc-900 truncate">{g.concepto}</p>
-                    <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border ${catColors[g.categoria] || catColors.OTROS}`}>
-                      {g.categoria}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border ${catColors[g.categoria] || catColors.OTROS}`}>
+                        {g.categoria}
+                      </span>
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border ${origenObj.badgeColor}`}>
+                        {origenObj.shortLabel}
+                      </span>
+                    </div>
                   </div>
                   <span className="font-mono font-bold text-rose-600 ml-3 shrink-0">${g.monto.toLocaleString('es-AR')}</span>
                 </div>
@@ -1039,6 +1119,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
+              {/* ¿QUIÉN EFECTUÓ EL GASTO? */}
+              <div className="space-y-1.5">
+                <label className="text-zinc-700 font-bold block text-[10px] uppercase tracking-wider">
+                  ¿Quién efectuó el gasto? (Origen de fondos) *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {ORIGENES_GASTO.map(orig => (
+                    <button
+                      key={orig.id}
+                      type="button"
+                      onClick={() => setGastoForm(prev => ({ ...prev, efectuado_por: orig.id }))}
+                      className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                        gastoForm.efectuado_por === orig.id
+                          ? 'border-zinc-900 bg-zinc-900 text-white shadow-xs font-bold'
+                          : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span>{orig.emoji}</span>
+                        <span className="truncate">{orig.label}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* PREVIEW */}
               {gastoForm.monto && parseFloat(gastoForm.monto) > 0 && (
                 <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg flex justify-between items-center">
@@ -1089,7 +1195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5 text-xs">
               <p className="font-semibold text-slate-700">Socio: <span className="font-bold text-slate-900">{transferToApprove.cliente_nombre_completo}</span></p>
-              <p className="font-semibold text-slate-700">Monto: <span className="font-bold text-emerald-700 font-mono">${transferToApprove.monto.toLocaleString('es-AR')} ARS</span></p>
+              <p className="font-semibold text-slate-700">Monto: <span className="font-bold text-emerald-700 font-mono">${getTransferMonto(transferToApprove).toLocaleString('es-AR')} ARS</span></p>
               <p className="font-semibold text-slate-700">Mes: <span className="font-bold text-slate-900">{transferToApprove.mes_correspondiente}</span></p>
             </div>
 
@@ -1135,7 +1241,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </button>
               <button
                 onClick={() => {
-                  aprobarPagoTransferencia(transferToApprove.id, googleUser?.email || 'admin@kaha.fit', destinoSeleccionado);
+                  const montoFinal = getTransferMonto(transferToApprove);
+                  aprobarPagoTransferencia(transferToApprove.id, googleUser?.email || 'admin@kaha.fit', destinoSeleccionado, montoFinal);
                   setTransferToApprove(null);
                 }}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs cursor-pointer border-none flex items-center gap-1.5"
@@ -1152,6 +1259,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <EmailInicioMesModal 
         isOpen={showEmailMesModal} 
         onClose={() => setShowEmailMesModal(false)} 
+      />
+
+      {/* MODAL REVISIÓN DE BAJAS DE TURNOS FIJOS (DÍA 10+) */}
+      <AdminBajasReviewModal
+        isOpen={showBajasModal}
+        onClose={() => setShowBajasModal(false)}
+        onOpenEmailModal={() => setShowEmailReporteModal(true)}
+      />
+
+      {/* MODAL REPORTE EMAIL MOROSOS ADMIN */}
+      <EmailReporteMorososAdminModal
+        isOpen={showEmailReporteModal}
+        onClose={() => setShowEmailReporteModal(false)}
       />
     </div>
   );

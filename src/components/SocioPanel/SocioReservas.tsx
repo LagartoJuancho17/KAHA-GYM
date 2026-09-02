@@ -34,12 +34,14 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     return planes.find(p => p.id === socio.plan_id) || null;
   }, [planes, socio]);
 
-  const paidMonth = useMemo(() => {
-    return socio.ultimo_mes_pagado || new Date().toISOString().slice(0, 7);
-  }, [socio]);
+  const currentCalendarMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const [calYear, calMonth] = currentCalendarMonth.split('-').map(Number);
+  const nextMonthDate = new Date(calYear, calMonth, 1);
+  const nextCalendarMonth = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  const mesActualNombre = new Date(calYear, calMonth - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
-  const isDateInPaidMonth = (dateStr: string) => {
-    return dateStr.startsWith(paidMonth);
+  const isDateInCurrentMonth = (dateStr: string) => {
+    return dateStr.startsWith(currentCalendarMonth);
   };
 
   const getDatesOfWeekdayInMonth = (dayName: string, monthStr: string): string[] => {
@@ -64,7 +66,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
   const getAvailableDatesForTurn = (dayName: string) => {
     const daysMap = { 'DOMINGO': 0, 'LUNES': 1, 'MARTES': 2, 'MIERCOLES': 3, 'JUEVES': 4, 'VIERNES': 5, 'SABADO': 6 };
     const targetDay = daysMap[dayName as keyof typeof daysMap] ?? 1;
-    const [year, month] = paidMonth.split('-').map(Number);
+    const [year, month] = currentCalendarMonth.split('-').map(Number);
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0);
     const minDate = new Date(startOfMonth);
@@ -99,12 +101,12 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
   }, [fixedDaysCount]);
 
   const activeIndividualReservations = useMemo(() => {
-    return (socio.reservas_individuales || []).filter(r => isDateInPaidMonth(r.fecha));
-  }, [socio, paidMonth]);
+    return (socio.reservas_individuales || []).filter(r => isDateInCurrentMonth(r.fecha));
+  }, [socio, currentCalendarMonth]);
 
   const suspendedClassesThisMonth = useMemo(() => {
-    return (socio.clases_suspendidas || []).filter(s => isDateInPaidMonth(s.fecha));
-  }, [socio, paidMonth]);
+    return (socio.clases_suspendidas || []).filter(s => isDateInCurrentMonth(s.fecha));
+  }, [socio, currentCalendarMonth]);
 
   const reintegratedSuspensionsCount = useMemo(() => {
     return suspendedClassesThisMonth.filter(s => s.reintegrado && socio.turnos_fijos.includes(s.turno_id)).length;
@@ -117,9 +119,6 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
   const availableSlots = useMemo(() => {
     return Math.max(0, totalMonthlySlots - usedSlots);
   }, [totalMonthlySlots, usedSlots]);
-
-  // Fix 2: Use the real calendar current month, not paidMonth, to determine isNextMonth badges
-  const currentCalendarMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
 
   // Unified sessions list (excluding past dates, including next month)
   const sesionesDelMes = useMemo(() => {
@@ -140,16 +139,6 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     let list: SesionInfo[] = [];
     const hoyStr = new Date().toISOString().slice(0, 10);
 
-    // Calculate next month relative to the CALENDAR (not paidMonth)
-    const [calYear, calMonth] = currentCalendarMonth.split('-').map(Number);
-    const nextMonthDate = new Date(calYear, calMonth, 1);
-    const nextMonthStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
-
-    // Also calculate next month relative to paidMonth (for fixed slots)
-    const [yearNum, monthNum] = paidMonth.split('-').map(Number);
-    const nextPaidMonthDate = new Date(yearNum, monthNum, 1);
-    const nextPaidMonthStr = `${nextPaidMonthDate.getFullYear()}-${String(nextPaidMonthDate.getMonth() + 1).padStart(2, '0')}`;
-
     const processMonthFixed = (monthStr: string) => {
       socio.turnos_fijos.forEach(tfId => {
         const turn = turnos.find(t => t.id === tfId);
@@ -161,7 +150,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
 
           const susp = (socio.clases_suspendidas || []).find(s => s.turno_id === tfId && s.fecha === date);
           // isNextMonth = true only if the date belongs to the NEXT real calendar month (or later)
-          const isNextMonth = date >= nextMonthStr;
+          const isNextMonth = date >= nextCalendarMonth;
           list.push({
             id: `fixed-${tfId}-${date}`,
             tipo: 'FIJO',
@@ -178,22 +167,13 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
       });
     };
 
-    // 1. Fixed days for current paidMonth (>= hoyStr)
-    processMonthFixed(paidMonth);
+    // 1. Fixed days for current calendar month (>= hoyStr)
+    processMonthFixed(currentCalendarMonth);
 
-    // 2. If paidMonth is behind current calendar month, also process current calendar month
-    if (paidMonth < currentCalendarMonth) {
-      processMonthFixed(currentCalendarMonth);
-    }
+    // 2. Fixed days for next month relative to calendar (>= hoyStr)
+    processMonthFixed(nextCalendarMonth);
 
-    // 3. Fixed days for next month relative to calendar (>= hoyStr)
-    processMonthFixed(nextMonthStr);
-    // Also process next month relative to paidMonth if different from calendar next
-    if (nextPaidMonthStr !== nextMonthStr && nextPaidMonthStr !== currentCalendarMonth && nextPaidMonthStr !== paidMonth) {
-      processMonthFixed(nextPaidMonthStr);
-    }
-
-    // 4. Individual bookings (>= hoyStr)
+    // 3. Individual bookings (>= hoyStr)
     (socio.reservas_individuales || []).forEach(r => {
       if (r.fecha < hoyStr) return; // Exclude past dates
 
@@ -201,7 +181,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
       if (!turn) return;
 
       // isNextMonth = true only if date is in next calendar month or later
-      const isNextMonth = r.fecha >= nextMonthStr;
+      const isNextMonth = r.fecha >= nextCalendarMonth;
 
       list.push({
         id: `indiv-${r.id}`,
@@ -229,7 +209,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     });
 
     return result;
-  }, [socio, turnos, paidMonth, currentCalendarMonth]);
+  }, [socio, turnos, currentCalendarMonth, nextCalendarMonth]);
 
   const misWaitlists = useMemo(() => {
     return (waitlistReservas || []).filter(w => w.cliente_id === socio.id);
@@ -334,7 +314,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
         {/* Sessions list */}
         <div className="space-y-3.5">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest font-mono">Mis Sesiones Programadas ({paidMonth})</h4>
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest font-mono capitalize">Mis Sesiones Programadas ({mesActualNombre})</h4>
             {sesionesDelMes.length > 0 && (
               <span className="text-[9px] font-bold text-slate-400 font-mono">{sesionesDelMes.length} sesión{sesionesDelMes.length !== 1 ? 'es' : ''}</span>
             )}

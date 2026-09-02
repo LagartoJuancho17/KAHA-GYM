@@ -36,7 +36,7 @@ export const INITIAL_HISTORIAL_PRECIOS: HistorialPrecioPlan[] = [
 const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const;
 
 // Horarios de Lunes a Viernes: 
-// 7:30 (cupo 7), 8:30 (7), 9:30 (7), 10:30 (5 ó 7), 11:00 (3 solo Ma+Ju), 11:30 (5), 12:00 (7),
+// 7:30 (cupo 7), 8:30 (7), 9:30 (7), 10:30 (5 ó 7), 11:00 (3 solo Martes), 11:30 (5), 12:00 (7),
 // 16:00 (7), 17:00 (7), 18:00 (7), 19:00 (7), 20:00 (7), 21:00 (8)
 // Adicionalmente solo Martes + Jueves + Viernes: 15:00 (cupo 7)
 export function generarTurnosIniciales(): Turno[] {
@@ -50,7 +50,7 @@ export function generarTurnosIniciales(): Turno[] {
       { hora: '08:30', cupo: 7 },
       { hora: '09:30', cupo: 7 },
       { hora: '10:30', cupo: esDiasLMW ? 7 : 5 },
-      ...(!esDiasLMW ? [{ hora: '11:00', cupo: 3 }] : []),
+      ...(dia === 'MARTES' ? [{ hora: '11:00', cupo: 3 }] : []),
       { hora: '11:30', cupo: 5 },
       { hora: '12:00', cupo: esDiasLMW ? 3 : 7 },
       { hora: '16:00', cupo: 7 },
@@ -425,6 +425,7 @@ export const INITIAL_GASTOS: any[] = [
     concepto: 'Alquiler Salón Principal',
     monto: 150000.00,
     categoria: 'ALQUILER',
+    efectuado_por: 'JUANCHI_TRANSFERENCIA',
     fecha: '2026-07-05',
     registrado_por: 'admin@gimnasio.com.ar',
     creado_at: '2026-07-05T10:00:00Z'
@@ -434,6 +435,7 @@ export const INITIAL_GASTOS: any[] = [
     concepto: 'Servicios Luz Edesur y Gas',
     monto: 38000.00,
     categoria: 'SERVICIOS',
+    efectuado_por: 'RULO_TRANSFERENCIA',
     fecha: '2026-07-10',
     registrado_por: 'admin@gimnasio.com.ar',
     creado_at: '2026-07-10T11:00:00Z'
@@ -443,6 +445,7 @@ export const INITIAL_GASTOS: any[] = [
     concepto: 'Honorarios Profesores Julio',
     monto: 130000.00,
     categoria: 'PROFESORES',
+    efectuado_por: 'EFECTIVO_CAJA',
     fecha: '2026-07-28',
     registrado_por: 'admin@gimnasio.com.ar',
     creado_at: '2026-07-28T18:00:00Z'
@@ -452,6 +455,7 @@ export const INITIAL_GASTOS: any[] = [
     concepto: 'Alquiler Salón Principal',
     monto: 140000.00,
     categoria: 'ALQUILER',
+    efectuado_por: 'JUANCHI_TRANSFERENCIA',
     fecha: '2026-06-05',
     registrado_por: 'admin@gimnasio.com.ar',
     creado_at: '2026-06-05T10:00:00Z'
@@ -461,6 +465,7 @@ export const INITIAL_GASTOS: any[] = [
     concepto: 'Servicios Luz e Internet',
     monto: 32000.00,
     categoria: 'SERVICIOS',
+    efectuado_por: 'RULO_TRANSFERENCIA',
     fecha: '2026-06-10',
     registrado_por: 'admin@gimnasio.com.ar',
     creado_at: '2026-06-10T11:00:00Z'
@@ -470,6 +475,7 @@ export const INITIAL_GASTOS: any[] = [
     concepto: 'Honorarios Profesores Junio',
     monto: 110000.00,
     categoria: 'PROFESORES',
+    efectuado_por: 'EFECTIVO_CAJA',
     fecha: '2026-06-28',
     registrado_por: 'admin@gimnasio.com.ar',
     creado_at: '2026-06-28T18:00:00Z'

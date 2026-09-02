@@ -151,11 +151,14 @@ export interface AlertaNotificacion {
   };
 }
 
+export type OrigenGasto = 'JUANCHI_TRANSFERENCIA' | 'RULO_TRANSFERENCIA' | 'EFECTIVO_CAJA';
+
 export interface Gasto {
   id: string;
   concepto: string;
   monto: number;
   categoria: 'PROFESORES' | 'SERVICIOS' | 'ALQUILER' | 'INSUMOS' | 'OTROS';
+  efectuado_por?: OrigenGasto; // 'JUANCHI_TRANSFERENCIA' | 'RULO_TRANSFERENCIA' | 'EFECTIVO_CAJA'
   fecha: string; // 'YYYY-MM-DD'
   registrado_por: string;
   creado_at: string;

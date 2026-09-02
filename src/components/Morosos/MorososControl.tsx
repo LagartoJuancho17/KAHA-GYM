@@ -3,10 +3,12 @@ import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente, MedioPago } from '../../types';
 import { 
-  AlertTriangle, ShieldAlert, DollarSign, X, Receipt
+  AlertTriangle, ShieldAlert, DollarSign, X, Receipt, UserMinus, Mail
 } from 'lucide-react';
 import { MorososCronSimulator } from './MorososCronSimulator';
 import { MorososList } from './MorososList';
+import { AdminBajasReviewModal } from './AdminBajasReviewModal';
+import { EmailReporteMorososAdminModal } from '../Notifications/EmailReporteMorososAdminModal';
 
 export const MorososControl: React.FC = () => {
   const { 
@@ -25,6 +27,13 @@ export const MorososControl: React.FC = () => {
   });
   const [fastPagoSuccess, setFastPagoSuccess] = useState('');
 
+  // Modales de Bajas y Reporte Email
+  const [showBajasModal, setShowBajasModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
+  const mesActual = new Date().toISOString().slice(0, 7);
+  const diaHoy = new Date().getDate();
+
   // --- CALCULO KPIs DE CONTROL ---
   const clientesActivos = useMemo(() => clientes.filter(c => c.activo), [clientes]);
   const totalActivosCount = clientesActivos.length;
@@ -34,6 +43,15 @@ export const MorososControl: React.FC = () => {
 
   const deudoresTotalesList = useMemo(() => clientesActivos.filter(c => c.deuda_acumulada > 0), [clientesActivos]);
   const deudoresCount = deudoresTotalesList.length;
+
+  // Candidatos a baja de turno fijo (Día 10+)
+  const candidatosBajaFijos = useMemo(() => {
+    return clientesActivos.filter(c => {
+      if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
+      const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual;
+      return noPago;
+    });
+  }, [clientesActivos, mesActual]);
 
   const porcentajeMora = totalActivosCount > 0 
     ? Math.round((morososCount / totalActivosCount) * 100) 
@@ -104,10 +122,67 @@ export const MorososControl: React.FC = () => {
     <div className="space-y-6 p-3 sm:p-6 max-w-7xl mx-auto overflow-x-hidden" id="morosos-tab-panel">
       
       {/* SECCIÓN CABECERA */}
-      <div>
-        <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Módulo de Morosidad</h2>
-        <p className="text-zinc-500 font-sans text-sm font-medium">Control de impagos mensualizado, conciliación de saldos y simulación de base de datos</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Módulo de Morosidad</h2>
+          <p className="text-zinc-500 font-sans text-sm font-medium">Control de impagos mensualizado, conciliación de saldos y simulación de base de datos</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+          >
+            <Mail className="w-3.5 h-3.5 text-zinc-500" />
+            <span>Reporte Email Admins</span>
+          </button>
+
+          {candidatosBajaFijos.length > 0 && (
+            <button
+              onClick={() => setShowBajasModal(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
+            >
+              <UserMinus className="w-3.5 h-3.5" />
+              <span>Revisar Bajas Día 10 ({candidatosBajaFijos.length})</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* BANNER AVISO DÍA 10+ BAJAS PENDIENTES DE REVISIÓN */}
+      {candidatosBajaFijos.length > 0 && (
+        <div className="bg-gradient-to-r from-red-50 via-amber-50 to-red-50 border border-red-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in" id="morosos-dia-10-banner">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <AlertTriangle className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-red-950">
+                ⚠️ Bajas sugeridas de turno fijo (Día 10+): {candidatosBajaFijos.length} socio(s) sin pagar
+              </p>
+              <p className="text-[11px] text-red-800/80 mt-0.5">
+                Las bajas de turno fijo no se ejecutan automáticamente. Requieren tu confirmación manual para liberar los cupos.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+            >
+              <Mail className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Enviar Reporte</span>
+            </button>
+            <button
+              onClick={() => setShowBajasModal(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all border-none"
+            >
+              <UserMinus className="w-3.5 h-3.5" />
+              <span>Revisar Bajas</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPIS DE MOROSIDAD */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5" id="delinquency-kpis">
@@ -277,6 +352,18 @@ export const MorososControl: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL REVISIÓN DE BAJAS DE TURNOS FIJOS (DÍA 10+) */}
+      <AdminBajasReviewModal
+        isOpen={showBajasModal}
+        onClose={() => setShowBajasModal(false)}
+        onOpenEmailModal={() => setShowEmailModal(true)}
+      />
+
+      {/* MODAL REPORTE EMAIL MOROSOS ADMIN */}
+      <EmailReporteMorososAdminModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+      />
     </div>
   );
 };

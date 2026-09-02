@@ -73,6 +73,40 @@ export const SocioPanel: React.FC = () => {
 
   const canPay = hasDebt || canPayAdvance || isCurrentMonthUnpaid;
 
+  // Mensaje de novedad a partir del 6 de cada mes SOLO para los que NO pagaron
+  const isPostDia5Unpaid = useMemo(() => {
+    if (!socio || !isCurrentMonthUnpaid) return false;
+    const diaHoy = new Date().getDate();
+    return diaHoy >= 6;
+  }, [socio, isCurrentMonthUnpaid]);
+
+  const recordatorioNovedad = useMemo(() => {
+    if (!isPostDia5Unpaid || !socio) return null;
+    return {
+      id: `recordatorio-pago-${currentCalendarMonth}-${socio.id}`,
+      titulo: '💚 Te dejamos un pequeño recordatorio',
+      contenido: `Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
+
+Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
+
+¡Queremos que sigas siendo parte de KAHA!
+Cualquier cosa, estamos acá para ayudarte. 💚`,
+      fecha: `${currentCalendarMonth}-06`,
+      categoria: 'ARANCELES' as const,
+      creado_por: 'KAHA GYM',
+      destacado: true,
+      socio_id: socio.id
+    };
+  }, [isPostDia5Unpaid, socio, currentCalendarMonth]);
+
+  const socioNovedades = useMemo(() => {
+    const list = novedades.filter(n => !n.socio_id || n.socio_id === socio?.id);
+    if (recordatorioNovedad && !list.some(n => n.id === recordatorioNovedad.id)) {
+      return [recordatorioNovedad, ...list];
+    }
+    return list;
+  }, [novedades, socio, recordatorioNovedad]);
+
   // Feature 3: Show month-start popup when current month is unpaid
   // Controlled via localStorage so user can dismiss it and it won't re-show in same session
   useEffect(() => {
@@ -180,7 +214,7 @@ export const SocioPanel: React.FC = () => {
       {activeTabSection === 'HOME' && (
         <div className="space-y-6 animate-fade-in" id="socio-section-home">
           {/* Novedades preview */}
-          {novedades.length > 0 && (
+          {socioNovedades.length > 0 && (
             <div className="bg-gradient-to-r from-slate-900 to-emerald-950 text-white rounded-3xl p-6.5 relative overflow-hidden shadow-md space-y-4" id="home-novedades-preview">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.15),transparent_60%)] pointer-events-none"></div>
               
@@ -201,7 +235,7 @@ export const SocioPanel: React.FC = () => {
               </div>
 
               <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {novedades.slice(0, 2).map((nov) => (
+                {socioNovedades.slice(0, 2).map((nov) => (
                   <div 
                     key={nov.id} 
                     onClick={() => setActiveTabSection('NOVEDADES')}
@@ -437,10 +471,11 @@ export const SocioPanel: React.FC = () => {
         >
           <Megaphone className={`w-5 h-5 transition-colors ${activeTabSection === 'NOVEDADES' ? 'text-emerald-600' : 'text-slate-400'}`} />
           <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'NOVEDADES' ? 'text-emerald-600' : 'text-slate-400'}`}>Cartelera</span>
-          {activeTabSection === 'NOVEDADES' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
-          {novedades.some(n => n.destacado) && activeTabSection !== 'NOVEDADES' && (
-            <span className="absolute top-1.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full border border-white"></span>
-          )}
+          <span className="absolute bottom-0 inset-x-3 h-0.5 rounded-full transition-opacity" style={{ backgroundColor: activeTabSection === 'NOVEDADES' ? 'rgb(16 185 129)' : 'transparent' }} />
+          <span
+            className="absolute top-1.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full border border-white transition-opacity"
+            style={{ opacity: socioNovedades.some(n => n.destacado) && activeTabSection !== 'NOVEDADES' ? 1 : 0, pointerEvents: 'none' }}
+          />
         </button>
 
         {/* CONTROL DE CUPOS (RESERVAS) */}
@@ -451,7 +486,7 @@ export const SocioPanel: React.FC = () => {
         >
           <CalendarDays className={`w-5 h-5 transition-colors ${activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-400'}`} />
           <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-400'}`}>Cupos</span>
-          {activeTabSection === 'RESERVAS' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
+          <span className="absolute bottom-0 inset-x-3 h-0.5 rounded-full transition-opacity" style={{ backgroundColor: activeTabSection === 'RESERVAS' ? 'rgb(16 185 129)' : 'transparent' }} />
         </button>
 
         {/* HOME CENTRAL BUTTON */}
@@ -481,7 +516,7 @@ export const SocioPanel: React.FC = () => {
         >
           <Receipt className={`w-5 h-5 transition-colors ${activeTabSection === 'PAGOS' ? 'text-emerald-600' : 'text-slate-400'}`} />
           <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PAGOS' ? 'text-emerald-600' : 'text-slate-400'}`}>Plan</span>
-          {activeTabSection === 'PAGOS' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
+          <span className="absolute bottom-0 inset-x-3 h-0.5 rounded-full transition-opacity" style={{ backgroundColor: activeTabSection === 'PAGOS' ? 'rgb(16 185 129)' : 'transparent' }} />
         </button>
 
         {/* MEMBRESÍA (PERFIL) */}
@@ -492,12 +527,13 @@ export const SocioPanel: React.FC = () => {
         >
           <div className="relative">
             <User className={`w-5 h-5 transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`} />
-            {novedades.some(n => n.destacado) && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full border border-white"></span>
-            )}
+            <span
+              className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full border border-white transition-opacity"
+              style={{ opacity: socioNovedades.some(n => n.destacado) ? 1 : 0, pointerEvents: 'none' }}
+            />
           </div>
           <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PERFIL' ? 'text-emerald-600' : 'text-slate-400'}`}>Membresía</span>
-          {activeTabSection === 'PERFIL' && <span className="absolute bottom-0 inset-x-3 h-0.5 bg-emerald-500 rounded-full" />}
+          <span className="absolute bottom-0 inset-x-3 h-0.5 rounded-full transition-opacity" style={{ backgroundColor: activeTabSection === 'PERFIL' ? 'rgb(16 185 129)' : 'transparent' }} />
         </button>
       </nav>
 

@@ -38,7 +38,7 @@ export const MorososCronSimulator: React.FC<MorososCronSimulatorProps> = ({
     setTimeout(() => {
       setCronConsole(prev => [
         ...prev,
-        `>> Evaluating grace period limits (Rules: Day 1, 5, 6, 11).`,
+        `>> Evaluating grace period limits (Rules: Day 1, 5, 6-9, 10+).`,
         `>> Checking registered monthly coverages for mes-current: [${simularFecha.slice(0, 7)}]`
       ]);
     }, 600);
@@ -65,7 +65,7 @@ export const MorososCronSimulator: React.FC<MorososCronSimulatorProps> = ({
         </div>
 
         <p className="text-zinc-400 text-xs font-sans leading-relaxed">
-          La regla comercial determina: <strong>"Día 5 de cada mes a las 23:59 es el vencimiento"</strong>. Cualquier alumno que no registre un pago para el mes se le cambia el estado automáticamente a <strong className="text-red-400">MOROSO</strong> y se le imputa el saldo de su plan.
+          La regla comercial determina: <strong>"Día 5 a las 23:59 vence el pago. Del día 6 al 9 se envían avisos y, a partir del día 10, las bajas de turno fijo quedan sujetas a revisión manual y confirmación del Administrador."</strong>
         </p>
 
         <p className="text-zinc-400 text-xs font-sans leading-relaxed">

@@ -44,9 +44,12 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
     return planes.find(p => p.id === socio.plan_id) || null;
   }, [planes, socio]);
 
-  const paidMonth = useMemo(() => {
-    return socio.ultimo_mes_pagado || new Date().toISOString().slice(0, 7);
-  }, [socio]);
+  const currentCalendarMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const [curYear, curMonth] = currentCalendarMonth.split('-').map(Number);
+  const nextMonthDate = new Date(curYear, curMonth, 1);
+  const nextCalendarMonth = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  const mesActualNombre = new Date(curYear, curMonth - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  const mesProximoNombre = nextMonthDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
   const selectedBookingTurno = useMemo(() => {
     if (!bookingTurnId) return null;
@@ -110,7 +113,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   const getAvailableDatesForTurn = (dayName: string) => {
     const daysMap = { 'DOMINGO': 0, 'LUNES': 1, 'MARTES': 2, 'MIERCOLES': 3, 'JUEVES': 4, 'VIERNES': 5, 'SABADO': 6 };
     const targetDay = daysMap[dayName as keyof typeof daysMap] ?? 1;
-    const [year, month] = paidMonth.split('-').map(Number);
+    const [year, month] = currentCalendarMonth.split('-').map(Number);
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0);
     const minDate = new Date(startOfMonth);
@@ -160,12 +163,12 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   }, [turnos, activeDay]);
 
   const activeIndividualReservations = useMemo(() => {
-    return (socio.reservas_individuales || []).filter(r => r.fecha.startsWith(paidMonth));
-  }, [socio, paidMonth]);
+    return (socio.reservas_individuales || []).filter(r => r.fecha.startsWith(currentCalendarMonth));
+  }, [socio, currentCalendarMonth]);
 
   const suspendedClassesThisMonth = useMemo(() => {
-    return (socio.clases_suspendidas || []).filter(s => s.fecha.startsWith(paidMonth));
-  }, [socio, paidMonth]);
+    return (socio.clases_suspendidas || []).filter(s => s.fecha.startsWith(currentCalendarMonth));
+  }, [socio, currentCalendarMonth]);
 
   const reintegratedSuspensionsCount = useMemo(() => {
     return suspendedClassesThisMonth.filter(s => s.reintegrado && socio.turnos_fijos.includes(s.turno_id)).length;
@@ -761,98 +764,194 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             </div>
 
             {/* Body */}
-            <div className="p-5 space-y-3 overflow-y-auto">
-              <p className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
-                Sesiones de este mes ({paidMonth}):
-              </p>
-              <div className="grid grid-cols-1 gap-2">
-                {getDatesOfWeekdayInMonth(selectedReprogramTurno.dia, paidMonth).map(dateStr => {
-                  const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === selectedReprogramTurno.id && s.fecha === dateStr);
-                  const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long'
-                  });
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="space-y-2">
+                <p className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+                  Sesiones de este mes ({mesActualNombre}):
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {getDatesOfWeekdayInMonth(selectedReprogramTurno.dia, currentCalendarMonth).map(dateStr => {
+                    const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === selectedReprogramTurno.id && s.fecha === dateStr);
+                    const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long'
+                    });
 
-                  return (
-                    <div key={dateStr} className="flex justify-between items-center bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
-                      <div>
-                        <span className="font-bold text-slate-800 capitalize block">{dateFormatted}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">Turno Fijo Asignado</span>
-                      </div>
-
-                      {isSuspended ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg">
-                            Clase Suspendida
-                          </span>
-                          <button
-                            onClick={() => {
-                              const res = revertirSuspensionClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
-                              if (res.success) {
-                                setSuccessMessage(res.message);
-                                setReprogramTurnId(null);
-                                setTimeout(() => setSuccessMessage(null), 4000);
-                              } else {
-                                setErrorMessage(res.message);
-                                setTimeout(() => setErrorMessage(null), 4000);
-                              }
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none flex items-center gap-1.5"
-                            title="Volver a inscribirte en este turno si hay cupos disponibles"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            Retomar
-                          </button>
+                    return (
+                      <div key={dateStr} className="flex justify-between items-center bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+                        <div>
+                          <span className="font-bold text-slate-800 capitalize block">{dateFormatted}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Turno Fijo Asignado</span>
                         </div>
-                      ) : pendingSuspendDate === dateStr ? (
-                        /* Inline confirm step */
-                        <div className="flex flex-col gap-2 items-end">
-                          <p className="text-[10px] text-amber-800 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg text-right">
-                            ¿Confirmar baja de esta sesión?
-                          </p>
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={() => setPendingSuspendDate(null)}
-                              className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border border-slate-200 bg-white"
-                            >
-                              Cancelar
-                            </button>
+
+                        {isSuspended ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg">
+                              Clase Suspendida
+                            </span>
                             <button
                               onClick={() => {
-                                const res = suspenderClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
-                                setPendingSuspendDate(null);
+                                const res = revertirSuspensionClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
                                 if (res.success) {
-                                  setSuspendSuccessDate(dateStr);
+                                  setSuccessMessage(res.message);
+                                  setReprogramTurnId(null);
+                                  setTimeout(() => setSuccessMessage(null), 4000);
                                 } else {
                                   setErrorMessage(res.message);
                                   setTimeout(() => setErrorMessage(null), 4000);
                                 }
                               }}
-                              className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] transition-all cursor-pointer shadow-xs border-none"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none flex items-center gap-1.5"
+                              title="Volver a inscribirte en este turno si hay cupos disponibles"
                             >
-                              Confirmar baja
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Retomar
                             </button>
                           </div>
+                        ) : pendingSuspendDate === dateStr ? (
+                          /* Inline confirm step */
+                          <div className="flex flex-col gap-2 items-end">
+                            <p className="text-[10px] text-amber-800 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg text-right">
+                              ¿Confirmar baja de esta sesión?
+                            </p>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => setPendingSuspendDate(null)}
+                                className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border border-slate-200 bg-white"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const res = suspenderClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
+                                  setPendingSuspendDate(null);
+                                  if (res.success) {
+                                    setSuspendSuccessDate(dateStr);
+                                  } else {
+                                    setErrorMessage(res.message);
+                                    setTimeout(() => setErrorMessage(null), 4000);
+                                  }
+                                }}
+                                className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] transition-all cursor-pointer shadow-xs border-none"
+                              >
+                                Confirmar baja
+                              </button>
+                            </div>
+                          </div>
+                        ) : suspendSuccessDate === dateStr ? (
+                          /* Success state for this date */
+                          <div className="flex flex-col gap-1.5 items-end">
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-right">
+                              ✅ ¡Baja registrada! Cupo libre para recupero.
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setPendingSuspendDate(dateStr)}
+                            className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none"
+                          >
+                            Suspender
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Next month sessions */}
+              <div className="space-y-2 pt-3 border-t border-slate-200/80">
+                <p className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+                  Sesiones del próximo mes ({mesProximoNombre}):
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {getDatesOfWeekdayInMonth(selectedReprogramTurno.dia, nextCalendarMonth).map(dateStr => {
+                    const isSuspended = (socio.clases_suspendidas || []).some(s => s.turno_id === selectedReprogramTurno.id && s.fecha === dateStr);
+                    const dateFormatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-AR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long'
+                    });
+
+                    return (
+                      <div key={dateStr} className="flex justify-between items-center bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+                        <div>
+                          <span className="font-bold text-slate-800 capitalize block">{dateFormatted}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Turno Fijo Asignado</span>
                         </div>
-                      ) : suspendSuccessDate === dateStr ? (
-                        /* Success state for this date */
-                        <div className="flex flex-col gap-1.5 items-end">
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-right">
-                            ✅ ¡Baja registrada! Cupo libre para recupero.
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setPendingSuspendDate(dateStr)}
-                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none"
-                        >
-                          Suspender
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+
+                        {isSuspended ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg">
+                              Clase Suspendida
+                            </span>
+                            <button
+                              onClick={() => {
+                                const res = revertirSuspensionClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
+                                if (res.success) {
+                                  setSuccessMessage(res.message);
+                                  setReprogramTurnId(null);
+                                  setTimeout(() => setSuccessMessage(null), 4000);
+                                } else {
+                                  setErrorMessage(res.message);
+                                  setTimeout(() => setErrorMessage(null), 4000);
+                                }
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none flex items-center gap-1.5"
+                              title="Volver a inscribirte en este turno si hay cupos disponibles"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Retomar
+                            </button>
+                          </div>
+                        ) : pendingSuspendDate === dateStr ? (
+                          <div className="flex flex-col gap-2 items-end">
+                            <p className="text-[10px] text-amber-800 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg text-right">
+                              ¿Confirmar baja de esta sesión?
+                            </p>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => setPendingSuspendDate(null)}
+                                className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border border-slate-200 bg-white"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const res = suspenderClaseFija(socio.id, selectedReprogramTurno.id, dateStr);
+                                  setPendingSuspendDate(null);
+                                  if (res.success) {
+                                    setSuspendSuccessDate(dateStr);
+                                  } else {
+                                    setErrorMessage(res.message);
+                                    setTimeout(() => setErrorMessage(null), 4000);
+                                  }
+                                }}
+                                className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-2.5 py-1.5 rounded-xl text-[10px] transition-all cursor-pointer shadow-xs border-none"
+                              >
+                                Confirmar baja
+                              </button>
+                            </div>
+                          </div>
+                        ) : suspendSuccessDate === dateStr ? (
+                          <div className="flex flex-col gap-1.5 items-end">
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-right">
+                              ✅ ¡Baja registrada! Cupo libre para recupero.
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setPendingSuspendDate(dateStr)}
+                            className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-xs border-none"
+                          >
+                            Suspender
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 

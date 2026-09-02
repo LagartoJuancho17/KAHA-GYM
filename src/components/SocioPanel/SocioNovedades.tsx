@@ -1,6 +1,7 @@
 // src/components/SocioPanel/SocioNovedades.tsx
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
+import { Novedad } from '../../types';
 import { Megaphone, Award, User, Search, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export const SocioNovedades: React.FC = () => {
@@ -8,13 +9,13 @@ export const SocioNovedades: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
   const [buscarText, setBuscarText] = useState<string>('');
 
-  // ── Lógica de alerta de pago ─────────────────────────────────────────────
+  // ── Lógica de recordatorio de pago a partir del día 6 ─────────────────────
   const alertaPago = useMemo(() => {
     if (!selectedSocioId) return null;
 
     const hoy = new Date();
     const diaHoy = hoy.getDate();
-    if (diaHoy <= 5) return null; // Antes del día 5 no hay alerta
+    if (diaHoy < 6) return null; // A partir del 6 de cada mes
 
     const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
     const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -29,16 +30,39 @@ export const SocioNovedades: React.FC = () => {
 
     // Verificar también por ultimo_mes_pagado en el cliente
     const socio = clientes.find(c => c.id === selectedSocioId);
-    if (socio?.ultimo_mes_pagado === mesActual) return null;
+    if (socio?.ultimo_mes_pagado && socio.ultimo_mes_pagado >= mesActual) return null; // Ya pagó ✅
 
-    return { nombreMes };
+    return { nombreMes, mesActual, socio };
   }, [selectedSocioId, pagos, clientes]);
 
+  const recordatorioNovedad = useMemo<Novedad | null>(() => {
+    if (!alertaPago || !selectedSocioId) return null;
+    return {
+      id: `recordatorio-pago-${alertaPago.mesActual}-${selectedSocioId}`,
+      titulo: '💚 Te dejamos un pequeño recordatorio',
+      contenido: `Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
+
+Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
+
+¡Queremos que sigas siendo parte de KAHA!
+Cualquier cosa, estamos acá para ayudarte. 💚`,
+      fecha: `${alertaPago.mesActual}-06`,
+      categoria: 'ARANCELES',
+      creado_por: 'KAHA GYM',
+      destacado: true,
+      socio_id: selectedSocioId
+    };
+  }, [alertaPago, selectedSocioId]);
+
   // ── Filtrar novedades para este socio ────────────────────────────────────
-  // Mostrar: novedades globales (sin socio_id) + novedades privadas de este socio
+  // Mostrar: novedades globales (sin socio_id) + novedades privadas de este socio + recordatorio de pago si aplica
   const novedadesFiltradas = useMemo(() => {
-    return novedades.filter(n => !n.socio_id || n.socio_id === selectedSocioId);
-  }, [novedades, selectedSocioId]);
+    const list = novedades.filter(n => !n.socio_id || n.socio_id === selectedSocioId);
+    if (recordatorioNovedad && !list.some(n => n.id === recordatorioNovedad.id)) {
+      return [recordatorioNovedad, ...list];
+    }
+    return list;
+  }, [novedades, selectedSocioId, recordatorioNovedad]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { TODAS: novedadesFiltradas.length };
@@ -59,6 +83,9 @@ export const SocioNovedades: React.FC = () => {
         return true;
       })
       .sort((a, b) => {
+        // Recordatorio de pago primero siempre
+        if (a.id.startsWith('recordatorio-pago-')) return -1;
+        if (b.id.startsWith('recordatorio-pago-')) return 1;
         // Novedades personales primero (gracias de pago)
         if (a.socio_id && !b.socio_id) return -1;
         if (!a.socio_id && b.socio_id) return 1;
@@ -82,30 +109,51 @@ export const SocioNovedades: React.FC = () => {
         </p>
       </div>
 
-      {/* ── BANNER ROJO: cuota pendiente pasado el día 5 ─────────────────── */}
+      {/* ── BANNER DESTACADO: Recordatorio de cuota a partir del día 6 para socios sin pago ─────────────────── */}
       {alertaPago && (
         <div
-          className="flex items-start gap-3 rounded-2xl p-4 border animate-fade-in"
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl p-5.5 border shadow-xs animate-fade-in"
           style={{
-            background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
-            border: '1.5px solid #fca5a5',
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f7fee7 100%)',
+            border: '1.5px solid #86efac',
           }}
           id="socio-alerta-pago-pendiente"
         >
-          <div
-            className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-xl"
-            style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
-          >
-            <AlertTriangle className="w-4.5 h-4.5 text-white" />
+          <div className="flex items-start gap-3.5 min-w-0 flex-1">
+            <div
+              className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-2xl shadow-xs"
+              style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+            >
+              <span className="text-lg">💚</span>
+            </div>
+            <div className="space-y-1.5 min-w-0">
+              <p className="text-sm font-black text-emerald-950 leading-snug">
+                💚 Te dejamos un pequeño recordatorio
+              </p>
+              <div className="text-xs text-emerald-900 leading-relaxed font-sans space-y-2">
+                <p>
+                  Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
+                </p>
+                <p>
+                  Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
+                </p>
+                <p className="font-semibold">
+                  ¡Queremos que sigas siendo parte de KAHA!
+                  <br />
+                  Cualquier cosa, estamos acá para ayudarte. 💚
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="space-y-1 min-w-0">
-            <p className="text-sm font-bold text-red-800 leading-snug">
-              ⚠️ Cuota de {alertaPago.nombreMes} pendiente
-            </p>
-            <p className="text-[11px] text-red-700/80 leading-relaxed font-sans">
-              Ya pasó el día 5 y aún no registramos tu pago. Recordá que el turno fijo se mantiene activo solo con la cuota al día.{' '}
-              <span className="font-semibold">Si ya pagaste o tenés alguna dificultad, escribinos. 🤝</span>
-            </p>
+          <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
+            <a
+              href={`https://wa.me/541178402722?text=${encodeURIComponent('Hola KAHA GYM, me comunico por mi cuota y turno fijo.')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all shadow-xs"
+            >
+              Escribir por WhatsApp 🤝
+            </a>
           </div>
         </div>
       )}
@@ -155,7 +203,8 @@ export const SocioNovedades: React.FC = () => {
             const isArancel = nov.categoria === 'ARANCELES';
             const isTurno = nov.categoria === 'TURNOS';
             const isEvento = nov.categoria === 'EVENTOS';
-            const isPersonal = !!nov.socio_id; // Novedad privada de agradecimiento
+            const isRecordatorio = nov.id.startsWith('recordatorio-pago-');
+            const isPersonal = !!nov.socio_id && !isRecordatorio; // Novedad privada de agradecimiento
 
             // Per-category color scheme
             let cardBg = 'bg-gradient-to-br from-sky-50 to-sky-100/60 border-sky-200';
@@ -166,7 +215,15 @@ export const SocioNovedades: React.FC = () => {
             let accentBar = 'bg-sky-500';
             let labelTxt = 'Información General';
 
-            if (isPersonal) {
+            if (isRecordatorio) {
+              cardBg = 'bg-gradient-to-br from-emerald-50 via-teal-50/70 to-emerald-100/60 border-emerald-300 ring-2 ring-emerald-400/40';
+              badgeCls = 'bg-emerald-600/15 text-emerald-900 border-emerald-400 font-extrabold';
+              titleCls = 'text-emerald-950 font-black';
+              bodyCls = 'text-emerald-900 font-medium';
+              footerCls = 'border-emerald-200/60 text-emerald-700/80';
+              accentBar = 'bg-emerald-500';
+              labelTxt = '💚 Recordatorio';
+            } else if (isPersonal) {
               // Novedades privadas (agradecimiento de pago) → verde vibrante
               cardBg = 'bg-gradient-to-br from-emerald-50 to-green-100/60 border-emerald-300';
               badgeCls = 'bg-emerald-600/15 text-emerald-800 border-emerald-400';
@@ -205,12 +262,18 @@ export const SocioNovedades: React.FC = () => {
               <div
                 key={nov.id}
                 className={`rounded-2xl border p-5 flex flex-col justify-between gap-4 relative overflow-hidden shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${cardBg} ${
-                  nov.destacado ? 'ring-2 ring-amber-400/40' : ''
+                  nov.destacado && !isRecordatorio ? 'ring-2 ring-amber-400/40' : ''
                 } ${isPersonal ? 'ring-2 ring-emerald-400/40' : ''}`}
               >
                 <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${accentBar}`}></div>
 
-                {nov.destacado && !isPersonal && (
+                {isRecordatorio && (
+                  <span className="absolute top-0 right-0 bg-emerald-600 text-white px-2.5 py-0.5 rounded-bl-xl text-[8px] font-black uppercase tracking-widest font-mono flex items-center gap-1">
+                    💚 AVISO
+                  </span>
+                )}
+
+                {nov.destacado && !isPersonal && !isRecordatorio && (
                   <span className="absolute top-0 right-0 bg-amber-500 text-white px-2.5 py-0.5 rounded-bl-xl text-[8px] font-black uppercase tracking-widest font-mono flex items-center gap-1">
                     <Award className="w-3 h-3 text-white" />
                     DESTACADO
@@ -239,6 +302,19 @@ export const SocioNovedades: React.FC = () => {
                   <p className={`text-xs font-sans whitespace-pre-line leading-relaxed ${bodyCls}`}>
                     {nov.contenido}
                   </p>
+
+                  {isRecordatorio && (
+                    <div className="pt-2">
+                      <a
+                        href={`https://wa.me/541178402722?text=${encodeURIComponent('Hola KAHA GYM, me comunico por mi cuota y turno fijo.')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3.5 rounded-xl text-[11px] transition-all shadow-xs"
+                      >
+                        Escribir por WhatsApp 🤝
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div className={`pt-3 border-t flex items-center gap-1 text-[9.5px] font-sans mt-auto pl-2 ${footerCls}`}>

@@ -1,11 +1,11 @@
 // src/components/Pagos/PagosLog.tsx
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
-import { Pago, MedioPago, Gasto } from '../../types';
+import { Pago, MedioPago, Gasto, OrigenGasto } from '../../types';
 import { 
   Plus, DollarSign, ArrowDownRight, ArrowUpRight, X, Trash2,
   TrendingDown, Calendar, ChevronRight, AlertCircle, Receipt, Check,
-  Eye, EyeOff
+  Eye, EyeOff, User
 } from 'lucide-react';
 
 import { PagoFormModal } from './PagoFormModal';
@@ -41,6 +41,12 @@ function diasEnMes(diaSemana: number, yearMonth: string): number {
 }
 
 const CATEGORIAS_GASTO = ['ALQUILER', 'SERVICIOS', 'INSUMOS', 'PROFESORES', 'OTROS'] as const;
+
+const ORIGENES_GASTO: { id: OrigenGasto; label: string; shortLabel: string; emoji: string; badgeColor: string }[] = [
+  { id: 'JUANCHI_TRANSFERENCIA', label: 'Juanchi con transferencia', shortLabel: 'Juanchi (Transf.)', emoji: '👤', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { id: 'RULO_TRANSFERENCIA', label: 'Rulo con transferencia', shortLabel: 'Rulo (Transf.)', emoji: '👤', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { id: 'EFECTIVO_CAJA', label: 'Efectivo de Caja', shortLabel: 'Efectivo Caja', emoji: '💵', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+];
 
 // Genera los últimos N meses desde hoy de forma dinámica
 function generarUltimosMeses(n = 12) {
@@ -96,11 +102,13 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   // ─── EGRESOS STATE ───────────────────────────────────────────────
   const [filtroMesGastos, setFiltroMesGastos] = useState<string>(new Date().toISOString().slice(0, 7));
   const [filtroCatGastos, setFiltroCatGastos] = useState<string>('TODOS');
+  const [filtroOrigenGasto, setFiltroOrigenGasto] = useState<string>('TODOS');
   const [showGastoModal, setShowGastoModal] = useState(false);
   const [gastoForm, setGastoForm] = useState({
     concepto: '',
     monto: '',
     categoria: 'OTROS' as Gasto['categoria'],
+    efectuado_por: 'JUANCHI_TRANSFERENCIA' as OrigenGasto,
     fecha: new Date().toISOString().slice(0, 10)
   });
   const [gastoErr, setGastoErr] = useState('');
@@ -165,11 +173,20 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     return gastos.filter(g => {
       if (!g.fecha.startsWith(filtroMesGastos)) return false;
       if (filtroCatGastos !== 'TODOS' && g.categoria !== filtroCatGastos) return false;
+      if (filtroOrigenGasto !== 'TODOS' && (g.efectuado_por || 'EFECTIVO_CAJA') !== filtroOrigenGasto) return false;
       return true;
     });
-  }, [gastos, filtroMesGastos, filtroCatGastos]);
+  }, [gastos, filtroMesGastos, filtroCatGastos, filtroOrigenGasto]);
 
   const gastosTotalFiltrado = gastosFiltrados.reduce((s, g) => s + g.monto, 0);
+
+  const gastosMesDesglose = useMemo(() => {
+    const gastosMes = gastos.filter(g => g.fecha.startsWith(filtroMesGastos));
+    const juanchi = gastosMes.filter(g => g.efectuado_por === 'JUANCHI_TRANSFERENCIA').reduce((s, g) => s + g.monto, 0);
+    const rulo = gastosMes.filter(g => g.efectuado_por === 'RULO_TRANSFERENCIA').reduce((s, g) => s + g.monto, 0);
+    const efectivo = gastosMes.filter(g => (g.efectuado_por || 'EFECTIVO_CAJA') === 'EFECTIVO_CAJA').reduce((s, g) => s + g.monto, 0);
+    return { juanchi, rulo, efectivo };
+  }, [gastos, filtroMesGastos]);
 
   const handleGastoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,10 +194,17 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     const monto = parseFloat(gastoForm.monto);
     if (!gastoForm.concepto.trim()) { setGastoErr('El concepto es obligatorio.'); return; }
     if (isNaN(monto) || monto <= 0) { setGastoErr('El monto debe ser mayor a 0.'); return; }
-    const res = registrarGasto({ concepto: gastoForm.concepto.trim(), monto, categoria: gastoForm.categoria, fecha: gastoForm.fecha, registrado_por: 'admin@gimnasio.com.ar' });
+    const res = registrarGasto({ 
+      concepto: gastoForm.concepto.trim(), 
+      monto, 
+      categoria: gastoForm.categoria, 
+      efectuado_por: gastoForm.efectuado_por,
+      fecha: gastoForm.fecha, 
+      registrado_por: 'admin@gimnasio.com.ar' 
+    });
     if (res.success) {
       setGastoOk('¡Gasto registrado!');
-      setGastoForm({ concepto: '', monto: '', categoria: 'OTROS', fecha: new Date().toISOString().slice(0, 10) });
+      setGastoForm({ concepto: '', monto: '', categoria: 'OTROS', efectuado_por: 'JUANCHI_TRANSFERENCIA', fecha: new Date().toISOString().slice(0, 10) });
       setTimeout(() => { setShowGastoModal(false); setGastoOk(''); }, 1200);
     } else {
       setGastoErr(res.message);
@@ -231,6 +255,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       concepto: `Liquidación ${profNombre} — ${filtroMesLiq}`,
       monto,
       categoria: 'PROFESORES',
+      efectuado_por: 'JUANCHI_TRANSFERENCIA',
       fecha: `${filtroMesLiq}-28`,
       registrado_por: 'admin@gimnasio.com.ar'
     });
@@ -374,33 +399,49 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       {activeSubTab === 'EGRESOS' && (
         <div className="space-y-6">
           {/* KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5">
-            <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white border border-zinc-200 p-4 rounded-xl flex items-center justify-between text-xs font-sans">
               <div>
                 <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block font-sans">Total Egresos</span>
-                <div className="text-2xl font-mono font-bold text-rose-600 mt-1">
+                <div className="text-xl font-mono font-bold text-rose-600 mt-0.5">
                   {mostrarBalance ? `$${gastosTotalFiltrado.toLocaleString('es-AR')}` : '$ •••••••'}
                 </div>
+                <span className="text-[10px] text-zinc-400 font-medium mt-0.5 block">{gastosFiltrados.length} registros</span>
               </div>
-              <TrendingDown className="w-6 h-6 text-rose-300" />
+              <TrendingDown className="w-5 h-5 text-rose-300 shrink-0" />
             </div>
-            <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
+
+            <div className="bg-white border border-indigo-100 p-4 rounded-xl flex items-center justify-between text-xs font-sans">
               <div>
-                <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Registros</span>
-                <div className="text-2xl font-mono font-bold text-zinc-900 mt-1">{gastosFiltrados.length}</div>
-              </div>
-              <Receipt className="w-6 h-6 text-zinc-300" />
-            </div>
-            <div className="bg-white border border-zinc-200 p-5 rounded-xl flex items-center justify-between text-xs font-sans">
-              <div>
-                <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider block">Promedio por Gasto</span>
-                <div className="text-2xl font-mono font-bold text-zinc-700 mt-1">
-                  {mostrarBalance
-                    ? `$${gastosFiltrados.length > 0 ? Math.round(gastosTotalFiltrado / gastosFiltrados.length).toLocaleString('es-AR') : 0}`
-                    : '$ •••••••'}
+                <span className="text-indigo-600 text-[10px] font-bold uppercase tracking-wider block">Juanchi (Transf.)</span>
+                <div className="text-xl font-mono font-bold text-indigo-950 mt-0.5">
+                  {mostrarBalance ? `$${gastosMesDesglose.juanchi.toLocaleString('es-AR')}` : '$ •••••••'}
                 </div>
+                <span className="text-[10px] text-indigo-400 font-medium mt-0.5 block">Transferencias Juanchi</span>
               </div>
-              <DollarSign className="w-6 h-6 text-zinc-300" />
+              <span className="text-base">👤</span>
+            </div>
+
+            <div className="bg-white border border-emerald-100 p-4 rounded-xl flex items-center justify-between text-xs font-sans">
+              <div>
+                <span className="text-emerald-600 text-[10px] font-bold uppercase tracking-wider block">Rulo (Transf.)</span>
+                <div className="text-xl font-mono font-bold text-emerald-950 mt-0.5">
+                  {mostrarBalance ? `$${gastosMesDesglose.rulo.toLocaleString('es-AR')}` : '$ •••••••'}
+                </div>
+                <span className="text-[10px] text-emerald-400 font-medium mt-0.5 block">Transferencias Rulo</span>
+              </div>
+              <span className="text-base">👤</span>
+            </div>
+
+            <div className="bg-white border border-amber-100 p-4 rounded-xl flex items-center justify-between text-xs font-sans">
+              <div>
+                <span className="text-amber-700 text-[10px] font-bold uppercase tracking-wider block">Efectivo de Caja</span>
+                <div className="text-xl font-mono font-bold text-amber-950 mt-0.5">
+                  {mostrarBalance ? `$${gastosMesDesglose.efectivo.toLocaleString('es-AR')}` : '$ •••••••'}
+                </div>
+                <span className="text-[10px] text-amber-500 font-medium mt-0.5 block">Efectivo Físico</span>
+              </div>
+              <span className="text-base">💵</span>
             </div>
           </div>
 
@@ -420,6 +461,13 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                   {CATEGORIAS_GASTO.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+                <span>Efectuado por:</span>
+                <select value={filtroOrigenGasto} onChange={e => setFiltroOrigenGasto(e.target.value)} className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold">
+                  <option value="TODOS">Todos los orígenes</option>
+                  {ORIGENES_GASTO.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </div>
             </div>
             <button
               onClick={() => { setGastoErr(''); setGastoOk(''); setShowGastoModal(true); }}
@@ -434,12 +482,13 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
           {/* TABLA GASTOS */}
           <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
-            <div className="min-w-[480px]">
+            <div className="min-w-[580px]">
             <table className="w-full text-left text-xs font-sans">
               <thead>
                 <tr className="bg-zinc-50 text-zinc-500 font-semibold border-b border-zinc-200 uppercase tracking-wider text-[10px]">
                   <th className="p-4">Concepto</th>
                   <th className="p-4">Categoría</th>
+                  <th className="p-4">Efectuado por</th>
                   <th className="p-4">Fecha</th>
                   <th className="p-4">Registrado por</th>
                   <th className="p-4 text-right">Monto</th>
@@ -448,36 +497,44 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
               </thead>
               <tbody className="divide-y divide-zinc-100 text-zinc-700 font-medium">
                 {gastosFiltrados.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-zinc-400 italic">Sin gastos registrados para el período seleccionado.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-zinc-400 italic">Sin gastos registrados para el período seleccionado.</td></tr>
                 ) : (
-                  gastosFiltrados.map(g => (
-                    <tr key={g.id} className="hover:bg-zinc-50/50">
-                      <td className="p-4 font-semibold text-zinc-900">{g.concepto}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${catColors[g.categoria] || catColors.OTROS}`}>
-                          {g.categoria}
-                        </span>
-                      </td>
-                      <td className="p-4 font-mono text-zinc-500 text-[10px]">{g.fecha}</td>
-                      <td className="p-4 font-mono text-zinc-400 text-[10px]">{g.registrado_por}</td>
-                      <td className="p-4 text-right font-mono font-bold text-rose-600">${g.monto.toLocaleString('es-AR')}</td>
-                      <td className="p-4 text-center">
-                        <button
-                          onClick={() => eliminarGasto(g.id)}
-                          className="p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-md transition-colors cursor-pointer border-none bg-transparent"
-                          title="Eliminar gasto"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  gastosFiltrados.map(g => {
+                    const origenObj = ORIGENES_GASTO.find(o => o.id === g.efectuado_por) || ORIGENES_GASTO[2];
+                    return (
+                      <tr key={g.id} className="hover:bg-zinc-50/50">
+                        <td className="p-4 font-semibold text-zinc-900">{g.concepto}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${catColors[g.categoria] || catColors.OTROS}`}>
+                            {g.categoria}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${origenObj.badgeColor}`}>
+                            {origenObj.label}
+                          </span>
+                        </td>
+                        <td className="p-4 font-mono text-zinc-500 text-[10px]">{g.fecha}</td>
+                        <td className="p-4 font-mono text-zinc-400 text-[10px]">{g.registrado_por}</td>
+                        <td className="p-4 text-right font-mono font-bold text-rose-600">${g.monto.toLocaleString('es-AR')}</td>
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => eliminarGasto(g.id)}
+                            className="p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-md transition-colors cursor-pointer border-none bg-transparent"
+                            title="Eliminar gasto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
               {gastosFiltrados.length > 0 && (
                 <tfoot>
                   <tr className="bg-zinc-50 border-t border-zinc-200">
-                    <td colSpan={4} className="p-4 font-bold text-xs text-zinc-600 uppercase tracking-wider">Total del período</td>
+                    <td colSpan={5} className="p-4 font-bold text-xs text-zinc-600 uppercase tracking-wider">Total del período</td>
                     <td className="p-4 text-right font-mono font-bold text-rose-700 text-sm">${gastosTotalFiltrado.toLocaleString('es-AR')}</td>
                     <td></td>
                   </tr>
@@ -748,6 +805,32 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                     <button key={cat} type="button" onClick={() => setGastoForm(prev => ({ ...prev, categoria: cat }))}
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer border-none ${gastoForm.categoria === cat ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-zinc-300 bg-white'}`}>
                       {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ¿QUIÉN EFECTUÓ EL GASTO? */}
+              <div className="space-y-1.5">
+                <label className="text-zinc-700 font-bold block text-[10px] uppercase tracking-wider">
+                  ¿Quién efectuó el gasto? (Origen de fondos) *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {ORIGENES_GASTO.map(orig => (
+                    <button
+                      key={orig.id}
+                      type="button"
+                      onClick={() => setGastoForm(prev => ({ ...prev, efectuado_por: orig.id }))}
+                      className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                        gastoForm.efectuado_por === orig.id
+                          ? 'border-zinc-900 bg-zinc-900 text-white shadow-xs font-bold'
+                          : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span>{orig.emoji}</span>
+                        <span className="truncate">{orig.label}</span>
+                      </div>
                     </button>
                   ))}
                 </div>

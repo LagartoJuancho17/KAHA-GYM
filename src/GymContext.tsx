@@ -73,6 +73,8 @@ interface GymContextType {
   // Turnos Methods
   asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>; excedePlan?: boolean; turnosFijosActuales?: string[]; maxDias?: number; clienteNombre?: string };
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
+  darDeBajaTurnosFijosSocio: (clienteId: string, motivo?: string, userEmail?: string) => { success: boolean; message: string };
+  darDeBajaTurnosFijosMultiple: (clienteIds: string[], motivo?: string, userEmail?: string) => { success: boolean; procesados: number };
   notificarBajaClase: (clienteId: string, turnoId: string, fecha?: string) => boolean;
   notificarAltaWaitlist: (clienteId: string, turnoId: string, fecha?: string) => boolean;
   asignarTurnoVariable: (clienteId: string, turnoId: string | null) => { success: boolean; message: string };
@@ -97,8 +99,8 @@ interface GymContextType {
 
   // Transferencias en Revision
   pagosEnRevision: PagoEnRevision[];
-  solicitarPagoTransferencia: (clienteId: string) => { success: boolean; message: string };
-  aprobarPagoTransferencia: (revisionId: string, adminEmail: string, destinoTransferencia?: 'JUANCHI' | 'RULO' | string) => { success: boolean; message: string };
+  solicitarPagoTransferencia: (clienteId: string, monto?: number, mes?: string) => { success: boolean; message: string };
+  aprobarPagoTransferencia: (revisionId: string, adminEmail: string, destinoTransferencia?: 'JUANCHI' | 'RULO' | string, montoOverride?: number) => { success: boolean; message: string };
   rechazarPagoTransferencia: (revisionId: string) => { success: boolean; message: string };
   
   // Novedades Methods
@@ -332,6 +334,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data: waitlistDb, error: waitErr } = await supabase.from('lista_espera_turnos').select('*');
       if (waitErr) throw waitErr;
 
+      // Lista de espera POR FECHA (dia puntual). Antes vivia solo en localStorage,
+      // por eso los socios reportaban que no les quedaba guardada.
+      const { data: esperaFechaDb, error: esperaFechaErr } = await supabase
+        .from('lista_espera_reservas')
+        .select('*')
+        .order('creado_at', { ascending: true });
+      if (esperaFechaErr) console.warn('No se pudo leer la lista de espera por fecha:', esperaFechaErr);
+
       // 5. Fetch Pagos
       const { data: pagosDb, error: pagosErr } = await supabase
         .from('pagos')
@@ -353,11 +363,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Nota sobre logs de auditoría en Supabase:', logsErr);
       }
 
-      // Migración: el turno de 11:00 de Lunes/Miércoles/Viernes ya no existe.
-      // generarTurnosIniciales dejó de crearlo, pero pueden quedar filas viejas
-      // en la tabla `turnos` de Supabase (por eso seguía apareciendo en la grilla
-      // y no se podía quitar). Las filtramos al cargar y las limpiamos de la base.
-      const TURNOS_OBSOLETOS = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00'];
+      // Migración: los turnos de 11:00 de Lunes/Miércoles/Viernes/Jueves ya no existen (solo Martes 11:00).
+      // generarTurnosIniciales dejó de crearlos, pero pueden quedar filas viejas
+      // en la tabla `turnos` de Supabase. Las filtramos al cargar y las limpiamos de la base.
+      const TURNOS_OBSOLETOS = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00', 'JUEVES-11:00'];
       const localIdDeTurno = (t: any) => `${t.dia}-${t.hora.substring(0, 5)}`;
       const turnosObsoletos = dbTurnos.filter(t => TURNOS_OBSOLETOS.includes(localIdDeTurno(t)));
       if (turnosObsoletos.length > 0) {
@@ -501,6 +510,26 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTurnos(shiftList);
       setPagos(mappedPagos);
       setRecuperos(mappedRecs);
+
+      // Lista de espera por fecha: la base manda. Se mapea el uuid del turno al id
+      // local ("MARTES-21:00") que usa todo el front.
+      const uuidToLocal = new Map<string, string>();
+      dbTurnos.forEach(t => uuidToLocal.set(t.id, `${t.dia}-${t.hora.substring(0, 5)}`));
+      const esperaFecha: WaitlistReserva[] = (esperaFechaDb || [])
+        .map((w: any) => {
+          const localId = uuidToLocal.get(w.turno_id);
+          if (!localId) return null;
+          return {
+            id: w.id,
+            cliente_id: w.cliente_id,
+            turno_id: localId,
+            fecha: typeof w.fecha === 'string' ? w.fecha.slice(0, 10) : w.fecha,
+            creado_at: w.creado_at
+          } as WaitlistReserva;
+        })
+        .filter(Boolean) as WaitlistReserva[];
+      setWaitlistReservas(esperaFecha);
+      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(esperaFecha));
       // Historial: unir base + local, nunca reemplazar.
       // Antes, si la base traía aunque sea 1 fila, se pisaba localStorage entero y
       // todo lo que no había llegado a subir se perdía en el refresh. Ese era el bug.
@@ -656,8 +685,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (localTurnos) {
         let parsedTurnos: Turno[] = JSON.parse(localTurnos);
-        // Migración: eliminar turno 11:00 de Lunes, Miércoles y Viernes
-        const turnosA_Eliminar = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00'];
+        // Migración: eliminar turno 11:00 de Lunes, Miércoles, Viernes y Jueves
+        const turnosA_Eliminar = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00', 'JUEVES-11:00'];
         const turnosFiltrados = parsedTurnos.filter(t => !turnosA_Eliminar.includes(t.id));
         if (turnosFiltrados.length !== parsedTurnos.length) {
           localStorage.setItem('gym_turnos', JSON.stringify(turnosFiltrados));
@@ -1097,6 +1126,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedClientes = [newClient, ...clientes];
     saveState(updatedClientes, undefined, undefined, updatedTurnos);
 
+    // Promesa del alta en la base. La lista de espera por fecha la espera antes de
+    // insertarse, porque tiene FK a clientes.
+    let esperarAltaDelSocio: Promise<unknown> = Promise.resolve();
+
     if (supabase) {
       const planUuid = newClient.plan_id === 'p-none' ? '00000000-0000-0000-0000-000000000000' : newClient.plan_id;
       // Persistencia ORDENADA: primero se inserta (y espera) el cliente, y solo
@@ -1104,7 +1137,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // referencian al cliente por FK. Hacerlo en paralelo (fire-and-forget)
       // provocaba que la asignación llegara antes que el cliente y la FK la
       // rechazara silenciosamente: el socio quedaba "perdido" en los turnos.
-      (async () => {
+      esperarAltaDelSocio = (async () => {
         const { error: clienteError } = await supabase.from('clientes').insert({
           id: newClient.id,
           nombre: newClient.nombre,
@@ -1197,6 +1230,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const next = yaEsta ? prev : [...prev, nuevoEnEspera];
         localStorage.setItem('gym_waitlist_reservas', JSON.stringify(next));
         return next;
+      });
+      // Se persiste DESPUES de que el socio exista en la base: lista_espera_reservas
+      // tiene foreign key a clientes, y el alta del socio es asincrona. Sin esta
+      // espera el insert fallaba por FK y la anotacion no quedaba guardada.
+      esperarAltaDelSocio.then(() => {
+        persistirEsperaEnSupabase('alta', newClient.id, turno_id, fecha);
       });
       addAuditLog('LISTA_ESPERA_RESERVA_AGREGADO', {
         cliente: `${newClient.nombre} ${newClient.apellido}`,
@@ -2035,6 +2074,43 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const darDeBajaTurnosFijosSocio = (clienteId: string, motivo: string = 'Falta de pago (Día 10)', userEmail?: string) => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return { success: false, message: 'Cliente no encontrado' };
+
+    const turnosAQuitar = [...cli.turnos_fijos];
+    if (turnosAQuitar.length === 0) {
+      return { success: true, message: 'El socio no posee turnos fijos asignados.' };
+    }
+
+    turnosAQuitar.forEach(tId => {
+      removerAsignacionFija(clienteId, tId);
+    });
+
+    addAuditLog('CLIENTE_BAJA_TURNOS_FIJOS_MANUAL', {
+      cliente_id: clienteId,
+      cliente_nombre: `${cli.nombre} ${cli.apellido}`,
+      turnos_dados_de_baja: turnosAQuitar,
+      motivo,
+      fecha: new Date().toISOString()
+    }, userEmail);
+
+    addToast('delete', `Turnos fijos de ${cli.nombre} ${cli.apellido} dados de baja correctamente (${turnosAQuitar.length} turno/s liberado/s).`);
+
+    return { success: true, message: `Se dieron de baja ${turnosAQuitar.length} turno(s) fijo(s) de ${cli.nombre} ${cli.apellido}.` };
+  };
+
+  const darDeBajaTurnosFijosMultiple = (clienteIds: string[], motivo: string = 'Falta de pago (Día 10)', userEmail?: string) => {
+    let procesados = 0;
+    clienteIds.forEach(cid => {
+      const res = darDeBajaTurnosFijosSocio(cid, motivo, userEmail);
+      if (res.success) procesados++;
+    });
+
+    addToast('delete', `Se procesaron las bajas de turnos fijos para ${procesados} socio(s).`);
+    return { success: true, procesados };
+  };
+
   const asignarTurnoVariable = (clienteId: string, turnoId: string | null) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) {
@@ -2350,6 +2426,41 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Reserva agendada exitosamente.' };
   };
 
+  /**
+   * Sincroniza la lista de espera POR FECHA con Supabase (tabla lista_espera_reservas).
+   * Es distinta de lista_espera_turnos, que es la lista semanal del turno.
+   * Falla en silencio a propósito: el estado local ya se actualizó, así que un
+   * problema de red no debe romperle la acción al socio. Al recargar se reconcilia.
+   */
+  const persistirEsperaEnSupabase = (
+    accion: 'alta' | 'baja',
+    clienteId: string,
+    turnoId: string,
+    fecha: string
+  ) => {
+    if (!supabase) return;
+    resolveTurnoUuid(turnoId).then((turnoUuid) => {
+      if (!turnoUuid) {
+        console.warn(`Lista de espera: no se pudo resolver el UUID del turno ${turnoId}.`);
+        return;
+      }
+      if (accion === 'alta') {
+        supabase.from('lista_espera_reservas')
+          .upsert({ cliente_id: clienteId, turno_id: turnoUuid, fecha }, { onConflict: 'turno_id,cliente_id,fecha' })
+          .then(({ error }) => {
+            if (error) console.error('Error al guardar la lista de espera en Supabase:', error);
+          });
+      } else {
+        supabase.from('lista_espera_reservas')
+          .delete()
+          .eq('cliente_id', clienteId).eq('turno_id', turnoUuid).eq('fecha', fecha)
+          .then(({ error }) => {
+            if (error) console.error('Error al borrar de la lista de espera en Supabase:', error);
+          });
+      }
+    });
+  };
+
   const agregarListaEsperaReserva = (clienteId: string, turnoId: string, fecha: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
@@ -2360,7 +2471,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const nuevoEnEspera: WaitlistReserva = {
-      id: `wl-${Date.now()}`,
+      id: `wl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       cliente_id: clienteId,
       turno_id: turnoId,
       fecha,
@@ -2370,6 +2481,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedWl = [...waitlistReservas, nuevoEnEspera];
     setWaitlistReservas(updatedWl);
     localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updatedWl));
+
+    // Persistir en Supabase. Sin esto la espera vivía SOLO en el localStorage del
+    // navegador que la creó: el admin no la veía, se perdía al cambiar de
+    // dispositivo o limpiar el navegador. Era el bug de "no me quedan guardados".
+    persistirEsperaEnSupabase('alta', clienteId, turnoId, fecha);
 
     addAuditLog('LISTA_ESPERA_RESERVA_AGREGADO', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
@@ -2387,6 +2503,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const filtered = waitlistReservas.filter(w => !(w.cliente_id === clienteId && w.turno_id === turnoId && w.fecha === fecha));
     setWaitlistReservas(filtered);
     localStorage.setItem('gym_waitlist_reservas', JSON.stringify(filtered));
+    persistirEsperaEnSupabase('baja', clienteId, turnoId, fecha);
 
     addAuditLog('LISTA_ESPERA_RESERVA_REMOVIDO', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
@@ -2411,6 +2528,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newWl = waitlistReservas.filter(w => w.id !== nextWaitlistEntry.id);
       setWaitlistReservas(newWl);
       localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
+      persistirEsperaEnSupabase('baja', nextWaitlistEntry.cliente_id, turnoId, fecha);
       return procesarPromocionListaEspera(turnoId, fecha, currentClientes);
     }
 
@@ -2432,10 +2550,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
 
-    // Remove from waitlist
+    // Remove from waitlist (local + Supabase: ya entro a la clase, no espera mas)
     const newWl = waitlistReservas.filter(w => w.id !== nextWaitlistEntry.id);
     setWaitlistReservas(newWl);
     localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
+    persistirEsperaEnSupabase('baja', nextWaitlistEntry.cliente_id, turnoId, fecha);
 
     // Send internal notification to nextClient
     const turno = turnos.find(t => t.id === turnoId);
@@ -2824,7 +2943,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // TRANSFERENCIAS EN REVISIÓN
-  const solicitarPagoTransferencia = (clienteId: string): { success: boolean; message: string } => {
+  const solicitarPagoTransferencia = (clienteId: string, montoCustom?: number, mesCustom?: string): { success: boolean; message: string } => {
     const cli = clientes.find(c => c.id === clienteId);
     if (!cli) return { success: false, message: 'Cliente no encontrado.' };
 
@@ -2832,12 +2951,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const yaExiste = pagosEnRevision.some(p => p.cliente_id === clienteId && p.estado === 'PENDIENTE');
     if (yaExiste) return { success: false, message: 'Ya existe una transferencia en revisión para este socio.' };
 
+    const hasDebt = cli.deuda_acumulada > 0 || cli.estado === 'CON_DEUDA' || cli.estado === 'MOROSO';
+    const planDelSocio = planes.find(p => p.id === cli.plan_id);
+    const planPrecio = cli.precio_personalizado ?? (planDelSocio ? planDelSocio.precio : 0);
+    const montoRevision = montoCustom !== undefined && montoCustom > 0 
+      ? montoCustom 
+      : (hasDebt ? cli.deuda_acumulada : planPrecio);
+
+    const targetMes = mesCustom || new Date().toISOString().slice(0, 7);
+
     const nuevaRevision: PagoEnRevision = {
       id: `rev-${Date.now()}`,
       cliente_id: clienteId,
       cliente_nombre_completo: `${cli.nombre} ${cli.apellido}`,
-      monto: cli.deuda_acumulada,
-      mes_correspondiente: new Date().toISOString().slice(0, 7),
+      monto: montoRevision,
+      mes_correspondiente: targetMes,
       solicitado_por_email: cli.email,
       solicitado_at: new Date().toISOString(),
       estado: 'PENDIENTE'
@@ -2849,9 +2977,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: '¡Transferencia enviada! El equipo de KAHA GYM la revisará y confirmará tu pago.' };
   };
 
-  const aprobarPagoTransferencia = (revisionId: string, adminEmail: string, destinoTransferencia?: 'JUANCHI' | 'RULO' | string): { success: boolean; message: string } => {
+  const aprobarPagoTransferencia = (revisionId: string, adminEmail: string, destinoTransferencia?: 'JUANCHI' | 'RULO' | string, montoOverride?: number): { success: boolean; message: string } => {
     const revision = pagosEnRevision.find(p => p.id === revisionId);
     if (!revision) return { success: false, message: 'Revisión no encontrada.' };
+
+    const cli = clientes.find(c => c.id === revision.cliente_id);
+    const planDelSocio = cli ? planes.find(p => p.id === cli.plan_id) : undefined;
+    const planPrecio = cli?.precio_personalizado ?? (planDelSocio ? planDelSocio.precio : 0);
+    const hasDebt = cli ? (cli.deuda_acumulada > 0 || cli.estado === 'CON_DEUDA' || cli.estado === 'MOROSO') : false;
+
+    // Si la revisión tenía monto 0 o se pasa montoOverride, aseguramos el monto real
+    const montoFinal = montoOverride !== undefined && montoOverride > 0
+      ? montoOverride
+      : revision.monto > 0
+      ? revision.monto
+      : (hasDebt ? (cli?.deuda_acumulada || planPrecio) : planPrecio);
 
     const destino = destinoTransferencia || 'JUANCHI';
 
@@ -2859,7 +2999,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const res = registrarPago({
       cliente_id: revision.cliente_id,
       cliente_nombre_completo: revision.cliente_nombre_completo,
-      monto: revision.monto,
+      monto: montoFinal,
       medio_pago: 'TRANSFERENCIA',
       mes_correspondiente: revision.mes_correspondiente,
       hash_transaccion: `TRF-APROBADO-${revisionId}`,
@@ -2870,10 +3010,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!res.success) return res;
 
     // Mark as approved
-    const updated = pagosEnRevision.map(p => p.id === revisionId ? { ...p, estado: 'APROBADO' as const, destino_transferencia: destino } : p);
+    const updated = pagosEnRevision.map(p => p.id === revisionId ? { ...p, monto: montoFinal, estado: 'APROBADO' as const, destino_transferencia: destino } : p);
     setPagosEnRevision(updated);
     localStorage.setItem('gym_pagos_revision', JSON.stringify(updated));
-    return { success: true, message: `Transferencia a ${destino} aprobada y pago registrado correctamente.` };
+    return { success: true, message: `Transferencia a ${destino} aprobada y pago de $${montoFinal.toLocaleString('es-AR')} registrado correctamente.` };
   };
 
   const rechazarPagoTransferencia = (revisionId: string): { success: boolean; message: string } => {
@@ -3241,15 +3381,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             logLineas.push(`>> [NOTIFICACIÓN - DÍA 5] Enviando aviso a ${cli.nombre} ${cli.apellido}: "recordá que mañana vence la fecha para el pago...de no abonar la siguiente semana los turnos fijos se borran automáticamente..."`);
           }
 
-          // Regla Día 6 (del 6 al 10 inclusive): Suspensión momentánea de la semana 1
-          if (diaDelMes >= 6 && diaDelMes <= 10) {
+          // Regla Día 6 (del 6 al 9 inclusive): Suspensión momentánea y recordatorio
+          if (diaDelMes >= 6 && diaDelMes <= 9) {
             if (cli.turnos_fijos.length > 0) {
               const fechasSemana = [
                 `${deMesFormato}-06`,
                 `${deMesFormato}-07`,
                 `${deMesFormato}-08`,
-                `${deMesFormato}-09`,
-                `${deMesFormato}-10`
+                `${deMesFormato}-09`
               ];
 
               const weekdaysMap = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
@@ -3274,7 +3413,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                       });
                       suspendidoParaSocio = true;
                       suspendidosSemanaCount++;
-                      logLineas.push(`>> [ACCIÓN - DÍA 6] Suspendido turno ${tfId} para ${cli.nombre} ${cli.apellido} el día ${fechaStr} (Semana 1)`);
+                      logLineas.push(`>> [ACCIÓN - DÍA 6] Suspendido turno ${tfId} para ${cli.nombre} ${cli.apellido} el día ${fechaStr}`);
                     }
                   }
                 });
@@ -3286,46 +3425,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
 
-          // Regla Día 11 (11 en adelante): Baja oficial
-          if (diaDelMes >= 11) {
+          // Regla Día 10 (10 en adelante): Revisión manual del Admin (no se baja a ciegas)
+          if (diaDelMes >= 10) {
             if (cli.turnos_fijos.length > 0) {
-              logLineas.push(`>> [ACCIÓN - DÍA 11] Alumno ${cli.nombre} ${cli.apellido} no pagó para el día 11. Dando de baja turnos fijos...`);
-              const turnosAQuitar = [...cli.turnos_fijos];
-              cli.turnos_fijos = [];
-              dadosBajaCount++;
-
-              turnosAQuitar.forEach(turnoId => {
-                listadoTurnos = listadoTurnos.map(t => {
-                  if (t.id === turnoId) {
-                    const filtradoAsignados = t.asignados_ids.filter(cid => cid !== cli.id);
-                    let nuevosAsignados = [...filtradoAsignados];
-                    let nuevaWaitlist = [...t.lista_espera_ids];
-
-                    // Promover desde waitlist si hay lugar
-                    if (nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
-                      const promovidoId = nuevaWaitlist[0];
-                      nuevosAsignados.push(promovidoId);
-                      nuevaWaitlist = nuevaWaitlist.slice(1);
-
-                      // Promover en listadoClientesActualizado
-                      listadoClientesActualizado = listadoClientesActualizado.map(cSub => {
-                        if (cSub.id === promovidoId) {
-                          logLineas.push(`>> [PROMOCIÓN] Promovido ${cSub.nombre} ${cSub.apellido} al turno ${turnoId} (lista de espera).`);
-                          return { ...cSub, turnos_fijos: [...cSub.turnos_fijos, turnoId] };
-                        }
-                        return cSub;
-                      });
-                    }
-
-                    return {
-                      ...t,
-                      asignados_ids: nuevosAsignados,
-                      lista_espera_ids: nuevaWaitlist
-                    };
-                  }
-                  return t;
-                });
-              });
+              logLineas.push(`>> [REVISIÓN REQUERIDA - DÍA 10+] Alumno ${cli.nombre} ${cli.apellido} (${cli.turnos_fijos.length} turnos fijos) no pagó la cuota. Requiere confirmación manual del Administrador para proceder con la baja.`);
             }
           }
         }
@@ -3672,6 +3775,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const registrarGasto = (gastoData: Omit<Gasto, 'id' | 'creado_at'>) => {
     const nuevoGasto: Gasto = {
       ...gastoData,
+      efectuado_por: gastoData.efectuado_por || 'EFECTIVO_CAJA',
       id: `gas-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       creado_at: new Date().toISOString()
     };
@@ -3680,7 +3784,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('gym_gastos', JSON.stringify(updated));
       return updated;
     });
-    addAuditLog('GASTO_REGISTRADO', { concepto: gastoData.concepto, monto: gastoData.monto });
+    addAuditLog('GASTO_REGISTRADO', { 
+      concepto: gastoData.concepto, 
+      monto: gastoData.monto,
+      efectuado_por: nuevoGasto.efectuado_por
+    });
     addToast('add', 'Gasto registrado exitosamente.');
     return { success: true, message: 'Gasto registrado exitosamente.' };
   };
@@ -3889,7 +3997,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
-      asignarClienteFijo, removerAsignacionFija, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
+      asignarClienteFijo, removerAsignacionFija, darDeBajaTurnosFijosSocio, darDeBajaTurnosFijosMultiple, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
       registrarPago, actualizarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
