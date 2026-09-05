@@ -90,7 +90,8 @@ interface GymContextType {
   modificarPrecioOCupoTurno: (turnoId: string, nuevoCupo: number) => void;
   asignarProfesorTurno: (turnoId: string, profesor: string) => void;
   registrarVacaciones: (clienteId: string, fechaInicio: string, fechaFin: string) => { success: boolean; message: string };
-  crearReservaIndividual: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
+  // Async: el cupo lo valida la base con bloqueo (kaha_crear_reserva), no el navegador.
+  crearReservaIndividual: (clienteId: string, turnoId: string, fecha: string) => Promise<{ success: boolean; message: string; putInWaitlist?: boolean }>;
   cancelarReservaIndividual: (clienteId: string, reservaId: string) => { success: boolean; message: string };
   suspenderClaseFija: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
   revertirSuspensionClaseFija: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
@@ -2457,16 +2458,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('CUPO_TURNO_EDITADO', { turno_id: turnoId, nuevo_cupo: nuevoCupo });
   };
 
-  const crearReservaIndividual = (clienteId: string, turnoId: string, fecha: string) => {
+  const crearReservaIndividual = async (clienteId: string, turnoId: string, fecha: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
 
     const turno = turnos.find(t => t.id === turnoId);
     if (!turno) return { success: false, message: 'Turno no encontrado.' };
 
-    // Ocupación por la función canónica (src/lib/ocupacion.ts). Antes esta fórmula
-    // estaba copiada acá y en otros 5 lugares, y 3 de esas copias contaban distinto.
-    const totalOccupied = calcularOcupacion(turno, fecha, clientes, recuperos).total;
+    // Ocupación local, solo para el mensaje que ve el socio. La decisión REAL la
+    // toma la base (ver abajo): el estado del navegador puede tener horas.
+    let totalOccupied = calcularOcupacion(turno, fecha, clientes, recuperos).total;
 
     // Check duplicate: cannot book the EXACT SAME shift twice on the same date
     const alreadyBookedThisShiftOnDate = (cliente.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === fecha) || 
@@ -2480,7 +2481,65 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: `Ya tienes este turno reservado para el día ${fecha}.` };
     }
 
-    // Si el turno está lleno, anotar automáticamente en la lista de espera para esta fecha
+    // ---------------------------------------------------------------------
+    // El cupo lo decide la BASE, no el navegador.
+    // kaha_crear_reserva bloquea la fila del turno (FOR UPDATE), cuenta con el
+    // candado tomado y recién ahí inserta. Sin esto, dos dispositivos con estado
+    // viejo veían los dos "6 ocupados" y los dos entraban: paso de verdad, dos
+    // socios reservaron el mismo lugar con 5 minutos de diferencia.
+    // ---------------------------------------------------------------------
+    if (supabase) {
+      const turnoUuid = await resolveTurnoUuid(turnoId);
+      if (turnoUuid) {
+        const { data, error } = await supabase.rpc('kaha_crear_reserva', {
+          p_cliente_id: clienteId, p_turno_id: turnoUuid, p_fecha: fecha
+        });
+
+        if (!error && data) {
+          if (data.ok && data.reserva) {
+            // La base ya guardó la reserva; solo falta reflejarla en memoria.
+            const nueva = data.reserva as ReservaIndividual;
+            const actualizados = clientes.map(c => c.id === clienteId
+              ? { ...c, reservas_individuales: [...(c.reservas_individuales || []), nueva] }
+              : c);
+            saveState(actualizados, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+            addAuditLog('RESERVA_INDIVIDUAL_CREADA', {
+              cliente: `${cliente.nombre} ${cliente.apellido}`, turno_id: turnoId, fecha
+            });
+            addToast('add', `Reserva confirmada para ${cliente.nombre} (${data.ocupacion}/${data.cupo}).`);
+            return { success: true, message: 'Reserva agendada exitosamente.' };
+          }
+
+          if (data.motivo === 'duplicada') {
+            return { success: false, message: `Ya tienes este turno reservado para el día ${fecha}.` };
+          }
+
+          if (data.motivo === 'lleno') {
+            // La base vio el turno lleno aunque el navegador creyera que había lugar.
+            totalOccupied = data.ocupacion ?? totalOccupied;
+            const wlRes = agregarListaEsperaReserva(clienteId, turnoId, fecha);
+            if (wlRes.success) {
+              addToast('add', `Turno completo (${totalOccupied}/${data.cupo}). ${cliente.nombre} anotado/a en lista de espera.`);
+              return {
+                success: true,
+                message: `El turno está completo (${totalOccupied}/${data.cupo}). ${cliente.nombre} ${cliente.apellido} ha sido anotado/a en la lista de espera.`,
+                putInWaitlist: true
+              };
+            }
+            return wlRes;
+          }
+
+          return { success: false, message: `No se pudo reservar (${data.motivo || 'error'}).` };
+        }
+
+        // La llamada falló (sin red, función caída). Se avisa en vez de escribir
+        // por las nuestras: escribir directo es justamente lo que causaba sobrecupo.
+        console.error('kaha_crear_reserva falló:', error);
+        return { success: false, message: 'No se pudo confirmar la reserva contra el servidor. Probá de nuevo.' };
+      }
+    }
+
+    // Sin Supabase (desarrollo local sin credenciales): camino viejo, solo local.
     if (totalOccupied >= turno.cupo_maximo) {
       const wlRes = agregarListaEsperaReserva(clienteId, turnoId, fecha);
       if (wlRes.success) {

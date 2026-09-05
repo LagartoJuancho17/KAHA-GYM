@@ -110,7 +110,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     return clientes.find(c => c.id === realtimeCandidateClient);
   }, [clientes, realtimeCandidateClient]);
 
-  const handleAddRealtimeVariable = (e: React.FormEvent) => {
+  const handleAddRealtimeVariable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!realtimeCandidateClient && !guestName.trim()) return;
 
@@ -167,7 +167,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
       return;
     }
 
-    const res = crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
+    const res = await crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
     if (res.success) {
       setRealtimeSuccess(`✅ ¡Confirmado! ${res.message}`);
       setRealtimeCandidateClient('');

@@ -588,7 +588,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                             Clase Suspendida
                           </span>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               const isFijoTurn = socio.turnos_fijos.includes(selectedBookingTurno.id);
 
                               if (isFijoTurn) {
@@ -608,7 +608,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                                 if (!revRes.success) {
                                   // Si no había suspensión registrada, igual intentamos crear la reserva
                                 }
-                                const res = crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
+                                const res = await crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
                                 if (res.success) {
                                   setSuccessMessage('✅ Reserva confirmada. Tu lugar está asegurado.');
                                   setBookingTurnId(null);
@@ -699,8 +699,8 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                             </div>
                           ) : (
                             <button
-                              onClick={() => {
-                                const res = crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
+                              onClick={async () => {
+                                const res = await crearReservaIndividual(socio.id, selectedBookingTurno.id, dateStr);
                                 if (res.success) {
                                   setSuccessMessage(res.message);
                                   setBookingTurnId(null);
