@@ -4,6 +4,7 @@ import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
+import { esperaDelTurno, esPrioritario } from '../../lib/listaEspera';
 
 interface TurnoRealtimeModalProps {
   selectedSlot: { id: string; date: string };
@@ -22,7 +23,7 @@ const formatWspPhone = (phone?: string) => {
 
 export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selectedSlot, onClose }) => {
   const {
-    turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva,
+    turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva, sociosPrioritarios,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
     actualizarEstadoRecupero, addCliente, notificarBajaClase
   } = useGym();
@@ -70,18 +71,20 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   // Lista de espera para este turno y fecha
   const waitlistItems = useMemo(() => {
-    return waitlistReservas
-      .filter(w => w.turno_id === selectedSlot.id && w.fecha === selectedSlot.date)
+    // Mismo orden que usa la promocion automatica: VIP primero, despues por llegada.
+    // Si la turnera mostrara otro orden, el admin veria una cosa y entraria otra.
+    return esperaDelTurno(waitlistReservas, selectedSlot.id, selectedSlot.date, sociosPrioritarios)
       .map(w => {
         const cl = clientes.find(c => c.id === w.cliente_id);
         return {
           id: w.id,
           clienteId: w.cliente_id,
           nombre: cl ? `${cl.apellido}, ${cl.nombre}` : 'Socio',
-          creado_at: w.creado_at
+          creado_at: w.creado_at,
+          prioritario: esPrioritario(w.cliente_id, selectedSlot.id, sociosPrioritarios)
         };
       });
-  }, [waitlistReservas, selectedSlot.id, selectedSlot.date, clientes]);
+  }, [waitlistReservas, selectedSlot.id, selectedSlot.date, clientes, sociosPrioritarios]);
   
   // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date, and not already in waitlist
   const candidateClients = useMemo(() => {
@@ -445,12 +448,25 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
               </div>
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
                 {waitlistItems.map((wl, idx) => (
-                  <div key={wl.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-200/80 text-xs shadow-2xs">
+                  <div key={wl.id} className={`flex justify-between items-center p-2 rounded-lg text-xs shadow-2xs ${
+                    wl.prioritario ? 'bg-violet-50 border border-violet-300' : 'bg-white border border-amber-200/80'
+                  }`}>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                      <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                        wl.prioritario ? 'bg-violet-200 text-violet-900' : 'bg-amber-100 text-amber-800'
+                      }`}>
                         P{idx + 1}
                       </span>
                       <span className="font-semibold text-zinc-900">{wl.nombre}</span>
+                      {/* Marca visible para que el admin entienda por que este socio esta arriba. */}
+                      {wl.prioritario && (
+                        <span
+                          className="text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full tracking-wide"
+                          title="Prioridad máxima en este turno: entra primero cuando se libera un lugar"
+                        >
+                          PRIORIDAD
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"

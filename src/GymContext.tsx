@@ -13,6 +13,7 @@ import {
 import { supabase } from './supabaseClient';
 import { mergeLogs, logsFaltantesEnDb, parsearLogsGuardados, normalizarIdsLegacy, nuevoLogId, MAX_LOGS } from './lib/auditLogs';
 import { calcularOcupacion, conflictosAlAgregarFijo, reservasPropiasDuplicadas } from './lib/ocupacion';
+import { clavePrioridad, esperaDelTurno, proximoEnEntrar } from './lib/listaEspera';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -54,6 +55,10 @@ interface GymContextType {
   
   // Waitlist Reservas
   waitlistReservas: WaitlistReserva[];
+  // Claves `clienteId::turnoId` de socios con prioridad maxima en la espera de ese turno.
+  sociosPrioritarios: Set<string>;
+  marcarSocioPrioritario: (clienteId: string, turnoId: string, nota?: string) => Promise<{ success: boolean; message: string }>;
+  quitarSocioPrioritario: (clienteId: string, turnoId: string) => Promise<{ success: boolean; message: string }>;
   agregarListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
   removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
 
@@ -226,6 +231,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [novedadesProfesores, setNovedadesProfesores] = useState<NovedadProfesor[]>([]);
+  const [sociosPrioritarios, setSociosPrioritarios] = useState<Set<string>>(new Set());
   const [waitlistReservas, setWaitlistReservas] = useState<WaitlistReserva[]>(() => {
     try {
       const stored = localStorage.getItem('gym_waitlist_reservas');
@@ -341,6 +347,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .select('*')
         .order('creado_at', { ascending: true });
       if (esperaFechaErr) console.warn('No se pudo leer la lista de espera por fecha:', esperaFechaErr);
+
+      // Socios con prioridad maxima en la espera de un turno puntual (VIP).
+      const { data: prioritariosDb, error: prioritariosErr } = await supabase
+        .from('socios_prioritarios')
+        .select('*');
+      if (prioritariosErr) console.warn('No se pudieron leer los socios prioritarios:', prioritariosErr);
 
       // 5. Fetch Pagos
       const { data: pagosDb, error: pagosErr } = await supabase
@@ -515,6 +527,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // local ("MARTES-21:00") que usa todo el front.
       const uuidToLocal = new Map<string, string>();
       dbTurnos.forEach(t => uuidToLocal.set(t.id, `${t.dia}-${t.hora.substring(0, 5)}`));
+      // Prioritarios: se guarda la clave `clienteId::turnoLocal` para consulta O(1).
+      const prioritarios = new Set<string>();
+      (prioritariosDb || []).forEach((p: any) => {
+        const localId = uuidToLocal.get(p.turno_id);
+        if (localId) prioritarios.add(clavePrioridad(p.cliente_id, localId));
+      });
+      setSociosPrioritarios(prioritarios);
+
       const esperaFecha: WaitlistReserva[] = (esperaFechaDb || [])
         .map((w: any) => {
           const localId = uuidToLocal.get(w.turno_id);
@@ -570,23 +590,40 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Tabla no existe todavía: cargar desde localStorage como fallback
           console.warn('[KAHA] Tabla novedades no encontrada en Supabase, usando localStorage:', novedadesErr.message);
           const localNov = localStorage.getItem('gym_novedades');
-          const localNovedades: Novedad[] = localNov ? JSON.parse(localNov) : INITIAL_NOVEDADES;
+          const localParsed: Novedad[] = localNov ? JSON.parse(localNov) : INITIAL_NOVEDADES;
+          // Limpiar de local cualquier mensaje de gracias huérfano sin socio_id
+          const localNovedades = localParsed.filter(n => !(n.titulo?.includes('Gracias por tu pago') && !n.socio_id));
           setNovedades(localNovedades);
           localStorage.setItem('gym_novedades', JSON.stringify(localNovedades));
         } else {
-          const mappedNovedades: Novedad[] = (novedadesDb || []).map(n => ({
-            id: n.id,
-            titulo: n.titulo,
-            contenido: n.contenido,
-            fecha: n.fecha,
-            categoria: n.categoria as Novedad['categoria'],
-            creado_por: n.creado_por,
-            destacado: n.destacado
-          }));
+          // Eliminar de Supabase cualquier mensaje de agradecimiento corrupto que haya quedado sin socio_id
+          const corruptasIds = (novedadesDb || [])
+            .filter(n => n.titulo?.includes('Gracias por tu pago') && !n.socio_id)
+            .map(n => n.id);
+
+          if (corruptasIds.length > 0) {
+            supabase.from('novedades').delete().in('id', corruptasIds).then(({ error }) => {
+              if (!error) console.log(`🧹 Limpiadas ${corruptasIds.length} novedades de pago huérfanas en Supabase`);
+            });
+          }
+
+          const mappedNovedades: Novedad[] = (novedadesDb || [])
+            .filter(n => !(n.titulo?.includes('Gracias por tu pago') && !n.socio_id))
+            .map(n => ({
+              id: n.id,
+              titulo: n.titulo,
+              contenido: n.contenido,
+              fecha: n.fecha,
+              categoria: n.categoria as Novedad['categoria'],
+              creado_por: n.creado_por,
+              destacado: n.destacado,
+              socio_id: n.socio_id || undefined
+            }));
 
           // Merge: si hay novedades locales que no están en la DB, subirlas
           const localNov = localStorage.getItem('gym_novedades');
-          const localNovedades: Novedad[] = localNov ? JSON.parse(localNov) : [];
+          const localParsed: Novedad[] = localNov ? JSON.parse(localNov) : [];
+          const localNovedades = localParsed.filter(n => !(n.titulo?.includes('Gracias por tu pago') && !n.socio_id));
           const dbIds = new Set(mappedNovedades.map(n => n.id));
           const localFaltantes = localNovedades.filter(n => !dbIds.has(n.id));
 
@@ -598,7 +635,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               fecha: n.fecha,
               categoria: n.categoria,
               creado_por: n.creado_por,
-              destacado: n.destacado
+              destacado: n.destacado,
+              ...(n.socio_id ? { socio_id: n.socio_id } : {})
             }));
             supabase.from('novedades').upsert(toUpsert, { onConflict: 'id' }).then(({ error }) => {
               if (error) console.warn('[KAHA] No se pudieron subir novedades locales a Supabase:', error.message);
@@ -614,7 +652,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Error inesperado: usar localStorage
         console.warn('[KAHA] Error al cargar novedades de Supabase:', novErr);
         const localNov = localStorage.getItem('gym_novedades');
-        const fallback: Novedad[] = localNov ? JSON.parse(localNov) : INITIAL_NOVEDADES;
+        const localParsed: Novedad[] = localNov ? JSON.parse(localNov) : INITIAL_NOVEDADES;
+        const fallback: Novedad[] = localParsed.filter(n => !(n.titulo?.includes('Gracias por tu pago') && !n.socio_id));
         setNovedades(fallback);
       }
 
@@ -799,8 +838,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('gym_audit_logs', JSON.stringify(INITIAL_AUDIT_LOGS));
       }
 
-      if (localNovedades) setNovedades(JSON.parse(localNovedades));
-      else {
+      if (localNovedades) {
+        try {
+          const parsedNov = JSON.parse(localNovedades);
+          const cleanedNov = parsedNov.filter((n: any) => !(n.titulo?.includes('Gracias por tu pago') && !n.socio_id));
+          setNovedades(cleanedNov);
+          localStorage.setItem('gym_novedades', JSON.stringify(cleanedNov));
+        } catch {
+          setNovedades(INITIAL_NOVEDADES);
+          localStorage.setItem('gym_novedades', JSON.stringify(INITIAL_NOVEDADES));
+        }
+      } else {
         setNovedades(INITIAL_NOVEDADES);
         localStorage.setItem('gym_novedades', JSON.stringify(INITIAL_NOVEDADES));
       }
@@ -2520,6 +2568,72 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  /**
+   * Marca a un socio como PRIORITARIO en la espera de un turno puntual.
+   * Es por (socio, turno): ser VIP del JUEVES-19:00 no da prioridad en otros horarios.
+   */
+  const marcarSocioPrioritario = async (clienteId: string, turnoId: string, nota?: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Socio no encontrado.' };
+
+    const clave = clavePrioridad(clienteId, turnoId);
+    if (sociosPrioritarios.has(clave)) {
+      return { success: false, message: `${cliente.nombre} ya tiene prioridad en ${turnoId}.` };
+    }
+
+    // Optimista: la UI reacciona ya; si la base falla se revierte.
+    setSociosPrioritarios(prev => new Set(prev).add(clave));
+
+    if (supabase) {
+      const turnoUuid = await resolveTurnoUuid(turnoId);
+      if (!turnoUuid) {
+        setSociosPrioritarios(prev => { const n = new Set(prev); n.delete(clave); return n; });
+        return { success: false, message: 'No se pudo resolver el turno en la base.' };
+      }
+      const { error } = await supabase.from('socios_prioritarios')
+        .upsert({ cliente_id: clienteId, turno_id: turnoUuid, nota: nota || null }, { onConflict: 'cliente_id,turno_id' });
+      if (error) {
+        setSociosPrioritarios(prev => { const n = new Set(prev); n.delete(clave); return n; });
+        console.error('Error al marcar socio prioritario:', error);
+        return { success: false, message: 'No se pudo guardar la prioridad en la base.' };
+      }
+    }
+
+    addAuditLog('SOCIO_PRIORITARIO_AGREGADO', {
+      cliente: `${cliente.nombre} ${cliente.apellido}`, turno_id: turnoId, nota: nota || ''
+    });
+    addToast('add', `${cliente.nombre} tiene prioridad máxima en ${turnoId}.`);
+    return { success: true, message: `${cliente.nombre} ${cliente.apellido} ahora entra primero en la lista de espera de ${turnoId}.` };
+  };
+
+  const quitarSocioPrioritario = async (clienteId: string, turnoId: string) => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    const clave = clavePrioridad(clienteId, turnoId);
+    if (!sociosPrioritarios.has(clave)) {
+      return { success: false, message: 'Ese socio no tiene prioridad en este turno.' };
+    }
+
+    setSociosPrioritarios(prev => { const n = new Set(prev); n.delete(clave); return n; });
+
+    if (supabase) {
+      const turnoUuid = await resolveTurnoUuid(turnoId);
+      if (turnoUuid) {
+        const { error } = await supabase.from('socios_prioritarios')
+          .delete().eq('cliente_id', clienteId).eq('turno_id', turnoUuid);
+        if (error) {
+          setSociosPrioritarios(prev => new Set(prev).add(clave));
+          console.error('Error al quitar socio prioritario:', error);
+          return { success: false, message: 'No se pudo quitar la prioridad en la base.' };
+        }
+      }
+    }
+
+    addAuditLog('SOCIO_PRIORITARIO_QUITADO', {
+      cliente: cliente ? `${cliente.nombre} ${cliente.apellido}` : clienteId, turno_id: turnoId
+    });
+    return { success: true, message: 'Prioridad quitada.' };
+  };
+
   const agregarListaEsperaReserva = (clienteId: string, turnoId: string, fecha: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
@@ -2574,9 +2688,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const procesarPromocionListaEspera = (turnoId: string, fecha: string, currentClientes: Cliente[]): Cliente[] => {
-    const waitingList = waitlistReservas
-      .filter(w => w.turno_id === turnoId && w.fecha === fecha)
-      .sort((a, b) => new Date(a.creado_at).getTime() - new Date(b.creado_at).getTime());
+    // Orden: los socios PRIORITARIOS (VIP) de este turno entran primero; dentro de
+    // cada grupo manda el orden de llegada. Antes era FIFO puro.
+    const waitingList = esperaDelTurno(waitlistReservas, turnoId, fecha, sociosPrioritarios);
 
     if (waitingList.length === 0) return currentClientes;
 
@@ -2608,6 +2722,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return c;
     });
+
+    // Persistir la reserva del promovido. Antes esto solo vivia en memoria y en
+    // localStorage: el socio entraba en la pantalla del admin pero su reserva nunca
+    // llegaba a la base, asi que al recargar desaparecia y el lugar quedaba libre
+    // otra vez. Los callers hacen saveState() pero ninguno sube este cliente.
+    if (supabase) {
+      const promovido = updatedList.find(c => c.id === candidateClient.id);
+      if (promovido) {
+        supabase.from('clientes')
+          .update({ reservas_individuales: promovido.reservas_individuales || [] })
+          .eq('id', candidateClient.id)
+          .then(({ error }) => {
+            if (error) console.error('Error al persistir la reserva del socio promovido:', error);
+          });
+      }
+    }
 
     // Remove from waitlist (local + Supabase: ya entro a la clase, no espera mas)
     const newWl = waitlistReservas.filter(w => w.id !== nextWaitlistEntry.id);
@@ -3202,15 +3332,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // ── Novedad privada de agradecimiento para el socio ──────────────────────
     // Solo aparece en la cartelera del socio que pagó (gracias al campo socio_id)
-    const GRACIAS_PAGO = `Ya lo registramos y tus turnos fijos se renovaron correctamente 🙌\n\nRecordá que, si algún día vas a ausentarte, podés avisarlo directamente desde la app. De esta manera liberamos ese lugar para que otra persona pueda aprovecharlo y facilitamos la organización de recuperaciones para todos.\n\nEntre todos hacemos que KAHA funcione cada vez mejor 🤝💚`;
-    addNovedad({
-      titulo: '💚 ¡Gracias por tu pago!',
-      contenido: GRACIAS_PAGO,
-      categoria: 'INFORMACION',
-      destacado: false,
-      creado_por: 'KAHA GYM',
-      socio_id: cli.id
-    });
+    // Si el socio ya tiene este mensaje de agradecimiento vigente, no duplicar ("que no aparezca nada porque ya pagó")
+    const yaTieneMensajeGracias = novedades.some(n => 
+      n.socio_id === cli.id && n.titulo.includes('Gracias por tu pago')
+    );
+
+    if (!yaTieneMensajeGracias) {
+      const GRACIAS_PAGO = `Ya lo registramos y tus turnos fijos se renovaron correctamente 🙌\n\nRecordá que, si algún día vas a ausentarte, podés avisarlo directamente desde la app. De esta manera liberamos ese lugar para que otra persona pueda aprovecharlo y facilitamos la organización de recuperaciones para todos.\n\nEntre todos hacemos que KAHA funcione cada vez mejor 🤝💚`;
+      addNovedad({
+        titulo: '💚 ¡Gracias por tu pago!',
+        contenido: GRACIAS_PAGO,
+        categoria: 'INFORMACION',
+        destacado: false,
+        creado_por: 'KAHA GYM',
+        socio_id: cli.id
+      });
+    }
 
     addToast('add', 'Pago registrado exitosamente.');
 
@@ -4077,6 +4214,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       googleUser, signInWithGoogle, signInWithEmailAndPassword, signOutGoogle,
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
+      sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, darDeBajaTurnosFijosSocio, darDeBajaTurnosFijosMultiple, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,

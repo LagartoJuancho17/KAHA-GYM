@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { CalendarDays, Plus, Calendar, X, Clock, CalendarClock, Info, Phone, ExternalLink, Check, User, RefreshCw } from 'lucide-react';
+import { balanceDelMes } from '../../lib/cuposMensuales';
 
 interface SocioReservasProps {
   socio: Cliente;
@@ -87,10 +88,10 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     return dates;
   };
 
-  const totalMonthlySlots = useMemo(() => {
-    if (!planSocio) return 12;
-    return planSocio.dias_por_semana * 4;
-  }, [planSocio]);
+  // Días por semana del plan (o los personalizados si el socio tiene un arreglo aparte).
+  const diasPorSemanaSocio = useMemo(() => {
+    return socio.dias_personalizados ?? (planSocio ? planSocio.dias_por_semana : 3);
+  }, [socio.dias_personalizados, planSocio]);
 
   const fixedDaysCount = useMemo(() => {
     return socio.turnos_fijos.length;
@@ -112,13 +113,22 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     return suspendedClassesThisMonth.filter(s => s.reintegrado && socio.turnos_fijos.includes(s.turno_id)).length;
   }, [suspendedClassesThisMonth, socio.turnos_fijos]);
 
-  const usedSlots = useMemo(() => {
-    return Math.max(0, totalFixedSlotsForMonth - reintegratedSuspensionsCount + activeIndividualReservations.length);
-  }, [totalFixedSlotsForMonth, reintegratedSuspensionsCount, activeIndividualReservations]);
+  // Balance real del mes. Antes esto hacía `dias_por_semana * 4` y `turnos_fijos * 4`,
+  // pero los meses no tienen 4 semanas exactas: septiembre de 2026 tiene 5 miércoles.
+  // Por eso a Yanina Radici (lunes, miércoles y jueves fijos) le mostraba 12 clases
+  // cuando en realidad le tocaban 13, y el panel decía "13 / 12".
+  // El tope es INFORMATIVO: pasarse NO bloquea reservar.
+  const balance = useMemo(() => balanceDelMes({
+    turnosFijos: socio.turnos_fijos || [],
+    diasPorSemana: diasPorSemanaSocio,
+    mes: currentCalendarMonth,
+    suspendidasConCredito: reintegratedSuspensionsCount,
+    individuales: activeIndividualReservations.length
+  }), [socio.turnos_fijos, diasPorSemanaSocio, currentCalendarMonth, reintegratedSuspensionsCount, activeIndividualReservations]);
 
-  const availableSlots = useMemo(() => {
-    return Math.max(0, totalMonthlySlots - usedSlots);
-  }, [totalMonthlySlots, usedSlots]);
+  const totalMonthlySlots = balance.tope;
+  const usedSlots = balance.usados;
+  const availableSlots = balance.libres;
 
   // Unified sessions list (excluding past dates, including next month)
   const sesionesDelMes = useMemo(() => {
@@ -293,11 +303,23 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
             <p className="text-lg font-black text-emerald-700">{usedSlots} / {totalMonthlySlots}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Cupos Libres por Asignar</p>
+            <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">
+              {balance.excedidos > 0 ? 'Clases por encima del plan' : 'Cupos Libres por Asignar'}
+            </p>
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
-              <p className="text-lg font-black text-slate-800">{availableSlots}</p>
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                balance.excedidos > 0 ? 'bg-amber-500' : availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+              }`}></span>
+              <p className={`text-lg font-black ${balance.excedidos > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+                {balance.excedidos > 0 ? `+${balance.excedidos}` : availableSlots}
+              </p>
             </div>
+            {/* El tope es informativo: pasarse no impide reservar, solo se avisa. */}
+            {balance.excedidos > 0 && (
+              <p className="text-[9px] text-amber-600 leading-tight">
+                Podés seguir reservando; se te contabilizan como extra.
+              </p>
+            )}
           </div>
         </div>
 
