@@ -11,8 +11,9 @@ import {
 import { TurnoDetailsModal } from './TurnoDetailsModal';
 import { TurnoRealtimeModal } from './TurnoRealtimeModal';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
+import { SociosPrioritariosModal } from './SociosPrioritariosModal';
 import { SearchableSelect } from '../Common/SearchableSelect';
-import { History } from 'lucide-react';
+import { History, Crown } from 'lucide-react';
 
 export const TurnosGrid: React.FC = () => {
   const { 
@@ -22,6 +23,7 @@ export const TurnosGrid: React.FC = () => {
     suspenderClaseFija, programarRecuperoPendiente
   } = useGym();
 
+  const [showPrioritariosModal, setShowPrioritariosModal] = useState(false);
   const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('TIEMPO_REAL');
   const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(0);
   
@@ -273,6 +275,16 @@ export const TurnosGrid: React.FC = () => {
           >
             <History className="w-3.5 h-3.5 text-lime-400" />
             <span>Historial de Movimientos</span>
+          </button>
+
+          <button
+            onClick={() => setShowPrioritariosModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer border-none"
+            id="btn-socios-prioritarios"
+            title="Socios que entran primero en la lista de espera de un turno"
+          >
+            <Crown className="w-3.5 h-3.5 text-violet-200" />
+            <span>Socios con Prioridad</span>
           </button>
 
           <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 flex-wrap gap-1">
@@ -1054,6 +1066,11 @@ export const TurnosGrid: React.FC = () => {
       <TurnosHistorialModal
         isOpen={showHistorialModal}
         onClose={() => setShowHistorialModal(false)}
+      />
+
+      <SociosPrioritariosModal
+        isOpen={showPrioritariosModal}
+        onClose={() => setShowPrioritariosModal(false)}
       />
     </div>
   );
