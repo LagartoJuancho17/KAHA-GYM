@@ -73,3 +73,43 @@ export function proximoEnEntrar(
 ): WaitlistReserva | null {
   return esperaDelTurno(todas, turnoId, fecha, prioritarios)[0] || null;
 }
+
+// ---------------------------------------------------------------------------
+// Lista de espera SEMANAL (turno.lista_espera_ids).
+// Es otra lista, distinta de la de por fecha: esta define quien entra como FIJO
+// cuando se libera un lugar del turno, y es la que le importa al socio que quiere
+// sumarse al horario todas las semanas.
+//
+// Antes las dos promociones semanales tomaban lista_espera_ids[0], o sea orden de
+// llegada puro, ignorando la prioridad. Un socio marcado como VIP quedaba igual
+// atras: la marca no servia para nada en la lista que mas importa.
+// ---------------------------------------------------------------------------
+
+/**
+ * Ordena la espera semanal de un turno: VIP primero, despues por orden de llegada.
+ * `ids` es turno.lista_espera_ids, que ya viene en orden de llegada.
+ * No muta el array original.
+ */
+export function ordenarEsperaSemanal(
+  ids: string[],
+  turnoId: string,
+  prioritarios: Set<string>
+): string[] {
+  const conIndice = (ids || []).map((id, i) => ({ id, i }));
+  conIndice.sort((a, b) => {
+    const aVip = esPrioritario(a.id, turnoId, prioritarios);
+    const bVip = esPrioritario(b.id, turnoId, prioritarios);
+    if (aVip !== bVip) return aVip ? -1 : 1;
+    return a.i - b.i; // orden de llegada dentro de cada grupo
+  });
+  return conIndice.map(x => x.id);
+}
+
+/** El proximo en entrar como fijo cuando se libera un lugar, o null si no hay nadie. */
+export function proximoFijo(
+  ids: string[],
+  turnoId: string,
+  prioritarios: Set<string>
+): string | null {
+  return ordenarEsperaSemanal(ids, turnoId, prioritarios)[0] || null;
+}

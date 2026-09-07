@@ -2,7 +2,7 @@
 //   npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ordenarListaEspera, esperaDelTurno, proximoEnEntrar, clavePrioridad, esPrioritario } from './listaEspera';
+import { ordenarListaEspera, esperaDelTurno, proximoEnEntrar, clavePrioridad, esPrioritario, ordenarEsperaSemanal, proximoFijo } from './listaEspera';
 import { WaitlistReserva } from '../types';
 
 const w = (id: string, cliente_id: string, creado_at: string, turno_id = 'JUEVES-19:00', fecha = '2026-09-10'): WaitlistReserva =>
@@ -108,4 +108,47 @@ test('esPrioritario y clavePrioridad', () => {
   assert.equal(esPrioritario('juanpa', 'MARTES-10:00', s), false);
   assert.equal(esPrioritario('ana', 'JUEVES-19:00', s), false);
   assert.equal(clavePrioridad('a', 'b'), 'a::b');
+});
+
+// --- espera SEMANAL (la que define quien entra como fijo) -------------------
+
+test('REGRESION: el VIP entra primero en la espera SEMANAL', () => {
+  // Caso real: Juana Otero estaba en la espera semanal de LUNES-09:30 desde el
+  // 02/09. La marcaron VIP el 07/09 y no cambio nada: las dos promociones
+  // semanales tomaban lista_espera_ids[0], orden de llegada puro.
+  const ids = ['ana', 'beto', 'juana'];
+  assert.equal(proximoFijo(ids, 'LUNES-09:30', new Set()), 'ana', 'sin VIP entra el primero');
+  assert.equal(
+    proximoFijo(ids, 'LUNES-09:30', vip(['juana', 'LUNES-09:30'])),
+    'juana',
+    'con VIP entra Juana aunque llego ultima'
+  );
+});
+
+test('la prioridad semanal tambien es POR TURNO', () => {
+  const prioridades = vip(['juana', 'LUNES-09:30']);
+  assert.equal(proximoFijo(['ana', 'juana'], 'MARTES-10:00', prioridades), 'ana',
+    'en otro turno no tiene ventaja');
+});
+
+test('entre dos VIP semanales manda el orden de llegada', () => {
+  const orden = ordenarEsperaSemanal(
+    ['comun', 'vip2', 'vip1'], 'LUNES-09:30',
+    vip(['vip1', 'LUNES-09:30'], ['vip2', 'LUNES-09:30'])
+  );
+  assert.deepEqual(orden, ['vip2', 'vip1', 'comun'], 'vip2 llego antes que vip1');
+});
+
+test('ordenarEsperaSemanal no muta el array original', () => {
+  const ids = ['ana', 'juana'];
+  const copia = [...ids];
+  ordenarEsperaSemanal(ids, 'LUNES-09:30', vip(['juana', 'LUNES-09:30']));
+  assert.deepEqual(ids, copia);
+});
+
+test('espera semanal vacia o nula', () => {
+  assert.deepEqual(ordenarEsperaSemanal([], 'L', new Set()), []);
+  assert.deepEqual(ordenarEsperaSemanal(null, 'L', new Set()), []);
+  assert.equal(proximoFijo([], 'L', new Set()), null);
+  assert.equal(proximoFijo(null, 'L', new Set()), null);
 });

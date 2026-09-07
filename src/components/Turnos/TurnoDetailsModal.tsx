@@ -4,6 +4,7 @@ import { useGym } from '../../GymContext';
 import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle, History, ArrowLeftRight, ChevronUp } from 'lucide-react';
 import { SearchableSelect } from '../Common/SearchableSelect';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
+import { ordenarEsperaSemanal, esPrioritario } from '../../lib/listaEspera';
 
 interface TurnoDetailsModalProps {
   turnoId: string;
@@ -16,7 +17,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   const { 
     turnos, clientes, planes, profesores,
     asignarClienteFijo, removerAsignacionFija, checkInFlexible, updateCliente,
-    modificarPrecioOCupoTurno, asignarProfesorTurno
+    modificarPrecioOCupoTurno, asignarProfesorTurno, sociosPrioritarios
   } = useGym();
 
   const [selectedClientToAssignId, setSelectedClientToAssignId] = useState('');
@@ -515,13 +516,20 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                   <h5 className="font-bold text-[10px] text-zinc-400 uppercase tracking-widest font-sans">Lista de Espera ({selectedTurno.lista_espera_ids.length})</h5>
                 </div>
                 <div className="space-y-1.5">
-                  {selectedTurno.lista_espera_ids.map((cId, idx) => {
+                  {/* Mismo orden que usa la promocion automatica: VIP primero.
+                      Si la pantalla mostrara otro orden, entraria alguien distinto
+                      del que el admin ve arriba de todo. */}
+                  {ordenarEsperaSemanal(selectedTurno.lista_espera_ids, turnoId, sociosPrioritarios).map((cId, idx) => {
                     const cl = clientes.find(c => c.id === cId);
                     if (!cl) return null;
+                    const vip = esPrioritario(cId, turnoId, sociosPrioritarios);
                     return (
-                      <div key={cl.id} className="flex justify-between items-center p-2 bg-amber-50/50 border border-amber-100 rounded-lg">
-                        <span className="font-mono text-[10px] bg-amber-100 text-amber-800 px-1 rounded-sm font-bold">P{idx + 1}</span>
-                        <span className="font-semibold text-zinc-800 flex-1 ml-2">{cl.nombre} {cl.apellido}</span>
+                      <div key={cl.id} className={`flex justify-between items-center p-2 rounded-lg ${vip ? 'bg-violet-50 border border-violet-300' : 'bg-amber-50/50 border border-amber-100'}`}>
+                        <span className={`font-mono text-[10px] px-1 rounded-sm font-bold ${vip ? 'bg-violet-200 text-violet-900' : 'bg-amber-100 text-amber-800'}`}>P{idx + 1}</span>
+                        <span className="font-semibold text-zinc-800 flex-1 ml-2">
+                          {cl.nombre} {cl.apellido}
+                          {vip && <span className="ml-1.5 text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full">PRIORIDAD</span>}
+                        </span>
                         <button
                           onClick={() => {
                             if (window.confirm(`¿Está seguro que desea retirar a ${cl.nombre} ${cl.apellido} de la lista de espera de este turno?`)) {

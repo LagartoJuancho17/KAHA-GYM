@@ -13,7 +13,7 @@ import {
 import { supabase } from './supabaseClient';
 import { mergeLogs, logsFaltantesEnDb, parsearLogsGuardados, normalizarIdsLegacy, nuevoLogId, MAX_LOGS } from './lib/auditLogs';
 import { calcularOcupacion, conflictosAlAgregarFijo, reservasPropiasDuplicadas } from './lib/ocupacion';
-import { clavePrioridad, esperaDelTurno, proximoEnEntrar } from './lib/listaEspera';
+import { clavePrioridad, esperaDelTurno, proximoEnEntrar, ordenarEsperaSemanal } from './lib/listaEspera';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -76,7 +76,7 @@ interface GymContextType {
   updatePrecioPlan: (planId: string, nuevoPrecio: number, userEmail: string) => void;
 
   // Turnos Methods
-  asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>; excedePlan?: boolean; turnosFijosActuales?: string[]; maxDias?: number; clienteNombre?: string };
+  asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>; yaEnEspera?: boolean; puestoEnEspera?: number; totalEnEspera?: number; excedePlan?: boolean; turnosFijosActuales?: string[]; maxDias?: number; clienteNombre?: string };
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
   darDeBajaTurnosFijosSocio: (clienteId: string, motivo?: string, userEmail?: string) => { success: boolean; message: string };
   darDeBajaTurnosFijosMultiple: (clienteIds: string[], motivo?: string, userEmail?: string) => { success: boolean; procesados: number };
@@ -1828,7 +1828,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Mandar a lista de espera automática
       const actualWaitlist = turno.lista_espera_ids.includes(clienteId);
       if (actualWaitlist) {
-        return { success: false, message: 'El turno está lleno y el cliente ya se encuentra en la lista de espera de este slot.' };
+        // Antes esto decia solo "ya esta en la lista" y era un callejon sin salida:
+        // el admin apretaba Asignar, no pasaba nada visible y parecia que se borraba.
+        // Ahora se le dice en que puesto quedo y si la prioridad ya lo puso primero.
+        const ordenada = ordenarEsperaSemanal(turno.lista_espera_ids, turnoId, sociosPrioritarios);
+        const puesto = ordenada.indexOf(clienteId) + 1;
+        const esVip = sociosPrioritarios.has(clavePrioridad(clienteId, turnoId));
+        return {
+          success: false,
+          yaEnEspera: true,
+          puestoEnEspera: puesto,
+          totalEnEspera: ordenada.length,
+          message: esVip
+            ? `${cliente.nombre} ya está en la lista de espera de ${turnoId}, en el puesto ${puesto} de ${ordenada.length}. Tiene prioridad, así que entra apenas se libere un lugar.`
+            : `${cliente.nombre} ya está en la lista de espera de ${turnoId}, en el puesto ${puesto} de ${ordenada.length}. El turno está completo (${turno.asignados_ids.length}/${turno.cupo_maximo}). Para que entre primero, dale prioridad desde "Socios con Prioridad".`
+        };
       }
 
       const updatedTurnos = turnos.map(t => {
@@ -2100,10 +2114,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Promover de forma automática desde la lista de espera SOLO SI se liberó un lugar de un asignado fijo y hay cupo libre!
         if (estabaEnAsignados && nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
-          const promovidoId = nuevaWaitlist[0];
+          // VIP primero, despues orden de llegada. Antes tomaba nuevaWaitlist[0],
+          // asi que marcar a alguien como prioritario no le servia de nada para
+          // entrar al horario fijo, que es la lista que mas le importa al socio.
+          const ordenada = ordenarEsperaSemanal(nuevaWaitlist, t.id, sociosPrioritarios);
+          const promovidoId = ordenada[0];
           waitlistClientLiberado = promovidoId;
           nuevosAsignados.push(promovidoId);
-          nuevaWaitlist = nuevaWaitlist.slice(1);
+          nuevaWaitlist = nuevaWaitlist.filter(id => id !== promovidoId);
         }
 
         return { 
@@ -2408,7 +2426,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Promover automáticamente desde lista de espera hasta cubrir el nuevo cupo
       while (nuevaWaitlist.length > 0 && nuevosAsignados.length < nuevoCupo) {
-        const promovidoId = nuevaWaitlist.shift()!;
+        // Mismo criterio que al liberarse un lugar: VIP primero.
+        const promovidoId = ordenarEsperaSemanal(nuevaWaitlist, t.id, sociosPrioritarios)[0];
+        nuevaWaitlist = nuevaWaitlist.filter(id => id !== promovidoId);
         nuevosAsignados.push(promovidoId);
         promovidos.push(promovidoId);
       }
