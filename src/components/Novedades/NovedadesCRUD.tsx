@@ -42,16 +42,21 @@ export const NovedadesCRUD: React.FC = () => {
   };
 
   // Category counts
+  // Category counts (solo novedades públicas del gimnasio)
+  const novedadesPublicas = useMemo(() => {
+    return novedades.filter(n => !n.socio_id && !n.titulo.includes('Gracias por tu pago'));
+  }, [novedades]);
+
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { TODAS: novedades.length };
-    novedades.forEach(n => {
+    const counts: Record<string, number> = { TODAS: novedadesPublicas.length };
+    novedadesPublicas.forEach(n => {
       counts[n.categoria] = (counts[n.categoria] || 0) + 1;
     });
     return counts;
-  }, [novedades]);
+  }, [novedadesPublicas]);
 
   const filteredNovedades = useMemo(() => {
-    return novedades
+    return novedadesPublicas
       .filter(n => {
         if (filterCategory !== 'TODAS' && n.categoria !== filterCategory) return false;
         if (buscarText.trim()) {

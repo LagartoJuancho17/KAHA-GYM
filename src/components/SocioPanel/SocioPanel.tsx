@@ -100,7 +100,24 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
   }, [isPostDia5Unpaid, socio, currentCalendarMonth]);
 
   const socioNovedades = useMemo(() => {
-    const list = novedades.filter(n => !n.socio_id || n.socio_id === socio?.id);
+    let list = novedades.filter(n => {
+      const esMensajePago = n.titulo.includes('Gracias por tu pago') || n.contenido.includes('tus turnos fijos se renovaron');
+      if (esMensajePago) {
+        return !!socio?.id && n.socio_id === socio.id;
+      }
+      return !n.socio_id || (!!socio?.id && n.socio_id === socio.id);
+    });
+
+    let yaVioMensajeGracias = false;
+    list = list.filter(n => {
+      const esMensajePago = n.titulo.includes('Gracias por tu pago') || n.contenido.includes('tus turnos fijos se renovaron');
+      if (esMensajePago) {
+        if (yaVioMensajeGracias) return false;
+        yaVioMensajeGracias = true;
+      }
+      return true;
+    });
+
     if (recordatorioNovedad && !list.some(n => n.id === recordatorioNovedad.id)) {
       return [recordatorioNovedad, ...list];
     }

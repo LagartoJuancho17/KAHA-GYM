@@ -52,7 +52,7 @@ export function generarTurnosIniciales(): Turno[] {
       { hora: '10:30', cupo: esDiasLMW ? 7 : 5 },
       ...(dia === 'MARTES' ? [{ hora: '11:00', cupo: 3 }] : []),
       { hora: '11:30', cupo: 5 },
-      { hora: '12:00', cupo: esDiasLMW ? 3 : 7 },
+      ...(dia !== 'MIERCOLES' ? [{ hora: '12:00', cupo: esDiasLMW ? 3 : 7 }] : []),
       { hora: '16:00', cupo: 7 },
       { hora: '17:00', cupo: 7 },
       { hora: '18:00', cupo: 7 },

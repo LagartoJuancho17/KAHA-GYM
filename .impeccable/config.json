@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/components/SocioPanel/SocioReservas.tsx"
+        ],
+        "createdAt": "2026-09-02T17:28:35.132Z",
+        "reason": "Claude: los botones Suspender/Cancelar usan text-slate-400 con hover:text-rose-600 y hover:bg-rose-50 en la misma clase; el gris solo aplica sobre fondo transparente y en hover el texto cambia a rose-600 junto con el fondo, asi que nunca hay gris sobre color"
+      }
+    ]
+  }
+}

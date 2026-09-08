@@ -57,7 +57,27 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
   // ── Filtrar novedades para este socio ────────────────────────────────────
   // Mostrar: novedades globales (sin socio_id) + novedades privadas de este socio + recordatorio de pago si aplica
   const novedadesFiltradas = useMemo(() => {
-    const list = novedades.filter(n => !n.socio_id || n.socio_id === selectedSocioId);
+    // 1. Filtrado estricto: los mensajes de pago ("Gracias por tu pago") NUNCA son globales.
+    // Solo se muestran si tienen socio_id y coincide exactamente con selectedSocioId.
+    let list = novedades.filter(n => {
+      const esMensajePago = n.titulo.includes('Gracias por tu pago') || n.contenido.includes('tus turnos fijos se renovaron');
+      if (esMensajePago) {
+        return !!selectedSocioId && n.socio_id === selectedSocioId;
+      }
+      return !n.socio_id || (!!selectedSocioId && n.socio_id === selectedSocioId);
+    });
+
+    // 2. Deduplicar: Si el socio ya tiene un mensaje de agradecimiento, mostrar como máximo 1 (el más reciente)
+    let yaVioMensajeGracias = false;
+    list = list.filter(n => {
+      const esMensajePago = n.titulo.includes('Gracias por tu pago') || n.contenido.includes('tus turnos fijos se renovaron');
+      if (esMensajePago) {
+        if (yaVioMensajeGracias) return false;
+        yaVioMensajeGracias = true;
+      }
+      return true;
+    });
+
     if (recordatorioNovedad && !list.some(n => n.id === recordatorioNovedad.id)) {
       return [recordatorioNovedad, ...list];
     }

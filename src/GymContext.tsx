@@ -98,6 +98,18 @@ interface GymContextType {
 
   // Pagos Methods
   registrarPago: (pago: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => { success: boolean; message: string };
+  registrarPagosMultiples: (
+    pagosList: Array<{
+      cliente_id: string;
+      monto: number;
+      medio_pago: MedioPago;
+      mes_correspondiente: string;
+      hash_transaccion?: string;
+      destino_transferencia?: 'JUANCHI' | 'RULO' | 'EFECTIVO';
+      registrado_por?: string;
+    }>,
+    userEmail: string
+  ) => { success: boolean; message: string; generatedPagos: Pago[] };
   actualizarPago: (pagoId: string, updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia'>>, userEmail?: string) => { success: boolean; message: string };
   actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
   eliminarPago: (pagoId: string) => void;
@@ -3299,13 +3311,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cli = clientes.find(c => c.id === pagoData.cliente_id);
     if (!cli) return { success: false, message: 'Cliente no encontrado.' };
 
-    const cleanHash = pagoData.hash_transaccion?.trim() || `TXN-${Date.now()}`;
+    let cleanHash = pagoData.hash_transaccion?.trim() || `TXN-${Date.now()}`;
     
-    // Prevención de duplicados por hash
+    // Prevención de duplicados por hash:
+    // Solo bloqueamos si es exactamente el MISMO cliente, para el MISMO mes y con el MISMO hash
     if (pagoData.hash_transaccion) {
-      const duplicado = pagos.some(p => p.hash_transaccion === pagoData.hash_transaccion);
-      if (duplicado) {
-        return { success: false, message: 'Este pago ya se encuentra registrado (Detección de hash duplicado).' };
+      const cleanInputHash = pagoData.hash_transaccion.trim();
+      const duplicadoMismoClienteYMes = pagos.some(
+        p => (p.hash_transaccion === cleanInputHash || p.hash_transaccion?.startsWith(`${cleanInputHash}#`)) &&
+             p.cliente_id === pagoData.cliente_id &&
+             p.mes_correspondiente === pagoData.mes_correspondiente
+      );
+      if (duplicadoMismoClienteYMes) {
+        return { success: false, message: 'Este pago ya se encuentra registrado para este socio y mes (Detección de duplicado).' };
       }
     }
 
@@ -3313,6 +3331,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const pagoId = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : `pay-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    // Si el hash ya existe en otro pago (ej: 1 transferencia bancaria que cubre múltiples cuotas o personas),
+    // agregamos un sufijo único para no violar la restricción UNIQUE de la columna hash_transaccion en Supabase.
+    if (pagos.some(p => p.hash_transaccion === cleanHash)) {
+      cleanHash = `${cleanHash}#${pagoId.slice(0, 6)}`;
+    }
 
     const now = new Date().toISOString();
 
@@ -3431,6 +3455,179 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('add', 'Pago registrado exitosamente.');
 
     return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
+  };
+
+  // CLIENT PAGOS OPERATIONS - MULTIPLES (Lote / Batch / Cuotas múltiples)
+  const registrarPagosMultiples = (
+    pagosList: Array<{
+      cliente_id: string;
+      monto: number;
+      medio_pago: MedioPago;
+      mes_correspondiente: string;
+      hash_transaccion?: string;
+      destino_transferencia?: 'JUANCHI' | 'RULO' | 'EFECTIVO';
+      registrado_por?: string;
+    }>,
+    userEmail: string = 'operator@gimnasio.com.ar'
+  ): { success: boolean; message: string; generatedPagos: Pago[] } => {
+    if (!pagosList || pagosList.length === 0) {
+      return { success: false, message: 'No hay pagos para registrar.', generatedPagos: [] };
+    }
+
+    // Validación preliminar de todos los ítems
+    for (const p of pagosList) {
+      const cli = clientes.find(c => c.id === p.cliente_id);
+      if (!cli) {
+        return { success: false, message: `Socio no encontrado para uno de los cobros.`, generatedPagos: [] };
+      }
+      if (isNaN(p.monto) || p.monto <= 0) {
+        return { success: false, message: `El monto para ${cli.nombre} ${cli.apellido} debe ser mayor a 0 pesos.`, generatedPagos: [] };
+      }
+      if (!p.mes_correspondiente) {
+        return { success: false, message: `Falta mes correspondiente para ${cli.nombre} ${cli.apellido}.`, generatedPagos: [] };
+      }
+    }
+
+    const now = new Date().toISOString();
+    const nuevosPagos: Pago[] = [];
+    const baseHash = (pagosList[0]?.hash_transaccion?.trim()) || `MP-${Date.now()}`;
+
+    // Copia de trabajo para acumular secuencialmente las reducciones de deuda y últimos meses
+    let currentClientes = [...clientes];
+
+    pagosList.forEach((pagoItem, idx) => {
+      const pagoId = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `pay-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 9)}`;
+
+      // Asignar hash único a cada registro para evitar colisión de la restricción UNIQUE de Supabase
+      let itemHash = pagosList.length > 1
+        ? `${baseHash}#${idx + 1}`
+        : baseHash;
+
+      // Si colisiona con algún pago preexistente en la base
+      if (pagos.some(p => p.hash_transaccion === itemHash)) {
+        itemHash = `${itemHash}_${pagoId.slice(0, 4)}`;
+      }
+
+      const cli = currentClientes.find(c => c.id === pagoItem.cliente_id);
+
+      const nuevoPago: Pago = {
+        id: pagoId,
+        cliente_id: pagoItem.cliente_id,
+        cliente_nombre_completo: cli ? `${cli.nombre} ${cli.apellido}` : '',
+        monto: pagoItem.monto,
+        medio_pago: pagoItem.medio_pago,
+        mes_correspondiente: pagoItem.mes_correspondiente,
+        hash_transaccion: itemHash,
+        destino_transferencia: pagoItem.destino_transferencia || 'RULO',
+        registrado_por: userEmail,
+        fecha_pago: now,
+        creado_at: now
+      };
+
+      nuevosPagos.push(nuevoPago);
+
+      // Reducción acumulativa de la deuda del cliente
+      currentClientes = currentClientes.map(c => {
+        if (c.id === pagoItem.cliente_id) {
+          const nuevaDeuda = Math.max(0, c.deuda_acumulada - pagoItem.monto);
+          let ultimoMes = c.ultimo_mes_pagado;
+          if (!ultimoMes || pagoItem.mes_correspondiente > ultimoMes) {
+            ultimoMes = pagoItem.mes_correspondiente;
+          }
+          let nuevoEstado = c.estado;
+          if (nuevaDeuda === 0) {
+            nuevoEstado = 'ACTIVO';
+          } else if (nuevoEstado === 'MOROSO' && nuevaDeuda > 0) {
+            nuevoEstado = 'CON_DEUDA';
+          }
+          return {
+            ...c,
+            deuda_acumulada: nuevaDeuda,
+            ultimo_mes_pagado: ultimoMes,
+            estado: nuevoEstado as EstadoCliente
+          };
+        }
+        return c;
+      });
+    });
+
+    const updatedPagos = [...nuevosPagos, ...pagos];
+
+    // Guardado atómico en React State y localStorage
+    saveState(currentClientes, planes, historialPrecios, turnos, updatedPagos, recuperos, auditLogs);
+
+    // Sincronización con Supabase en lote
+    if (supabase) {
+      const payloads = nuevosPagos.map(np => ({
+        id: np.id,
+        cliente_id: np.cliente_id,
+        monto: np.monto,
+        medio_pago: np.medio_pago,
+        mes_correspondiente: np.mes_correspondiente,
+        hash_transaccion: np.hash_transaccion,
+        destino_transferencia: np.destino_transferencia || null,
+        fecha_pago: np.fecha_pago,
+        creado_at: np.creado_at
+      }));
+
+      supabase.from('pagos').insert(payloads).then(({ error }) => {
+        if (error) {
+          console.error('[Supabase] Error al registrar pagos múltiples:', error.message, error.details);
+          // Si destino_transferencia no existe en schema, reintentar sin ella
+          if (error.code === '42703' || error.message?.includes('destino_transferencia')) {
+            const safePayloads = payloads.map(p => {
+              const cp = { ...p };
+              delete (cp as any).destino_transferencia;
+              return cp;
+            });
+            supabase.from('pagos').insert(safePayloads);
+          }
+        } else {
+          console.log(`[Supabase] ${nuevosPagos.length} pagos insertados exitosamente.`);
+        }
+      });
+
+      // Actualizar en Supabase los clientes afectados
+      const uniqueClientIds = Array.from(new Set(pagosList.map(p => p.cliente_id)));
+      uniqueClientIds.forEach(cId => {
+        const clientActualizado = currentClientes.find(c => c.id === cId);
+        if (clientActualizado) {
+          supabase.from('clientes').update({
+            deuda_acumulada: clientActualizado.deuda_acumulada,
+            ultimo_mes_pagado: clientActualizado.ultimo_mes_pagado,
+            estado: clientActualizado.estado
+          }).eq('id', cId).then(({ error }) => {
+            if (error) console.error('[Supabase] Error al actualizar cliente tras pago múltiple:', error.message);
+          });
+        }
+      });
+    }
+
+    // Auditoría y notificaciones
+    const montoTotal = nuevosPagos.reduce((acc, p) => acc + p.monto, 0);
+    addAuditLog('PAGO_REGISTRADO', {
+      tipo: 'PAGO_MULTIPLE',
+      cantidad: nuevosPagos.length,
+      monto_total: montoTotal,
+      medio: pagosList[0]?.medio_pago,
+      registrado_por: userEmail
+    }, userEmail);
+
+    addNotificacion(
+      'PAGO_REALIZADO',
+      'Cobros Registrados 💰',
+      `Se registraron exitosamente ${nuevosPagos.length} pagos por un total de $${montoTotal.toLocaleString('es-AR')} ARS.`
+    );
+
+    addToast('add', `${nuevosPagos.length} pagos registrados exitosamente.`);
+
+    return {
+      success: true,
+      message: `${nuevosPagos.length} pagos registrados exitosamente.`,
+      generatedPagos: nuevosPagos
+    };
   };
 
   // ACTUALIZAR PAGO EXISTENTE (MONTO, CLIENTE, MES, MEDIO, DESTINO, ETC)
@@ -4299,7 +4496,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarClienteFijo, removerAsignacionFija, darDeBajaTurnosFijosSocio, darDeBajaTurnosFijosMultiple, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
-      registrarPago, actualizarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
+      registrarPago, registrarPagosMultiples, actualizarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
       pagosEnRevision,
       solicitarPagoTransferencia,
       aprobarPagoTransferencia,

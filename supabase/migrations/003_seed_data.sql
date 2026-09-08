@@ -55,7 +55,6 @@ INSERT INTO turnos (dia, hora, cupo_maximo) VALUES
 ('MIERCOLES', '09:30:00', 7),
 ('MIERCOLES', '10:30:00', 5),
 ('MIERCOLES', '11:00:00', 3),
-('MIERCOLES', '12:00:00', 7),
 ('MIERCOLES', '16:00:00', 7),
 ('MIERCOLES', '17:00:00', 7),
 ('MIERCOLES', '18:00:00', 7),
