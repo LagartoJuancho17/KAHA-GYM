@@ -200,6 +200,55 @@ test('conflictosAlAgregarFijo cuenta también los recuperos', () => {
   assert.equal(conflictos[0].ocupacionConElFijo, 2);
 });
 
+test('conflictosAlAgregarFijo detecta fechas ocupadas solo por un recupero COMPLETADO', () => {
+  // Antes esto solo miraba estado PENDIENTE para generar la fecha candidata.
+  // Un recupero COMPLETADO (ya hizo check-in) sigue ocupando el lugar, y
+  // calcularOcupacion ya lo contaba: el gate tenía que verlo también.
+  const t = turno({ cupo_maximo: 1, asignados_ids: [] });
+  const recs = [recupero('MIERCOLES-19:00', '2026-08-26', 'COMPLETADO')];
+  const conflictos = conflictosAlAgregarFijo(t, [], recs, '2026-08-20');
+  assert.equal(conflictos.length, 1);
+  assert.equal(conflictos[0].ocupacionConElFijo, 2);
+});
+
+test('conflictosAlAgregarFijo ignora recuperos EXPIRADO al generar candidatas', () => {
+  const t = turno({ cupo_maximo: 1, asignados_ids: [] });
+  const recs = [recupero('MIERCOLES-19:00', '2026-08-26', 'EXPIRADO')];
+  assert.deepEqual(conflictosAlAgregarFijo(t, [], recs, '2026-08-20'), []);
+});
+
+test('REGRESION: la propia reserva del candidato no genera un falso conflicto', () => {
+  // Caso real: Juana Otero tenía una reserva suelta de HOY en LUNES-09:30 (cupo 7,
+  // ya con 7 fijos). Al evaluar si podía hacerse fija, esa fecha se colaba como
+  // "candidata" solo porque ELLA la había reservado, y el gate reportaba un
+  // "conflicto por reservas de otros socios" que en realidad no involucraba a
+  // nadie más: los fijos solos ya llenaban el cupo. Eso ya lo cubre el chequeo
+  // de cupo semanal aparte; este gate no debe disparar por la reserva propia.
+  const t = turno({ id: 'LUNES-09:30', cupo_maximo: 7, asignados_ids: ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'] });
+  const cs = [
+    ...['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7'].map(id => socio(id)),
+    socio('juana', { reservas_individuales: [reserva('LUNES-09:30', '2026-08-20')] as any })
+  ];
+  assert.deepEqual(
+    conflictosAlAgregarFijo(t, cs, [], '2026-08-20', 'juana'),
+    [],
+    'la reserva de HOY es de la propia candidata: no debe generar conflicto'
+  );
+});
+
+test('la reserva de otro socio en la MISMA fecha que la del candidato sigue siendo un conflicto real', () => {
+  const t = turno({ id: 'LUNES-09:30', cupo_maximo: 7, asignados_ids: ['f1', 'f2', 'f3', 'f4', 'f5', 'f6'] });
+  const cs = [
+    ...['f1', 'f2', 'f3', 'f4', 'f5', 'f6'].map(id => socio(id)),
+    socio('juana', { reservas_individuales: [reserva('LUNES-09:30', '2026-08-20')] as any }),
+    socio('otro', { reservas_individuales: [reserva('LUNES-09:30', '2026-08-20')] as any })
+  ];
+  // 6 fijos + reserva de "otro" (la de juana se descuenta) = 7, +1 fija = 8 > 7.
+  const conflictos = conflictosAlAgregarFijo(t, cs, [], '2026-08-20', 'juana');
+  assert.equal(conflictos.length, 1);
+  assert.equal(conflictos[0].ocupacionConElFijo, 8);
+});
+
 // --- bajar el cupo ----------------------------------------------------------
 
 test('bajar el cupo por debajo de los fijos se detecta', () => {

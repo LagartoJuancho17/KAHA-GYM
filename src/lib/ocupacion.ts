@@ -121,16 +121,28 @@ export function conflictosAlAgregarFijo(
   desde: string,
   clienteId?: string
 ): ConflictoFecha[] {
-  // Fechas candidatas: las que tienen alguna reserva o recupero en este turno.
+  // Fechas candidatas: las que tienen alguna reserva o recupero de OTRO socio en
+  // este turno. Las reservas del propio candidato NO cuentan para generar una
+  // fecha candidata (se limpian al asignarlo, ver reservasPropiasDuplicadas): si
+  // se las dejaba entrar acá, un socio con una reserva suelta de HOY disparaba un
+  // "conflicto" falso atribuido a "reservas de otros socios" cuando el motivo real
+  // era, como mucho, que los fijos solos ya llenaban el cupo (que ya cubre el
+  // chequeo de cupo semanal más abajo, sin necesidad de este gate).
   const fechas = new Set<string>();
   for (const c of clientes) {
-    if (c.activo === false) continue;
+    if (c.activo === false || c.id === clienteId) continue;
     for (const r of c.reservas_individuales || []) {
       if (r.turno_id === turno.id && r.fecha >= desde) fechas.add(r.fecha);
     }
   }
+  // PENDIENTE y COMPLETADO ocupan lugar (ver calcularOcupacion/contarRecuperos):
+  // un recupero ya completado (check-in hecho) sigue ocupando la fecha tanto como
+  // uno pendiente. Antes acá solo se miraba PENDIENTE, así que una fecha ocupada
+  // nada más que por un recupero COMPLETADO no se detectaba como candidata y el
+  // gate no la evaluaba nunca, aunque calcularOcupacion sí la contaría de más.
   for (const r of recuperos || []) {
-    if (r.estado === 'PENDIENTE' && r.turno_recupero_id === turno.id && r.fecha_recupero >= desde) {
+    if ((r.estado === 'PENDIENTE' || r.estado === 'COMPLETADO') &&
+        r.turno_recupero_id === turno.id && r.fecha_recupero >= desde) {
       fechas.add(r.fecha_recupero);
     }
   }

@@ -14,6 +14,7 @@ import { supabase } from './supabaseClient';
 import { mergeLogs, logsFaltantesEnDb, parsearLogsGuardados, normalizarIdsLegacy, nuevoLogId, MAX_LOGS } from './lib/auditLogs';
 import { calcularOcupacion, conflictosAlAgregarFijo, reservasPropiasDuplicadas } from './lib/ocupacion';
 import { clavePrioridad, esperaDelTurno, proximoEnEntrar, ordenarEsperaSemanal } from './lib/listaEspera';
+import { hoyArgentina } from './lib/fechas';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -350,7 +351,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data: asignacionesDb, error: asigErr } = await supabase.from('asignaciones_turnos').select('*');
       if (asigErr) throw asigErr;
 
-      const { data: waitlistDb, error: waitErr } = await supabase.from('lista_espera_turnos').select('*');
+      // order() explícito: sin esto Postgres no garantiza ningún orden en el
+      // select, así que "orden de llegada" (el desempate de ordenarEsperaSemanal
+      // para los no-VIP) quedaba a la suerte del plan de ejecución y podía
+      // cambiar entre una carga y la siguiente.
+      const { data: waitlistDb, error: waitErr } = await supabase
+        .from('lista_espera_turnos')
+        .select('*')
+        .order('creado_at', { ascending: true });
       if (waitErr) throw waitErr;
 
       // Lista de espera POR FECHA (dia puntual). Antes vivia solo en localStorage,
@@ -1365,8 +1373,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     addAuditLog('CLIENTE_CREADO', { id: newClient.id, nombre: `${newClient.nombre} ${newClient.apellido}`, tipo: newClient.tipo, turnos: actuallyAssignedTurnosFijos, lista_espera: waitlistTurnosFijos });
+    // Un log propio por cada turno en espera semanal. Antes esto sólo quedaba
+    // adentro de los `detalles` de CLIENTE_CREADO: el único emisor de
+    // TURNO_LISTA_ESPERA_AGREGADO en todo el código era asignarClienteFijo, así
+    // que un socio que entraba lleno YA en el alta no dejaba ese rastro y el
+    // historial de turnos (que filtra por acción, no por texto libre) no mostraba
+    // nada — parecía que nunca había pasado nada con ese turno.
+    waitlistTurnosFijos.forEach(tId => {
+      addAuditLog('TURNO_LISTA_ESPERA_AGREGADO', { cliente: `${newClient.nombre} ${newClient.apellido}`, turno: tId });
+    });
     if (waitlistTurnosFijos.length > 0) {
-      addToast('add', `Socio registrado. Se agregó a lista de espera en ${waitlistTurnosFijos.length} turno(s) completo(s).`);
+      addToast('add', `Socio registrado. Quedó en lista de espera en: ${waitlistTurnosFijos.join(', ')}.`);
     } else {
       addToast('add', 'Socio registrado exitosamente.');
     }
@@ -1476,7 +1493,20 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
+    // Espera por fecha y prioridad VIP: se limpian también, sino quedan filas
+    // huérfanas apuntando a un socio inactivo. La de espera por fecha además
+    // podía disparar la recursión de procesarPromocionListaEspera si alguien
+    // quedaba de baja mientras esperaba un cupo puntual.
+    const updatedWaitlistReservas = waitlistReservas.filter(w => w.cliente_id !== id);
+    const clavePrefijo = `${id}::`;
+    const updatedSociosPrioritarios = new Set(
+      Array.from(sociosPrioritarios).filter(clave => !clave.startsWith(clavePrefijo))
+    );
+
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+    setWaitlistReservas(updatedWaitlistReservas);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updatedWaitlistReservas));
+    setSociosPrioritarios(updatedSociosPrioritarios);
 
     if (supabase) {
       supabase.from('clientes').update({ activo: false, estado: 'INACTIVO' }).eq('id', id).then(({ error }) => {
@@ -1487,6 +1517,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       supabase.from('lista_espera_turnos').delete().eq('cliente_id', id).then(({ error }) => {
         if (error) console.error("Error al remover lista de espera en Supabase:", error);
+      });
+      supabase.from('lista_espera_reservas').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error("Error al remover espera por fecha en Supabase:", error);
+      });
+      supabase.from('socios_prioritarios').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error("Error al remover prioridad VIP en Supabase:", error);
       });
     }
 
@@ -1650,7 +1686,20 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
+    // En la base, socios_prioritarios y lista_espera_reservas tienen
+    // ON DELETE CASCADE por cliente_id: al borrar la fila de clientes se limpian
+    // solas. El estado LOCAL no tiene ese cascade, así que se limpia a mano para
+    // no dejar al socio eliminado colgado en memoria hasta el próximo reload.
+    const updatedWaitlistReservas = waitlistReservas.filter(w => w.cliente_id !== id);
+    const clavePrefijo = `${id}::`;
+    const updatedSociosPrioritarios = new Set(
+      Array.from(sociosPrioritarios).filter(clave => !clave.startsWith(clavePrefijo))
+    );
+
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+    setWaitlistReservas(updatedWaitlistReservas);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updatedWaitlistReservas));
+    setSociosPrioritarios(updatedSociosPrioritarios);
 
     if (supabase) {
       supabase.from('clientes').delete().eq('id', id).then(({ error }) => {
@@ -1820,7 +1869,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // hay que mirar cada fecha futura de este turno que ya tenga reservas puntuales o
     // recuperos. Antes esto sólo miraba `asignados_ids.length` y era ciego a las fechas,
     // por eso la matriz fija se veía prolija (7 de 7) y la turnera del día mostraba 8.
-    const hoyStr = new Date().toISOString().slice(0, 10);
+    // hoyArgentina, no toISOString(): esta última siempre da la fecha en UTC, y
+    // entre las 21:00 y las 23:59 hora Argentina ya devuelve la de MAÑANA. Con eso,
+    // una reserva de HOY quedaba fuera del ">= desde" y no se limpiaba como
+    // duplicada, y el gate de conflictos miraba el día equivocado.
+    const hoyStr = hoyArgentina();
     const conflictos = conflictosAlAgregarFijo(turno, clientes, recuperos, hoyStr, clienteId);
     if (conflictos.length > 0 && !opciones?.forzar) {
       const detalle = conflictos
@@ -1867,12 +1920,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveState(clientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
 
       if (supabase) {
-        const turnoUuid = getUuidFromTurnoId(turnoId);
-        supabase.from('lista_espera_turnos').insert({
-          cliente_id: clienteId,
-          turno_id: turnoUuid
-        }).then(({ error }) => {
-          if (error) console.error("Error al agregar a lista de espera en Supabase:", error);
+        // resolveTurnoUuid (async, con fallback por dia/hora si falta db_uuid en el
+        // state), no getUuidFromTurnoId (sincrónico): éste devolvía '' cuando el
+        // turno local no traía db_uuid, y ese '' se mandaba como turno_id — insert
+        // rechazado por Postgres, solo un console.error, sin aviso ni reintento.
+        // El state local igual decía "en espera", así que al recargar (la lista
+        // sale sólo de la base) el socio desaparecía sin ningún rastro del error.
+        resolveTurnoUuid(turnoId).then((turnoUuid) => {
+          if (!turnoUuid) {
+            console.warn(`No se pudo resolver el UUID del turno ${turnoId}; espera no persistida en Supabase.`);
+            addToast('error', 'Se anotó localmente, pero no se pudo guardar la lista de espera en la base. Reintentá desde "Gestionar Turnos".');
+            return;
+          }
+          supabase.from('lista_espera_turnos').insert({
+            cliente_id: clienteId,
+            turno_id: turnoUuid
+          }).then(({ error }) => {
+            if (error) console.error("Error al agregar a lista de espera en Supabase:", error);
+          });
         });
       }
 
@@ -2779,22 +2844,49 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const procesarPromocionListaEspera = (turnoId: string, fecha: string, currentClientes: Cliente[]): Cliente[] => {
-    // Orden: los socios PRIORITARIOS (VIP) de este turno entran primero; dentro de
-    // cada grupo manda el orden de llegada. Antes era FIFO puro.
-    const waitingList = esperaDelTurno(waitlistReservas, turnoId, fecha, sociosPrioritarios);
+    // ITERATIVO con una copia LOCAL de la espera, no recursivo sobre el closure de
+    // `waitlistReservas`. Antes, cuando el primero de la cola era invalido (socio
+    // dado de baja mientras esperaba), el codigo hacia
+    // `setWaitlistReservas(filtrado)` y se LLAMABA A SI MISMO — pero `setState` no
+    // actualiza la variable del closure de forma sincronica, asi que la llamada
+    // recursiva volvia a leer el MISMO `waitlistReservas` de siempre, encontraba
+    // la MISMA entrada invalida, y recursaba de nuevo: recursion infinita real
+    // (stack overflow) cada vez que un candidato de la espera estuviera inactivo.
+    // La baja de un socio (bajaLogicaCliente) ahora limpia sus filas de espera,
+    // pero igual conviene que esta funcion no dependa de eso para no crashear.
+    let esperaLocal = waitlistReservas;
+    const entradasAEliminar: typeof waitlistReservas = [];
 
-    if (waitingList.length === 0) return currentClientes;
+    let candidateClient: Cliente | undefined;
+    let nextWaitlistEntry: (typeof waitlistReservas)[number] | undefined;
 
-    const nextWaitlistEntry = waitingList[0];
-    const candidateClient = currentClientes.find(c => c.id === nextWaitlistEntry.cliente_id && c.activo);
-    if (!candidateClient) {
-      // Clean up invalid waitlist entry and try again
-      const newWl = waitlistReservas.filter(w => w.id !== nextWaitlistEntry.id);
-      setWaitlistReservas(newWl);
-      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
-      persistirEsperaEnSupabase('baja', nextWaitlistEntry.cliente_id, turnoId, fecha);
-      return procesarPromocionListaEspera(turnoId, fecha, currentClientes);
+    while (true) {
+      const waitingList = esperaDelTurno(esperaLocal, turnoId, fecha, sociosPrioritarios);
+      if (waitingList.length === 0) {
+        candidateClient = undefined;
+        break;
+      }
+      const candidato = waitingList[0];
+      const cliente = currentClientes.find(c => c.id === candidato.cliente_id && c.activo);
+      if (cliente) {
+        candidateClient = cliente;
+        nextWaitlistEntry = candidato;
+        break;
+      }
+      // Entrada invalida (socio inactivo): se saca de la copia LOCAL y se sigue
+      // el loop sobre esa copia, nunca sobre el closure viejo.
+      entradasAEliminar.push(candidato);
+      esperaLocal = esperaLocal.filter(w => w.id !== candidato.id);
     }
+
+    // Persistir de una sola vez las entradas invalidas que se fueron descartando.
+    if (entradasAEliminar.length > 0) {
+      setWaitlistReservas(esperaLocal);
+      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(esperaLocal));
+      entradasAEliminar.forEach(e => persistirEsperaEnSupabase('baja', e.cliente_id, turnoId, fecha));
+    }
+
+    if (!candidateClient || !nextWaitlistEntry) return currentClientes;
 
     // Auto-promote candidate
     const nuevaReservaAuto: ReservaIndividual = {
@@ -2830,8 +2922,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // Remove from waitlist (local + Supabase: ya entro a la clase, no espera mas)
-    const newWl = waitlistReservas.filter(w => w.id !== nextWaitlistEntry.id);
+    // Remove from waitlist (local + Supabase: ya entro a la clase, no espera mas).
+    // Filtra sobre `esperaLocal` (ya sin las entradas invalidas descartadas arriba
+    // en este mismo llamado), no sobre el `waitlistReservas` del closure: ese
+    // sigue siendo la foto vieja hasta el proximo render, y filtrar desde ahi
+    // resucitaria las entradas invalidas que recien se habian sacado.
+    const newWl = esperaLocal.filter(w => w.id !== nextWaitlistEntry!.id);
     setWaitlistReservas(newWl);
     localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
     persistirEsperaEnSupabase('baja', nextWaitlistEntry.cliente_id, turnoId, fecha);

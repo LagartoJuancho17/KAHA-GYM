@@ -137,13 +137,21 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
     if (!conflictoPlan) return;
     // 1. Actualizar dias_personalizados del socio
     updateCliente(conflictoPlan.clienteId, { dias_personalizados: conflictoPlan.nuevoMaxDias });
-    // 2. Asignar el turno (ya no va a exceder el límite)
+    // 2. Asignar el turno (ya no va a exceder el límite de días)
     const res = asignarClienteFijo(conflictoPlan.clienteId, turnoId, {});
     setConflictoPlan(null);
-    if (res.success) {
+    // res.success también es true cuando el turno está lleno y el socio fue a la
+    // ESPERA (putInWaitlist). Antes esto se festejaba igual como "asignado" —
+    // el plan ya había quedado ampliado de forma permanente en el paso 1, pero
+    // el turno no se asignó y el mensaje verde decía lo contrario.
+    if (res.success && !res.putInWaitlist) {
       setCellActionSuccess(`Plan ampliado a ${conflictoPlan.nuevoMaxDias} días y turno asignado exitosamente.`);
       setSelectedClientToAssignId('');
       setTimeout(() => setCellActionSuccess(''), 3000);
+    } else if (res.success && res.putInWaitlist) {
+      setCellActionWaitlist(`Plan ampliado a ${conflictoPlan.nuevoMaxDias} días. ${res.message}`);
+      setSelectedClientToAssignId('');
+      setTimeout(() => setCellActionWaitlist(''), 6000);
     } else {
       setCellActionError(res.message);
     }
@@ -155,10 +163,19 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
     const res = asignarClienteFijo(conflictoPlan.clienteId, turnoId, { reemplazarTurnoId });
     setConflictoPlan(null);
     setReemplazarTurnoId('');
-    if (res.success) {
+    // Si el turno destino está lleno, asignarClienteFijo NUNCA llega a ejecutar el
+    // swap (esa lógica vive en la rama de asignación exitosa): el turno viejo
+    // queda intacto y el socio va a la espera del nuevo. res.success sigue dando
+    // true en ese caso (putInWaitlist), así que hay que distinguirlo para no decir
+    // "reemplazado" cuando en realidad nada cambió de lugar.
+    if (res.success && !res.putInWaitlist) {
       setCellActionSuccess(`Turno reemplazado y ${turnoId} asignado exitosamente.`);
       setSelectedClientToAssignId('');
       setTimeout(() => setCellActionSuccess(''), 3000);
+    } else if (res.success && res.putInWaitlist) {
+      setCellActionWaitlist(`El turno viejo NO se quitó: ${turnoId} está completo. ${res.message}`);
+      setSelectedClientToAssignId('');
+      setTimeout(() => setCellActionWaitlist(''), 6000);
     } else {
       setCellActionError(res.message);
     }
