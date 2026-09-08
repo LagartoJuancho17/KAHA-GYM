@@ -4,6 +4,7 @@ import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { CalendarDays, Plus, Calendar, X, Clock, CalendarClock, Info, Phone, ExternalLink, Check, User, RefreshCw } from 'lucide-react';
 import { balanceDelMes } from '../../lib/cuposMensuales';
+import { hoyArgentina } from '../../lib/fechas';
 
 interface SocioReservasProps {
   socio: Cliente;
@@ -147,7 +148,11 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     }
 
     let list: SesionInfo[] = [];
-    const hoyStr = new Date().toISOString().slice(0, 10);
+    // hoyArgentina, no toISOString(): esa siempre da la fecha en UTC, y entre las
+    // 21:00 y las 23:59 hora Argentina ya da la de mañana. Con eso, la clase de
+    // HOY (mas tarde) se trataba como "pasada" y desaparecia de esta lista antes
+    // de que el socio llegara a ir.
+    const hoyStr = hoyArgentina();
 
     const processMonthFixed = (monthStr: string) => {
       socio.turnos_fijos.forEach(tfId => {
