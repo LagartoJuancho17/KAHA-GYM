@@ -152,3 +152,46 @@ test('espera semanal vacia o nula', () => {
   assert.equal(proximoFijo([], 'L', new Set()), null);
   assert.equal(proximoFijo(null, 'L', new Set()), null);
 });
+
+// --- prioridad en TODAS las semanas del turno -------------------------------
+
+test('REGRESION: Socio con Prioridad aparece P1 en TODAS las semanas del turno sin fila explícita', () => {
+  const prioridades = vip(['carlos', 'MIERCOLES-20:00']);
+  const esperaSemana1 = esperaDelTurno([], 'MIERCOLES-20:00', '2026-09-16', prioridades);
+  assert.equal(esperaSemana1.length, 1);
+  assert.equal(esperaSemana1[0].cliente_id, 'carlos');
+
+  const esperaSemana2 = esperaDelTurno([], 'MIERCOLES-20:00', '2026-09-23', prioridades);
+  assert.equal(esperaSemana2.length, 1);
+  assert.equal(esperaSemana2[0].cliente_id, 'carlos');
+});
+
+test('Socio con Prioridad va primero ante otros alumnos en lista de espera en todas las semanas', () => {
+  const prioridades = vip(['carlos', 'MIERCOLES-20:00']);
+  const filaExistente = [
+    w('1', 'guadalupe', '2026-09-02T10:00:00Z', 'MIERCOLES-20:00', '2026-09-16')
+  ];
+  const orden = esperaDelTurno(filaExistente, 'MIERCOLES-20:00', '2026-09-16', prioridades);
+  assert.equal(orden.length, 2);
+  assert.equal(orden[0].cliente_id, 'carlos', 'Carlos con prioridad va primero');
+  assert.equal(orden[1].cliente_id, 'guadalupe', 'Guadalupe sin prioridad queda segunda');
+});
+
+test('Socio con Prioridad que ya tiene reserva en una fecha puntual no entra en espera de esa fecha puntual', () => {
+  const prioridades = vip(['juana', 'LUNES-09:30']);
+  const clientes = [
+    {
+      id: 'juana',
+      activo: true,
+      reservas_individuales: [{ turno_id: 'LUNES-09:30', fecha: '2026-09-14' }]
+    }
+  ];
+  // En semana 1 (14/09 ya reservada): no debe figurar en lista de espera
+  const espera14 = esperaDelTurno([], 'LUNES-09:30', '2026-09-14', prioridades, { clientes });
+  assert.equal(espera14.length, 0);
+
+  // En semana 2 (21/09 sin reserva): debe figurar primero con prioridad
+  const espera21 = esperaDelTurno([], 'LUNES-09:30', '2026-09-21', prioridades, { clientes });
+  assert.equal(espera21.length, 1);
+  assert.equal(espera21[0].cliente_id, 'juana');
+});

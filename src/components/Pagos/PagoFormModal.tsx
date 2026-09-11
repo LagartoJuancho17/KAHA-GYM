@@ -333,8 +333,18 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                             <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
                             <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
                           </div>
-                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${c.deuda_acumulada > 0 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-                            {c.deuda_acumulada > 0 ? `Deuda: $${c.deuda_acumulada}` : 'Al día'}
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                            c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : c.deuda_acumulada > 0
+                              ? 'bg-red-50 text-red-600 border border-red-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO'
+                              ? 'Becado ($0)'
+                              : c.deuda_acumulada > 0
+                              ? `Deuda: $${c.deuda_acumulada.toLocaleString('es-AR')}`
+                              : 'Al día'}
                           </span>
                         </button>
                       );

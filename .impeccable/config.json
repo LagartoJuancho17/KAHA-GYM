@@ -11,6 +11,18 @@
         ],
         "createdAt": "2026-09-02T17:28:35.132Z",
         "reason": "Claude: los botones Suspender/Cancelar usan text-slate-400 con hover:text-rose-600 y hover:bg-rose-50 en la misma clase; el gris solo aplica sobre fondo transparente y en hover el texto cambia a rose-600 junto con el fondo, asi que nunca hay gris sobre color"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-09-08T12:46:53.978Z",
+        "reason": "eleccion preexistente de Tobias, app de gestion interna, no tocada en esta sesion"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-zinc-400 on bg-zinc-900",
+        "createdAt": "2026-09-08T16:24:29.845Z",
+        "reason": "mismo patron ya evaluado (Dashboard.tsx): zinc-400 sobre zinc-900 es ~7.5:1 de contraste, header oscuro preexistente, no tocado en su estilo por este fix"
       }
     ]
   }

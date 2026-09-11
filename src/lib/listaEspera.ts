@@ -53,14 +53,65 @@ export function ordenarListaEspera<T extends { cliente_id: string; turno_id: str
   });
 }
 
+export interface ClienteOpcionesEspera {
+  id: string;
+  activo?: boolean;
+  turnos_fijos?: string[];
+  reservas_individuales?: Array<{ turno_id: string; fecha: string }>;
+  clases_suspendidas?: Array<{ turno_id: string; fecha: string }>;
+}
+
 /** La espera de un turno y fecha concretos, ya ordenada. */
 export function esperaDelTurno(
   todas: WaitlistReserva[],
   turnoId: string,
   fecha: string,
-  prioritarios: Set<string>
+  prioritarios: Set<string>,
+  opciones?: {
+    clientes?: ClienteOpcionesEspera[];
+  }
 ): WaitlistReserva[] {
-  const delTurno = (todas || []).filter(w => w.turno_id === turnoId && w.fecha === fecha);
+  const delTurno = [...(todas || []).filter(w => w.turno_id === turnoId && w.fecha === fecha)];
+
+  // Socios con prioridad en este turno: si no tienen ya fila en la espera para esta fecha,
+  // y no tienen cupo/reserva tomada ni suspensión ese día, se integran automáticamente
+  // con prioridad en TODAS las semanas del turno.
+  if (prioritarios && prioritarios.size > 0) {
+    const prefijo = `::${turnoId}`;
+    for (const clave of prioritarios) {
+      if (clave.endsWith(prefijo)) {
+        const cid = clave.slice(0, clave.length - prefijo.length);
+        if (!cid) continue;
+
+        // Ya tiene fila explícita en la espera de esta fecha
+        if (delTurno.some(w => w.cliente_id === cid)) continue;
+
+        // Si tenemos información de clientes, validar que califique para estar en espera hoy
+        if (opciones?.clientes) {
+          const cl = opciones.clientes.find(c => c.id === cid);
+          if (cl) {
+            if (cl.activo === false) continue;
+            // Ya es fijo asignado de este turno
+            if (cl.turnos_fijos?.includes(turnoId)) continue;
+            // Ya tiene reserva confirmada en este turno y fecha
+            if ((cl.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === fecha)) continue;
+            // Tiene su clase suspendida ese día
+            if ((cl.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha)) continue;
+          }
+        }
+
+        // Sintetizar entrada de espera garantizada para esta fecha
+        delTurno.push({
+          id: `vip-auto-${cid}-${turnoId}-${fecha}`,
+          cliente_id: cid,
+          turno_id: turnoId,
+          fecha,
+          creado_at: '2000-01-01T00:00:00.000Z'
+        });
+      }
+    }
+  }
+
   return ordenarListaEspera(delTurno, prioritarios);
 }
 
@@ -69,9 +120,12 @@ export function proximoEnEntrar(
   todas: WaitlistReserva[],
   turnoId: string,
   fecha: string,
-  prioritarios: Set<string>
+  prioritarios: Set<string>,
+  opciones?: {
+    clientes?: ClienteOpcionesEspera[];
+  }
 ): WaitlistReserva | null {
-  return esperaDelTurno(todas, turnoId, fecha, prioritarios)[0] || null;
+  return esperaDelTurno(todas, turnoId, fecha, prioritarios, opciones)[0] || null;
 }
 
 // ---------------------------------------------------------------------------

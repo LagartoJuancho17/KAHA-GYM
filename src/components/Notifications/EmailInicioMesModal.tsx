@@ -6,10 +6,13 @@ import {
 } from 'lucide-react';
 import { useGym } from '../../GymContext';
 import { supabase } from '../../supabaseClient';
+import { hoyArgentina } from '../../lib/fechas';
+import { ACCIONES_EMAIL_INICIO_MES } from '../../lib/emailInicioMes';
 
 interface EmailInicioMesModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSent?: () => void;
 }
 
 export const MENSAJE_MAIL_INICIO_MES = `¡Hola! ¿Cómo están?
@@ -29,8 +32,8 @@ Equipo KAHA`;
 
 export const ASUNTO_MAIL_INICIO_MES = '💚 ¡Comenzamos un nuevo mes en KAHA!';
 
-export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen, onClose }) => {
-  const { clientes, addAuditLog, addToast, googleUser } = useGym();
+export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen, onClose, onSent }) => {
+  const { clientes, addAuditLog, addToast, googleUser, auditLogs } = useGym();
   const [asunto, setAsunto] = useState(ASUNTO_MAIL_INICIO_MES);
   const [mensaje, setMensaje] = useState(MENSAJE_MAIL_INICIO_MES);
   const [copiado, setCopiado] = useState(false);
@@ -40,10 +43,13 @@ export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen
   const [filtroSocio, setFiltroSocio] = useState('');
   const [resultadoEnvio, setResultadoEnvio] = useState<{ tipo: 'ok' | 'error' | 'info'; texto: string } | null>(null);
 
-  const hoy = new Date();
-  const mesKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+  const mesKey = hoyArgentina().slice(0, 7);
   const storageEnviadoKey = `kaha-mail-inicio-mes-enviado-${mesKey}`;
-  const yaEnviado = localStorage.getItem(storageEnviadoKey);
+  const yaEnviado = localStorage.getItem(storageEnviadoKey) ||
+    auditLogs?.find(l => 
+      (ACCIONES_EMAIL_INICIO_MES.includes(l.accion as any)) &&
+      (l.detalles?.mes === mesKey || (l.creado_at && l.creado_at.slice(0, 7) === mesKey))
+    )?.creado_at;
 
   // Destinatarios: socios activos con email válido
   const destinatarios = useMemo(() => {
@@ -111,6 +117,7 @@ export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen
       fecha: fechaStr
     }, googleUser?.email || 'admin@gimnasio.com.ar');
     addToast('add', 'Abriendo cliente de correo con los socios en CCO.');
+    onSent?.();
   };
 
   const handleEnviarViaEdgeFunction = async () => {
@@ -193,6 +200,7 @@ export const EmailInicioMesModal: React.FC<EmailInicioMesModalProps> = ({ isOpen
         texto: `✅ Se enviaron ${destinatarios.length} correos correctamente a los socios.`
       });
       addToast('add', `Correos de inicio de mes enviados a ${destinatarios.length} socios.`);
+      onSent?.();
     } catch (err: any) {
       console.error('Error al enviar correos:', err);
       setResultadoEnvio({

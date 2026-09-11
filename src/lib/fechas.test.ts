@@ -40,3 +40,19 @@ test('sin argumento usa el instante actual (no explota)', () => {
   const hoy = hoyArgentina();
   assert.match(hoy, /^\d{4}-\d{2}-\d{2}$/);
 });
+
+import { fechasFuturasDelTurno } from './fechas';
+
+test('fechasFuturasDelTurno devuelve las próximas fechas del día del turno', () => {
+  // 2026-09-11 es VIERNES
+  const miercoles = fechasFuturasDelTurno('MIERCOLES-20:00', '2026-09-11', 3);
+  assert.deepEqual(miercoles, ['2026-09-16', '2026-09-23', '2026-09-30']);
+
+  const lunes = fechasFuturasDelTurno('LUNES-09:30', '2026-09-11', 2);
+  assert.deepEqual(lunes, ['2026-09-14', '2026-09-21']);
+});
+
+test('fechasFuturasDelTurno tolera turno inválido o vacío', () => {
+  assert.deepEqual(fechasFuturasDelTurno('', '2026-09-11'), []);
+  assert.deepEqual(fechasFuturasDelTurno('INVALIDO-10:00', '2026-09-11'), []);
+});

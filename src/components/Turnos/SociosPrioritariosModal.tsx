@@ -139,8 +139,8 @@ export const SociosPrioritariosModal: React.FC<Props> = ({ isOpen, onClose }) =>
           )}
 
           <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-[11px] text-violet-900 leading-relaxed">
-            La prioridad es <strong>por socio y por horario</strong>. Si marcás a alguien en el
-            Jueves 19:00, entra primero solo en ese turno. En el resto va por orden de llegada.
+            La prioridad es <strong>por socio y por horario</strong>, y aplica a <strong>todas las semanas anotadas</strong> de ese turno. Si marcás a alguien en el
+            Jueves 19:00, entra primero en cada semana donde se libere un lugar hasta que obtenga su lugar fijo.
           </div>
 
           {/* Alta */}

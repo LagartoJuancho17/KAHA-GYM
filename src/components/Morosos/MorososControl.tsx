@@ -9,10 +9,11 @@ import { MorososCronSimulator } from './MorososCronSimulator';
 import { MorososList } from './MorososList';
 import { AdminBajasReviewModal } from './AdminBajasReviewModal';
 import { EmailReporteMorososAdminModal } from '../Notifications/EmailReporteMorososAdminModal';
+import { MorososDobleCheckModal, MorososDobleCheckConfig } from './MorososDobleCheckModal';
 
 export const MorososControl: React.FC = () => {
   const { 
-    clientes, planes, registrarPago, updateCliente
+    clientes, planes, registrarPago, updateCliente, altaCliente, bajaLogicaCliente, googleUser
   } = useGym();
 
   const [simularFecha, setSimularFecha] = useState(new Date().toISOString().slice(0, 10)); // Fecha actual como default
@@ -30,6 +31,9 @@ export const MorososControl: React.FC = () => {
   // Modales de Bajas y Reporte Email
   const [showBajasModal, setShowBajasModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+
+  // Estado del Modal de Doble Chequeo de Autorización
+  const [dobleCheckConfig, setDobleCheckConfig] = useState<MorososDobleCheckConfig | null>(null);
 
   const mesActual = new Date().toISOString().slice(0, 7);
   const diaHoy = new Date().getDate();
@@ -95,27 +99,79 @@ export const MorososControl: React.FC = () => {
     setFastPagoSuccess('');
   };
 
+  // --- ACCIONES CON DOBLE CHECKEO ---
+  const handleStartAltaCliente = (cl: Cliente) => {
+    setDobleCheckConfig({
+      tipo: 'ALTA_SOCIO',
+      cliente: cl,
+      onConfirm: () => {
+        altaCliente(cl.id);
+      }
+    });
+  };
+
+  const handleStartBajaSocio = (cl: Cliente) => {
+    setDobleCheckConfig({
+      tipo: 'BAJA_SOCIO',
+      cliente: cl,
+      onConfirm: () => {
+        bajaLogicaCliente(cl.id);
+      }
+    });
+  };
+
   const handleConfirmFastPagoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClienteToClear) return;
+    const parsedMonto = parseFloat(fastPagoForm.monto);
+    if (isNaN(parsedMonto) || parsedMonto <= 0) return;
 
-    const res = registrarPago({
-      cliente_id: selectedClienteToClear.id,
-      cliente_nombre_completo: `${selectedClienteToClear.nombre} ${selectedClienteToClear.apellido}`,
-      monto: parseFloat(fastPagoForm.monto),
-      medio_pago: fastPagoForm.medio_pago,
-      mes_correspondiente: simularFecha.slice(0, 7), // mes actual
-      hash_transaccion: fastPagoForm.hash_transaccion || undefined,
-      registrado_por: 'admin@gimnasio.com.ar'
-    }, 'admin@gimnasio.com.ar');
+    // Abrir flujo de Doble Chequeo antes de asentar el pago
+    setDobleCheckConfig({
+      tipo: 'COBRO_MOROSIDAD',
+      cliente: selectedClienteToClear,
+      detallesExtra: {
+        monto: parsedMonto,
+        mes: simularFecha.slice(0, 7),
+        medio: fastPagoForm.medio_pago
+      },
+      onConfirm: () => {
+        const res = registrarPago({
+          cliente_id: selectedClienteToClear.id,
+          cliente_nombre_completo: `${selectedClienteToClear.nombre} ${selectedClienteToClear.apellido}`,
+          monto: parsedMonto,
+          medio_pago: fastPagoForm.medio_pago,
+          mes_correspondiente: simularFecha.slice(0, 7), // mes actual
+          hash_transaccion: fastPagoForm.hash_transaccion || undefined,
+          registrado_por: googleUser?.email || 'admin@gimnasio.com.ar'
+        }, googleUser?.email || 'admin@gimnasio.com.ar');
 
-    if (res.success) {
-      setFastPagoSuccess('Pago registrado correctamente. Ficha del alumno regularizada al instante.');
-      setTimeout(() => {
-        setSelectedClienteToClear(null);
-        setFastPagoSuccess('');
-      }, 1500);
-    }
+        if (res.success) {
+          setFastPagoSuccess('Pago registrado correctamente. Ficha del alumno regularizada al instante.');
+          setTimeout(() => {
+            setSelectedClienteToClear(null);
+            setFastPagoSuccess('');
+          }, 1200);
+        }
+      }
+    });
+  };
+
+  const handleExencionChangeWithDobleCheck = (val: 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO') => {
+    if (!selectedClienteToClear) return;
+    if (selectedClienteToClear.exencion_cobro === val) return;
+
+    setDobleCheckConfig({
+      tipo: 'EXENCION_COBRO',
+      cliente: selectedClienteToClear,
+      detallesExtra: {
+        exencion: val
+      },
+      onConfirm: () => {
+        updateCliente(selectedClienteToClear.id, { exencion_cobro: val });
+        selectedClienteToClear.exencion_cobro = val;
+      }
+    });
   };
 
   return (
@@ -238,6 +294,8 @@ export const MorososControl: React.FC = () => {
         filtroMora={filtroMora}
         setFiltroMora={setFiltroMora}
         onFastClearClick={handleStartFastClear}
+        onAltaClick={handleStartAltaCliente}
+        onBajaSocioClick={handleStartBajaSocio}
       />
 
       {/* --- PANEL DE PAGO RAPIDO DESDE TABLA INTEGRADO --- */}
@@ -273,12 +331,7 @@ export const MorososControl: React.FC = () => {
                 <label className="text-zinc-500 font-semibold block text-[10px] uppercase font-sans">Exención / Excepción de Cobro</label>
                 <select
                   value={selectedClienteToClear.exencion_cobro || 'NINGUNA'}
-                  onChange={(e) => {
-                    const val = e.target.value as any;
-                    updateCliente(selectedClienteToClear.id, { exencion_cobro: val });
-                    // Mutate locally to update table state instantly
-                    selectedClienteToClear.exencion_cobro = val;
-                  }}
+                  onChange={(e) => handleExencionChangeWithDobleCheck(e.target.value as any)}
                   className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
                 >
                   <option value="NINGUNA">Ninguna (Control estándar)</option>
@@ -363,6 +416,12 @@ export const MorososControl: React.FC = () => {
       <EmailReporteMorososAdminModal
         isOpen={showEmailModal}
         onClose={() => setShowEmailModal(false)}
+      />
+
+      {/* MODAL DE DOBLE CHECKEO PARA MOVIMIENTOS Y BAJAS */}
+      <MorososDobleCheckModal
+        config={dobleCheckConfig}
+        onClose={() => setDobleCheckConfig(null)}
       />
     </div>
   );

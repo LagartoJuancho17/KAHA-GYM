@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Mail, User, Phone, Check, MapPin, CreditCard, Info, Loader2, Camera } from 'lucide-react';
+import { Mail, User, Phone, Check, MapPin, CreditCard, Info, Loader2, Camera, CheckCircle } from 'lucide-react';
 
 interface SocioPerfilProps {
   socio: Cliente;
@@ -33,19 +33,24 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
     return planes.find(p => p.id === socio.plan_id) || null;
   }, [planes, socio]);
 
-  const hasDebt = useMemo(() => {
+  const isBecado = useMemo(() => {
     if (!socio) return false;
-    return socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
+    return socio.exencion_cobro === 'BECADO' || socio.exencion_cobro === 'PERDONADO';
   }, [socio]);
 
+  const hasDebt = useMemo(() => {
+    if (!socio || isBecado) return false;
+    return socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
+  }, [socio, isBecado]);
+
   const canPayAdvance = useMemo(() => {
-    if (!socio || hasDebt) return false;
+    if (!socio || hasDebt || isBecado) return false;
     const now = new Date();
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     return (lastDay - now.getDate()) < 5;
-  }, [socio, hasDebt]);
+  }, [socio, hasDebt, isBecado]);
 
-  const canPay = hasDebt || canPayAdvance;
+  const canPay = !isBecado && (hasDebt || canPayAdvance);
 
   const handleSavePhone = () => {
     setIsEditingPhone(false);
@@ -215,11 +220,13 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                     <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">Estado de Cuenta:</span>
                       <span className={`font-mono font-bold px-2.5 py-0.5 rounded text-[10px] ${
-                        socio.estado === 'ACTIVO' 
+                        isBecado
+                          ? 'bg-emerald-100 border border-emerald-300 text-emerald-800'
+                          : socio.estado === 'ACTIVO' 
                           ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' 
                           : 'bg-rose-50 border border-rose-100 text-rose-700'
                       }`}>
-                        {socio.estado === 'ACTIVO' ? 'ACTIVO / AL DÍA' : 'CON DEUDA / INHABILITADO'}
+                        {isBecado ? 'ACTIVO / AL DÍA (BECADO)' : socio.estado === 'ACTIVO' ? 'ACTIVO / AL DÍA' : 'CON DEUDA / INHABILITADO'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
@@ -236,9 +243,15 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                     </div>
                     <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">Deuda Acumulada:</span>
-                      <span className={`font-bold font-mono text-[11px] ${socio.deuda_acumulada > 0 ? 'text-rose-700 font-extrabold' : 'text-slate-800'}`}>
-                        ${socio.deuda_acumulada.toLocaleString('es-AR')} ARS
-                      </span>
+                      {isBecado ? (
+                        <span className="font-bold font-mono text-[11px] text-emerald-700">
+                          $0 <span className="text-slate-500 font-normal text-[10px]">(<span className="line-through">${Math.round(socio.deuda_perdonada || planSocio?.precio || 0).toLocaleString('es-AR')}</span> - Becado)</span>
+                        </span>
+                      ) : (
+                        <span className={`font-bold font-mono text-[11px] ${socio.deuda_acumulada > 0 ? 'text-rose-700 font-extrabold' : 'text-slate-800'}`}>
+                          ${socio.deuda_acumulada.toLocaleString('es-AR')} ARS
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <span className="text-slate-500 font-semibold">ID Unico Cuenta:</span>
@@ -254,12 +267,19 @@ export const SocioPerfil: React.FC<SocioPerfilProps> = ({
                     </div>
                   </div>
 
-                  <div className={`p-4 border-t border-slate-200 ${socio.deuda_acumulada > 0 ? 'bg-rose-50/40' : 'bg-emerald-50/40'}`}>
-                    {socio.deuda_acumulada > 0 ? (
+                  <div className={`p-4 border-t border-slate-200 ${hasDebt ? 'bg-rose-50/40' : 'bg-emerald-50/40'}`}>
+                    {hasDebt ? (
                       <p className="text-[10px] text-rose-800 leading-relaxed font-semibold flex items-start gap-1.5">
                         <Info className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
                         <span>
                           Registrás una deuda de ${socio.deuda_acumulada.toLocaleString('es-AR')} ARS. Podés abonar de forma directa y 100% segura mediante Mercado Pago con el botón ubicado en tu plan vigente.
+                        </span>
+                      </p>
+                    ) : isBecado ? (
+                      <p className="text-[10px] text-emerald-800 leading-relaxed font-semibold flex items-start gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>
+                          Tu cuota se encuentra becada (deuda $0). Podés reservar y entrenar con normalidad en todos tus turnos habituales.
                         </span>
                       </p>
                     ) : (

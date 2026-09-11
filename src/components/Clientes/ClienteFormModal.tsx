@@ -32,7 +32,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
     telefono: '',
     tipo: 'FIJO' as TipoCliente,
     plan_id: planes[0]?.id || '',
-    exencion_cobro: 'NINGUNA' as 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO',
+    exencion_cobro: 'NINGUNA' as 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO' | 'BECADO',
     deuda_acumulada: 0,
     precio_personalizado: '' as string | number,
     dias_personalizados: '' as string | number,
@@ -329,6 +329,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
               <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Excepción / Exención de Cobro</label>
               <select value={clienteForm.exencion_cobro} onChange={(e) => setClienteForm(prev => ({ ...prev, exencion_cobro: e.target.value as any }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer" id="form-exencion-cobro">
                 <option value="NINGUNA">Ninguna (Control estándar)</option>
+                <option value="BECADO">Becado (Deuda $0)</option>
                 <option value="SUSPENDIDO">Suspensión momentánea</option>
                 <option value="POSTERGADO">Postergación autorizada</option>
                 <option value="PERDONADO">Exento este mes</option>

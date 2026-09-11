@@ -11,6 +11,8 @@ import { Gasto, PagoEnRevision, OrigenGasto } from '../types';
 import { EmailInicioMesModal } from './Notifications/EmailInicioMesModal';
 import { AdminBajasReviewModal } from './Morosos/AdminBajasReviewModal';
 import { EmailReporteMorososAdminModal } from './Notifications/EmailReporteMorososAdminModal';
+import { hoyArgentina } from '../lib/fechas';
+import { estaEmailInicioMesEnviado } from '../lib/emailInicioMes';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -33,7 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal, setOpenTurnosModalForId, onStartAuthorization 
 }) => {
   const { 
-    clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, 
+    clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, auditLogs,
     registrarGasto, autorizarCliente, eliminarCliente,
     pagosEnRevision, aprobarPagoTransferencia, rechazarPagoTransferencia, googleUser
   } = useGym();
@@ -67,6 +69,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Modal Email de Inicio de Mes a socios
   const [showEmailMesModal, setShowEmailMesModal] = useState(false);
+  const [mailEnviadoLocal, setMailEnviadoLocal] = useState(false);
   // Modal de Revisión de Bajas Día 10+
   const [showBajasModal, setShowBajasModal] = useState(false);
   const [showEmailReporteModal, setShowEmailReporteModal] = useState(false);
@@ -75,10 +78,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setMostrarBalance(prev => !prev);
   };
 
-  // Mes corriente de análisis (dinámico)
-  const mesActual = new Date().toISOString().slice(0, 7);
-  const diaHoy = new Date().getDate();
-  const mailEnviadoEsteMes = !!localStorage.getItem(`kaha-mail-inicio-mes-enviado-${mesActual}`);
+  // Mes corriente de análisis (dinámico según horario Argentina)
+  const hoyArg = hoyArgentina();
+  const mesActual = hoyArg.slice(0, 7);
+  const diaHoy = Number(hoyArg.slice(8, 10));
+  const mailEnviadoEsteMes = estaEmailInicioMesEnviado({
+    mes: mesActual,
+    enviadoLocal: mailEnviadoLocal,
+    auditLogs
+  });
 
   // --- CALCULOS DE KPIs ---
   const clientesActivosFicha = clientes.filter(c => c.activo);
@@ -289,18 +297,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Grilla Horarios
           </button>
 
-          <button
-            onClick={() => setShowEmailMesModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-            id="quick-email-mes-btn"
-            title="Enviar email de inicio de mes a todos los socios"
-          >
-            <Mail className="w-3.5 h-3.5 text-emerald-200" />
-            Mail de Mes
-            {!mailEnviadoEsteMes && diaHoy <= 5 && (
-              <span className="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span>
-            )}
-          </button>
+          {!mailEnviadoEsteMes && (
+            <button
+              onClick={() => setShowEmailMesModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              id="quick-email-mes-btn"
+              title="Enviar email de inicio de mes a todos los socios"
+            >
+              <Mail className="w-3.5 h-3.5 text-emerald-200" />
+              Mail de Mes
+              {diaHoy <= 5 && (
+                <span className="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span>
+              )}
+            </button>
+          )}
 
           {diaHoy >= 10 && candidatosBajaFijos.length > 0 && (
             <button
@@ -518,8 +528,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[150px] gap-4">
 
         {/* HERO — Balance del mes (tile 2x2, oscuro) */}
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setActiveTab('PAGOS')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('PAGOS');
+            }
+          }}
           className="group col-span-2 row-span-2 bg-zinc-900 text-white rounded-3xl p-7 text-left flex flex-col justify-between relative overflow-hidden cursor-pointer transition-transform hover:-translate-y-0.5"
           id="card-net-balance"
         >
@@ -580,7 +598,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
           </div>
-        </button>
+        </div>
 
         {/* Socios Activos */}
         <button
@@ -1258,7 +1276,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* MODAL EMAIL DE INICIO DE MES A SOCIOS */}
       <EmailInicioMesModal 
         isOpen={showEmailMesModal} 
-        onClose={() => setShowEmailMesModal(false)} 
+        onClose={() => setShowEmailMesModal(false)}
+        onSent={() => setMailEnviadoLocal(true)} 
       />
 
       {/* MODAL REVISIÓN DE BAJAS DE TURNOS FIJOS (DÍA 10+) */}

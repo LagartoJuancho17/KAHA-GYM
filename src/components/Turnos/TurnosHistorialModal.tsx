@@ -98,7 +98,7 @@ export const TurnosHistorialModal: React.FC<TurnosHistorialModalProps> = ({
 
       return true;
     });
-  }, [auditLogs, categoria, filtroFecha, searchTerm]);
+  }, [isOpen, auditLogs, categoria, filtroFecha, searchTerm]);
 
   // Helper para badge y descripción amigable
   const getLogPresentation = (log: AuditLog) => {

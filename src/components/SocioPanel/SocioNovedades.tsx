@@ -3,34 +3,42 @@ import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Novedad } from '../../types';
 import { Megaphone, Award, User, Search, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import {
+  TITULO_RECORDATORIO_DEUDA,
+  MENSAJE_RECORDATORIO_DEUDA,
+  socioEstaDebiendo
+} from '../../lib/recordatorioDeuda';
 
 export const SocioNovedades: React.FC = () => {
   const { novedades, clientes, pagos, selectedSocioId } = useGym();
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
   const [buscarText, setBuscarText] = useState<string>('');
 
-  // ── Lógica de recordatorio de pago a partir del día 6 ─────────────────────
+  // ── Lógica de recordatorio de pago SOLAMENTE para socios que están debiendo ─────────────────────
   const alertaPago = useMemo(() => {
     if (!selectedSocioId) return null;
 
-    const hoy = new Date();
-    const diaHoy = hoy.getDate();
-    if (diaHoy < 6) return null; // A partir del 6 de cada mes
+    const socio = clientes.find(c => c.id === selectedSocioId);
+    if (!socio) return null;
 
+    const hoy = new Date();
     const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
     const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const nombreMes = MESES_ES[hoy.getMonth()];
 
-    // Verificar si pagó este mes
-    const pagosDelMes = pagos.filter(
-      p => p.cliente_id === selectedSocioId && p.mes_correspondiente === mesActual
-    );
-    if (pagosDelMes.length > 0) return null; // Ya pagó ✅
+    // Validación estricta: SOLAMENTE a los socios que están debiendo
+    const debiendo = socioEstaDebiendo({
+      deuda_acumulada: socio.deuda_acumulada,
+      estado: socio.estado,
+      ultimo_mes_pagado: socio.ultimo_mes_pagado,
+      exencion_cobro: socio.exencion_cobro,
+      pagos,
+      socioId: socio.id,
+      fechaReferencia: hoy
+    });
 
-    // Verificar también por ultimo_mes_pagado en el cliente
-    const socio = clientes.find(c => c.id === selectedSocioId);
-    if (socio?.ultimo_mes_pagado && socio.ultimo_mes_pagado >= mesActual) return null; // Ya pagó ✅
+    if (!debiendo) return null;
 
     return { nombreMes, mesActual, socio };
   }, [selectedSocioId, pagos, clientes]);
@@ -39,13 +47,8 @@ export const SocioNovedades: React.FC = () => {
     if (!alertaPago || !selectedSocioId) return null;
     return {
       id: `recordatorio-pago-${alertaPago.mesActual}-${selectedSocioId}`,
-      titulo: '💚 Te dejamos un pequeño recordatorio',
-      contenido: `Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
-
-Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
-
-¡Queremos que sigas siendo parte de KAHA!
-Cualquier cosa, estamos acá para ayudarte. 💚`,
+      titulo: TITULO_RECORDATORIO_DEUDA,
+      contenido: MENSAJE_RECORDATORIO_DEUDA,
       fecha: `${alertaPago.mesActual}-06`,
       categoria: 'ARANCELES',
       creado_por: 'KAHA GYM',
@@ -64,6 +67,16 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
       if (esMensajePago) {
         return !!selectedSocioId && n.socio_id === selectedSocioId;
       }
+
+      // Recordatorio de deuda: SOLAMENTE para los que están debiendo
+      const esRecordatorioDeuda = n.titulo.includes('Te dejamos un pequeño recordatorio') ||
+                                  n.id.startsWith('recordatorio-pago-') ||
+                                  n.contenido.includes('tu turno fijo queda disponible para ser ocupado');
+      if (esRecordatorioDeuda) {
+        if (!alertaPago) return false;
+        return !n.socio_id || n.socio_id === selectedSocioId;
+      }
+
       return !n.socio_id || (!!selectedSocioId && n.socio_id === selectedSocioId);
     });
 
@@ -82,7 +95,7 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
       return [recordatorioNovedad, ...list];
     }
     return list;
-  }, [novedades, selectedSocioId, recordatorioNovedad]);
+  }, [novedades, selectedSocioId, recordatorioNovedad, alertaPago]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { TODAS: novedadesFiltradas.length };

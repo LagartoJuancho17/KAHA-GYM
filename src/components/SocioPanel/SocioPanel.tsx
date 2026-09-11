@@ -17,11 +17,16 @@ import { SocioWaitlistPromotedModal } from './SocioWaitlistPromotedModal';
 import { OnboardingModal } from '../Onboarding/OnboardingModal';
 import { NotificationManager } from '../Notifications/NotificationManager';
 import { Footer } from '../Common/Footer';
+import {
+  TITULO_RECORDATORIO_DEUDA,
+  MENSAJE_RECORDATORIO_DEUDA,
+  socioEstaDebiendo
+} from '../../lib/recordatorioDeuda';
 
 export const SocioPanel: React.FC = () => {
   const { 
     clientes, planes, selectedSocioId, googleUser,
-    novedades, setRolActivo, signOutGoogle, loading, turnos
+    novedades, setRolActivo, signOutGoogle, loading, turnos, pagos
   } = useGym();
 
   const [activeTabSection, setActiveTabSection] = useState<'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES'>('HOME');
@@ -51,53 +56,59 @@ export const SocioPanel: React.FC = () => {
     return planes.find(p => p.id === socio.plan_id) || null;
   }, [planes, socio]);
 
-  const hasDebt = useMemo(() => {
+  const isBecado = useMemo(() => {
     if (!socio) return false;
-    return socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
+    return socio.exencion_cobro === 'BECADO' || socio.exencion_cobro === 'PERDONADO';
   }, [socio]);
+
+  const hasDebt = useMemo(() => {
+    if (!socio || isBecado) return false;
+    return socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
+  }, [socio, isBecado]);
 
   // Fix 2b: Current month hasn't been paid yet
   const currentCalendarMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
 
   const isCurrentMonthUnpaid = useMemo(() => {
-    if (!socio) return false;
+    if (!socio || isBecado) return false;
     return !socio.ultimo_mes_pagado || socio.ultimo_mes_pagado < currentCalendarMonth;
-  }, [socio, currentCalendarMonth]);
+  }, [socio, currentCalendarMonth, isBecado]);
 
   const canPayAdvance = useMemo(() => {
-    if (!socio || hasDebt) return false;
+    if (!socio || hasDebt || isBecado) return false;
     const now = new Date();
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     return (lastDay - now.getDate()) < 5;
-  }, [socio, hasDebt]);
+  }, [socio, hasDebt, isBecado]);
 
-  const canPay = hasDebt || canPayAdvance || isCurrentMonthUnpaid;
+  const canPay = !isBecado && (hasDebt || canPayAdvance || isCurrentMonthUnpaid);
 
-  // Mensaje de novedad a partir del 6 de cada mes SOLO para los que NO pagaron
-  const isPostDia5Unpaid = useMemo(() => {
-    if (!socio || !isCurrentMonthUnpaid) return false;
-    const diaHoy = new Date().getDate();
-    return diaHoy >= 6;
-  }, [socio, isCurrentMonthUnpaid]);
+  // Mensaje de recordatorio SOLAMENTE para los que están debiendo
+  const isDebiendo = useMemo(() => {
+    if (!socio) return false;
+    return socioEstaDebiendo({
+      deuda_acumulada: socio.deuda_acumulada,
+      estado: socio.estado,
+      ultimo_mes_pagado: socio.ultimo_mes_pagado,
+      exencion_cobro: socio.exencion_cobro,
+      pagos,
+      socioId: socio.id
+    });
+  }, [socio, pagos]);
 
   const recordatorioNovedad = useMemo(() => {
-    if (!isPostDia5Unpaid || !socio) return null;
+    if (!isDebiendo || !socio) return null;
     return {
       id: `recordatorio-pago-${currentCalendarMonth}-${socio.id}`,
-      titulo: '💚 Te dejamos un pequeño recordatorio',
-      contenido: `Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
-
-Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
-
-¡Queremos que sigas siendo parte de KAHA!
-Cualquier cosa, estamos acá para ayudarte. 💚`,
+      titulo: TITULO_RECORDATORIO_DEUDA,
+      contenido: MENSAJE_RECORDATORIO_DEUDA,
       fecha: `${currentCalendarMonth}-06`,
       categoria: 'ARANCELES' as const,
       creado_por: 'KAHA GYM',
       destacado: true,
       socio_id: socio.id
     };
-  }, [isPostDia5Unpaid, socio, currentCalendarMonth]);
+  }, [isDebiendo, socio, currentCalendarMonth]);
 
   const socioNovedades = useMemo(() => {
     let list = novedades.filter(n => {
@@ -105,6 +116,16 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
       if (esMensajePago) {
         return !!socio?.id && n.socio_id === socio.id;
       }
+
+      // Recordatorio de deuda: SOLAMENTE a los socios que están debiendo
+      const esRecordatorioDeuda = n.titulo.includes('Te dejamos un pequeño recordatorio') || 
+                                  n.id.startsWith('recordatorio-pago-') ||
+                                  n.contenido.includes('tu turno fijo queda disponible para ser ocupado');
+      if (esRecordatorioDeuda) {
+        if (!isDebiendo) return false;
+        return !n.socio_id || (!!socio?.id && n.socio_id === socio.id);
+      }
+
       return !n.socio_id || (!!socio?.id && n.socio_id === socio.id);
     });
 
@@ -122,7 +143,7 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
       return [recordatorioNovedad, ...list];
     }
     return list;
-  }, [novedades, socio, recordatorioNovedad]);
+  }, [novedades, socio, recordatorioNovedad, isDebiendo]);
 
   // Feature 3: Show month-start popup when current month is unpaid
   // Controlled via localStorage so user can dismiss it and it won't re-show in same session
@@ -318,9 +339,20 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
               <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-xs">
                 <div>
                   <p className="text-slate-400 text-[10px] tracking-wider uppercase font-mono">Estado de Cuenta</p>
-                  <p className={`font-bold mt-0.5 ${socio.estado === 'ACTIVO' ? 'text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded text-[10px] uppercase font-mono inline-block' : 'text-rose-700 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded text-[10px] uppercase font-mono text-center inline-block'}`}>
-                    {socio.estado === 'ACTIVO' ? '✓ Al día' : `⚠ Pendiente: $${socio.deuda_acumulada.toLocaleString('es-AR')}`}
-                  </p>
+                  {isBecado ? (
+                    <div className="mt-0.5">
+                      <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold inline-block mr-1.5">
+                        ✓ Al día (Becado)
+                      </span>
+                      <span className="text-slate-600 font-mono text-[11px] font-bold">
+                        Deuda: $0 <span className="text-slate-400 font-normal">(<span className="line-through">${Math.round(socio.deuda_perdonada || planSocio?.precio || 0).toLocaleString('es-AR')}</span> - Becado)</span>
+                      </span>
+                    </div>
+                  ) : (
+                    <p className={`font-bold mt-0.5 ${socio.estado === 'ACTIVO' ? 'text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded text-[10px] uppercase font-mono inline-block' : 'text-rose-700 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded text-[10px] uppercase font-mono text-center inline-block'}`}>
+                      {socio.estado === 'ACTIVO' ? '✓ Al día' : `⚠ Pendiente: $${socio.deuda_acumulada.toLocaleString('es-AR')}`}
+                    </p>
+                  )}
                 </div>
                 
                 <div className="text-right">
@@ -568,7 +600,7 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
         />
       )}
 
-      {/* FEATURE 3: MONTH-START PAYMENT REMINDER POPUP */}
+      {/* FEATURE 3: MONTH-START PAYMENT REMINDER POPUP (SOLAMENTE DEUDORES O INICIO DE MES) */}
       {showMonthStartPopup && socio && isCurrentMonthUnpaid && (
         <div
           className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-sm animate-fade-in font-sans"
@@ -576,7 +608,11 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
         >
           <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden animate-scale-up">
             {/* Decorative top gradient */}
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-sky-400 rounded-t-3xl" />
+            <div className={`absolute top-0 inset-x-0 h-1 rounded-t-3xl ${
+              isDebiendo 
+                ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-green-500' 
+                : 'bg-gradient-to-r from-emerald-400 via-teal-400 to-sky-400'
+            }`} />
             
             {/* Close button */}
             <button
@@ -594,23 +630,46 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
             <div className="p-7 pt-8 space-y-5">
               {/* Icon + heading */}
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/30">
-                  <PartyPopper className="w-6 h-6 text-white" />
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
+                  isDebiendo 
+                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/30 text-2xl'
+                    : 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-emerald-500/30'
+                }`}>
+                  {isDebiendo ? <span>💚</span> : <PartyPopper className="w-6 h-6 text-white" />}
                 </div>
                 <div>
                   <p className="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-widest">
-                    ¡Nuevo mes!
+                    {isDebiendo ? '💚 Recordatorio' : '¡Nuevo mes!'}
                   </p>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight mt-0.5 capitalize">
-                    Ya empezó {new Date().toLocaleString('es-AR', { month: 'long' })} 🎉
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight mt-0.5">
+                    {isDebiendo 
+                      ? '💚 Te dejamos un pequeño recordatorio' 
+                      : `Ya empezó ${new Date().toLocaleString('es-AR', { month: 'long' })} 🎉`
+                    }
                   </h3>
                 </div>
               </div>
 
               {/* Body */}
-              <p className="text-slate-600 text-sm leading-relaxed font-sans">
-                Ya comenzó el nuevo mes. Podés abonar tu cuota ahora para tener todo en orden y seguir disfrutando de tus clases sin interrupciones.
-              </p>
+              {isDebiendo ? (
+                <div className="text-slate-700 text-xs leading-relaxed font-sans space-y-2">
+                  <p>
+                    Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
+                  </p>
+                  <p>
+                    Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
+                  </p>
+                  <p className="font-bold text-emerald-950">
+                    ¡Queremos que sigas siendo parte de KAHA!
+                    <br />
+                    Cualquier cosa, estamos acá para ayudarte. 💚
+                  </p>
+                </div>
+              ) : (
+                <p className="text-slate-600 text-sm leading-relaxed font-sans">
+                  Ya comenzó el nuevo mes. Podés abonar tu cuota ahora para tener todo en orden y seguir disfrutando de tus clases sin interrupciones.
+                </p>
+              )}
 
               {/* CTAs */}
               <div className="space-y-2.5 pt-1">
@@ -625,16 +684,27 @@ Cualquier cosa, estamos acá para ayudarte. 💚`,
                   <CreditCard className="w-4.5 h-4.5" />
                   Ir a abonar ahora →
                 </button>
+                {isDebiendo && (
+                  <a
+                    href={`https://wa.me/541178402722?text=${encodeURIComponent('Hola KAHA GYM, me comunico por mi cuota y turno fijo.')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-2.5 px-4 rounded-2xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-emerald-200 text-center"
+                    id="month-popup-wsp-btn"
+                  >
+                    Escribir por WhatsApp 🤝
+                  </a>
+                )}
                 <button
                   onClick={() => {
                     setShowMonthStartPopup(false);
                     const dismissedKey = `kaha-month-popup-dismissed-${currentCalendarMonth}-${socio.id}`;
                     localStorage.setItem(dismissedKey, 'true');
                   }}
-                  className="w-full py-2.5 px-5 rounded-2xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-all cursor-pointer border border-slate-200 bg-transparent"
+                  className="w-full py-2 px-5 rounded-2xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-all cursor-pointer border border-slate-200 bg-transparent"
                   id="month-popup-dismiss-btn"
                 >
-                  Continuar sin pagar aún
+                  Entendido, cerrar
                 </button>
               </div>
             </div>

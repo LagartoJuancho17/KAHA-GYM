@@ -129,12 +129,12 @@ export const INITIAL_CLIENTES: Cliente[] = [
     email: 'mateo_rossi@yahoo.com.ar',
     telefono: '341-234-5678',
     tipo: 'FIJO',
-    estado: 'ACTIVO',
+    estado: 'CON_DEUDA',
     plan_id: 'p-3d',
     activo: true,
-    deuda_acumulada: 0,
-    ultimo_mes_pagado: '2026-07',
-    turnos_fijos: [],
+    deuda_acumulada: 85000.00,
+    ultimo_mes_pagado: '2026-06',
+    turnos_fijos: ['LUNES-18:00', 'MIERCOLES-18:00', 'VIERNES-18:00'],
     creado_at: '2026-02-14T11:00:00Z'
   },
   {
@@ -232,18 +232,6 @@ export const INITIAL_PAGOS: Pago[] = [
     hash_transaccion: 'MP-99881122',
     registrado_por: 'admin@gimnasio.com.ar',
     creado_at: '2026-07-02T10:15:00Z'
-  },
-  {
-    id: 'pay-jul-2',
-    cliente_id: 'c-3',
-    cliente_nombre_completo: 'Mateo Rossi',
-    monto: 85000.00,
-    fecha_pago: '2026-07-03T16:40:00Z',
-    medio_pago: 'TRANSFERENCIA',
-    mes_correspondiente: '2026-07',
-    hash_transaccion: 'TX-88224511',
-    registrado_por: 'operator@gimnasio.com.ar',
-    creado_at: '2026-07-03T16:40:00Z'
   },
   {
     id: 'pay-jul-3',

@@ -73,7 +73,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   const waitlistItems = useMemo(() => {
     // Mismo orden que usa la promocion automatica: VIP primero, despues por llegada.
     // Si la turnera mostrara otro orden, el admin veria una cosa y entraria otra.
-    return esperaDelTurno(waitlistReservas, selectedSlot.id, selectedSlot.date, sociosPrioritarios)
+    return esperaDelTurno(waitlistReservas, selectedSlot.id, selectedSlot.date, sociosPrioritarios, { clientes })
       .map(w => {
         const cl = clientes.find(c => c.id === w.cliente_id);
         return {
@@ -462,7 +462,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                       {wl.prioritario && (
                         <span
                           className="text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full tracking-wide"
-                          title="Prioridad máxima en este turno: entra primero cuando se libera un lugar"
+                          title="Prioridad máxima en este turno: entra primero en todas las semanas si se libera un lugar"
                         >
                           PRIORIDAD
                         </span>

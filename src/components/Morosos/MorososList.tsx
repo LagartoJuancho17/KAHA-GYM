@@ -2,7 +2,10 @@
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Receipt, UserCheck } from 'lucide-react';
+import { Receipt, UserCheck, UserMinus, MessageCircle } from 'lucide-react';
+import { generarMensajeWhatsAppRecordatorio } from '../../lib/recordatorioDeuda';
+import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
+import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 
 interface MorososListProps {
   deudoresCount: number;
@@ -11,6 +14,8 @@ interface MorososListProps {
   filtroMora: 'TODOS' | 'MOROSO' | 'CON_DEUDA';
   setFiltroMora: (val: 'TODOS' | 'MOROSO' | 'CON_DEUDA') => void;
   onFastClearClick: (cl: Cliente) => void;
+  onAltaClick: (cl: Cliente) => void;
+  onBajaSocioClick: (cl: Cliente) => void;
 }
 
 export const MorososList: React.FC<MorososListProps> = ({
@@ -19,9 +24,11 @@ export const MorososList: React.FC<MorososListProps> = ({
   listadoDeudoresMora,
   filtroMora,
   setFiltroMora,
-  onFastClearClick
+  onFastClearClick,
+  onAltaClick,
+  onBajaSocioClick
 }) => {
-  const { planes, altaCliente } = useGym();
+  const { planes } = useGym();
 
   return (
     <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs text-xs font-sans">
@@ -104,15 +111,29 @@ export const MorososList: React.FC<MorososListProps> = ({
                         <span className="font-sans text-zinc-400 font-normal">Dentro de fecha límite</span>
                       )}
                     </td>
-                    <td className="p-4 font-mono font-bold text-red-700">
-                      ${c.deuda_acumulada.toLocaleString('es-AR')}
+                    <td className="p-4 font-mono">
+                      {c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-emerald-700">$0</span>
+                          <span className="text-zinc-400 font-normal line-through text-xs">
+                            ({formatearDeudaVisual(c, pl?.precio).textoTachado})
+                          </span>
+                          <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase">
+                            Becado
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-red-700">
+                          ${c.deuda_acumulada.toLocaleString('es-AR')}
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
                         <button
-                          onClick={() => altaCliente(c.id)}
-                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-xs transition-colors border-none cursor-pointer"
-                          title="Dar de Alta (Reactivar Socio en el Sistema)"
+                          onClick={() => onAltaClick(c)}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors border-none cursor-pointer"
+                          title="Autorizar Alta (Reactivar Socio en el Sistema)"
                           id={`btn-alta-moroso-${c.id}`}
                         >
                           <UserCheck className="w-3.5 h-3.5" />
@@ -120,11 +141,38 @@ export const MorososList: React.FC<MorososListProps> = ({
                         </button>
                         <button
                           onClick={() => onFastClearClick(c)}
-                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-xs transition-colors border-none cursor-pointer"
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors border-none cursor-pointer"
                           id={`btn-cobro-rapido-${c.id}`}
+                          title="Registrar Cobro y Regularizar"
                         >
                           <Receipt className="w-3.5 h-3.5 text-white" />
                           <span>Registrar Cobro</span>
+                        </button>
+                        {(() => {
+                          const waPhone = normalizarTelefonoWhatsApp(c.telefono);
+                          if (!waPhone) return null;
+                          return (
+                            <a
+                              href={`https://wa.me/${waPhone}?text=${encodeURIComponent(generarMensajeWhatsAppRecordatorio(c.nombre))}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                              title="Enviar recordatorio de pago por WhatsApp"
+                              id={`btn-whatsapp-moroso-${c.id}`}
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>Recordatorio</span>
+                            </a>
+                          );
+                        })()}
+                        <button
+                          onClick={() => onBajaSocioClick(c)}
+                          className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          title="Autorizar Baja de Socio del Sistema"
+                          id={`btn-baja-moroso-${c.id}`}
+                        >
+                          <UserMinus className="w-3.5 h-3.5 text-red-600" />
+                          <span>Dar de Baja</span>
                         </button>
                       </div>
                     </td>

@@ -2,6 +2,8 @@ import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard } from 'lucide-react';
+import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
+import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 
 interface ClienteProfileModalProps {
   isOpen: boolean;
@@ -12,22 +14,6 @@ interface ClienteProfileModalProps {
   onManageTurnos?: (cl: Cliente) => void;
   onAssignPlan?: (cl: Cliente) => void;
 }
-
-const getWhatsAppLink = (phone: string) => {
-  const cleanPhone = phone.replace(/\D/g, '');
-  if (!cleanPhone) return '';
-  let formattedPhone = cleanPhone;
-  if (!formattedPhone.startsWith('54')) {
-    if (formattedPhone.startsWith('9')) {
-      formattedPhone = '54' + formattedPhone;
-    } else if (formattedPhone.startsWith('15')) {
-      formattedPhone = '549' + formattedPhone.substring(2);
-    } else {
-      formattedPhone = '549' + formattedPhone;
-    }
-  }
-  return `https://wa.me/${formattedPhone}`;
-};
 
 const DIA_LABEL: Record<string, string> = {
   LUNES: 'Lun', MARTES: 'Mar', MIERCOLES: 'Mié', JUEVES: 'Jue', VIERNES: 'Vie'
@@ -58,6 +44,10 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   if (!selectedCliente) return null;
 
   const plan = planes.find(p => p.id === selectedCliente.plan_id);
+  const esBecado = selectedCliente.exencion_cobro === 'BECADO' || selectedCliente.exencion_cobro === 'PERDONADO';
+  const cuota = selectedCliente.precio_personalizado ?? plan?.precio ?? 0;
+  const formatoDeuda = formatearDeudaVisual(selectedCliente, cuota);
+  const wa = normalizarTelefonoWhatsApp(selectedCliente.telefono);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans" id="profile-detailed-modal">
@@ -77,17 +67,26 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                 onStartEdit(selectedCliente);
                 onClose();
               }}
-              className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-zinc-700"
-              id="btn-edit-profile-shortcut"
-              title="Editar ficha"
+              className="p-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium border border-zinc-700 cursor-pointer"
+              title="Editar Perfil"
             >
               <Edit2 className="w-3.5 h-3.5" />
-              <span>Editar</span>
+              <span className="hidden sm:inline">Editar</span>
+            </button>
+            <button
+              onClick={() => {
+                onDeleteClick(selectedCliente);
+                onClose();
+              }}
+              className="p-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium border border-rose-800/50 cursor-pointer"
+              title="Eliminar Socio"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Eliminar</span>
             </button>
             <button
               onClick={onClose}
-              className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors cursor-pointer"
-              id="btn-close-profile"
+              className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -95,26 +94,22 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
         </div>
 
         {/* Content body */}
-        <div className="p-4 sm:p-6 space-y-6 overflow-x-auto flex-1">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           
           {/* Información Personal */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
               <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Código / ID de Socio</span>
               <span className="font-mono font-bold text-zinc-900 block">{selectedCliente.codigo_socio || selectedCliente.id}</span>
-            </div>
-            <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-              <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Correo Electrónico</span>
-              <span className="font-semibold text-zinc-900 block">{selectedCliente.email}</span>
             </div>
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 flex justify-between items-center">
               <div>
                 <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Celular</span>
                 <span className="font-semibold text-zinc-900 block">{selectedCliente.telefono || 'Sin registrar'}</span>
               </div>
-              {selectedCliente.telefono && (
+              {wa && (
                 <a
-                  href={getWhatsAppLink(selectedCliente.telefono)}
+                  href={`https://wa.me/${wa}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 transition-colors inline-flex items-center justify-center border border-emerald-200"
@@ -132,15 +127,23 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
             </div>
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
               <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Deuda Acumulada</span>
-              <span className={`font-mono font-bold block ${selectedCliente.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                ${selectedCliente.deuda_acumulada.toLocaleString('es-AR')}
-              </span>
+              {esBecado ? (
+                <span className="font-mono font-bold block text-emerald-700">
+                  $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Becado)</span>
+                </span>
+              ) : (
+                <span className={`font-mono font-bold block ${selectedCliente.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                  ${selectedCliente.deuda_acumulada.toLocaleString('es-AR')}
+                </span>
+              )}
             </div>
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 col-span-2">
               <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Exención / Excepción de Cobro</span>
               <span className="font-bold text-zinc-900 block mt-1">
                 {selectedCliente.exencion_cobro === 'NINGUNA' || !selectedCliente.exencion_cobro ? (
                   <span className="text-zinc-500 font-sans text-xs">Ninguna (Estándar)</span>
+                ) : selectedCliente.exencion_cobro === 'BECADO' ? (
+                  <span className="text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded border border-emerald-300 uppercase text-[9px] font-bold">Becado (Deuda $0)</span>
                 ) : selectedCliente.exencion_cobro === 'SUSPENDIDO' ? (
                   <span className="text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200 uppercase text-[9px] font-bold">Suspensión momentánea</span>
                 ) : selectedCliente.exencion_cobro === 'POSTERGADO' ? (

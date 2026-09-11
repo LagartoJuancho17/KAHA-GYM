@@ -1,8 +1,9 @@
-// src/components/Clientes/ClientesTable.tsx
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User } from 'lucide-react';
+import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
+import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 
 interface ClientesTableProps {
   clientesFiltrados: Cliente[];
@@ -20,26 +21,13 @@ interface ClientesTableProps {
   onAssignPlan?: (c: Cliente) => void;
 }
 
-const getWhatsAppLink = (phone: string) => {
-  const cleanPhone = phone.replace(/\D/g, '');
-  if (!cleanPhone) return '';
-  let formattedPhone = cleanPhone;
-  if (!formattedPhone.startsWith('54')) {
-    if (formattedPhone.startsWith('9')) {
-      formattedPhone = '54' + formattedPhone;
-    } else if (formattedPhone.startsWith('15')) {
-      formattedPhone = '549' + formattedPhone.substring(2);
-    } else {
-      formattedPhone = '549' + formattedPhone;
-    }
-  }
-  return `https://wa.me/${formattedPhone}`;
-};
-
 // Estado (badge) unificado para tabla y cards
 const getEstadoBadge = (c: Cliente): { badgeClass: string; estadoLabel: string } => {
   if (c.autorizado === false) {
     return { badgeClass: 'bg-amber-100 text-amber-900 border-amber-200 animate-pulse', estadoLabel: 'Pendiente' };
+  }
+  if (c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO') {
+    return { badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold', estadoLabel: 'Al Día (Becado)' };
   }
   if (c.estado === 'MOROSO' || (!c.activo && c.deuda_acumulada > 0)) {
     return { badgeClass: 'bg-rose-100 text-rose-800 border-rose-200 font-bold', estadoLabel: 'Moroso (Baja)' };
@@ -53,20 +41,24 @@ const getEstadoBadge = (c: Cliente): { badgeClass: string; estadoLabel: string }
   return { badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100', estadoLabel: 'Al Día' };
 };
 
-const WhatsAppIcon: React.FC<{ phone: string }> = ({ phone }) => (
-  <a
-    href={getWhatsAppLink(phone)}
-    target="_blank"
-    rel="noopener noreferrer"
-    onClick={(e) => e.stopPropagation()}
-    className="text-emerald-600 hover:text-emerald-700 transition-colors inline-flex items-center"
-    title="Enviar mensaje de WhatsApp"
-  >
-    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.458L0 24zm5.835-4.117c1.661.988 3.513 1.507 5.409 1.508 5.761 0 10.448-4.679 10.45-10.439.002-2.79-1.082-5.412-3.053-7.382C16.71 1.597 14.092.513 11.993.513c-5.759 0-10.443 4.69-10.447 10.45-.001 1.88.49 3.73 1.42 5.362L1.856 22.28l6.183-1.621c-1.552-1.012-1.769-1.096-2.147-1.397zM17.17 14.398c-.284-.144-1.685-.83-1.947-.925-.263-.096-.454-.144-.645.144-.191.288-.741.925-.907 1.117-.167.19-.334.215-.618.072-.284-.144-1.202-.442-2.29-1.41-1.077-.96-1.804-2.148-2.015-2.51-.21-.362-.023-.558.158-.737.163-.162.363-.424.544-.637.182-.213.243-.362.364-.604.122-.241.06-.454-.03-.645-.09-.192-.646-1.56-.885-2.138-.233-.56-.47-.482-.645-.491-.167-.008-.358-.01-.55-.01s-.502.072-.765.362c-.263.288-1.004.978-1.004 2.384 0 1.406 1.028 2.763 1.171 2.955.143.192 2.023 3.084 4.9 4.323.684.295 1.218.47 1.635.6.688.219 1.314.188 1.81.114.551-.082 1.685-.688 1.925-1.353.24-.665.24-1.233.167-1.353-.072-.119-.263-.191-.547-.334z" />
-    </svg>
-  </a>
-);
+const WhatsAppIcon: React.FC<{ phone: string }> = ({ phone }) => {
+  const wa = normalizarTelefonoWhatsApp(phone);
+  if (!wa) return null;
+  return (
+    <a
+      href={`https://wa.me/${wa}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="text-emerald-600 hover:text-emerald-700 transition-colors inline-flex items-center"
+      title="Enviar mensaje de WhatsApp"
+    >
+      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.458L0 24zm5.835-4.117c1.661.988 3.513 1.507 5.409 1.508 5.761 0 10.448-4.679 10.45-10.439.002-2.79-1.082-5.412-3.053-7.382C16.71 1.597 14.092.513 11.993.513c-5.759 0-10.443 4.69-10.447 10.45-.001 1.88.49 3.73 1.42 5.362L1.856 22.28l6.183-1.621c-1.552-1.012-1.769-1.096-2.147-1.397zM17.17 14.398c-.284-.144-1.685-.83-1.947-.925-.263-.096-.454-.144-.645.144-.191.288-.741.925-.907 1.117-.167.19-.334.215-.618.072-.284-.144-1.202-.442-2.29-1.41-1.077-.96-1.804-2.148-2.015-2.51-.21-.362-.023-.558.158-.737.163-.162.363-.424.544-.637.182-.213.243-.362.364-.604.122-.241.06-.454-.03-.645-.09-.192-.646-1.56-.885-2.138-.233-.56-.47-.482-.645-.491-.167-.008-.358-.01-.55-.01s-.502.072-.765.362c-.263.288-1.004.978-1.004 2.384 0 1.406 1.028 2.763 1.171 2.955.143.192 2.023 3.084 4.9 4.323.684.295 1.218.47 1.635.6.688.219 1.314.188 1.81.114.551-.082 1.685-.688 1.925-1.353.24-.665.24-1.233.167-1.353-.072-.119-.263-.191-.547-.334z" />
+      </svg>
+    </a>
+  );
+};
 
 // Menú de acciones (compartido por tabla y cards)
 interface SocioActionsMenuProps {
@@ -205,7 +197,9 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
     const profes = Array.from(new Set(
       turnosChips.map(t => t.profesor).filter((p): p is string => Boolean(p && p.trim()))
     ));
-    return { plan, maxDias, precio, esPersonalizado, turnosChips, profes };
+    const esBecado = c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO';
+    const formatoDeuda = formatearDeudaVisual(c, precio);
+    return { plan, maxDias, precio, esPersonalizado, turnosChips, profes, esBecado, formatoDeuda };
   };
 
   const menuProps = (c: Cliente) => ({
@@ -228,7 +222,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
           </div>
         ) : (
           clientesPaginados.map(c => {
-            const { plan, maxDias, precio, esPersonalizado, turnosChips, profes } = getSocioData(c);
+            const { plan, maxDias, precio, esPersonalizado, turnosChips, profes, esBecado, formatoDeuda } = getSocioData(c);
             const { badgeClass, estadoLabel } = getEstadoBadge(c);
             return (
               <div
@@ -274,9 +268,15 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                   {/* Deuda */}
                   <div className="bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2">
                     <div className="text-[9px] uppercase tracking-wider text-zinc-400 font-bold font-mono">Deuda</div>
-                    <div className={`font-mono font-bold text-sm ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      ${c.deuda_acumulada.toLocaleString('es-AR')}
-                    </div>
+                    {esBecado ? (
+                      <div className="font-mono font-bold text-xs text-emerald-700">
+                        $0 <span className="text-zinc-400 font-normal text-[10px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Becado)</span>
+                      </div>
+                    ) : (
+                      <div className={`font-mono font-bold text-sm ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        ${c.deuda_acumulada.toLocaleString('es-AR')}
+                      </div>
+                    )}
                     <div className="text-[10px] text-zinc-400 font-mono truncate">
                       Últ: {c.ultimo_mes_pagado || 'Sin pagos'}
                     </div>
@@ -347,7 +347,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                 </tr>
               ) : (
                 clientesPaginados.map(c => {
-                  const { plan, maxDias, precio, esPersonalizado, turnosChips, profes } = getSocioData(c);
+                  const { plan, maxDias, precio, esPersonalizado, turnosChips, profes, esBecado, formatoDeuda } = getSocioData(c);
                   const { badgeClass, estadoLabel } = getEstadoBadge(c);
                   return (
                     <tr key={c.id} className="hover:bg-zinc-50 transition-colors font-sans border-b border-zinc-100" id={`row-cliente-desktop-${c.id}`}>
@@ -415,9 +415,15 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                         </div>
                       </td>
                       <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
-                        <span className={`font-mono font-bold ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-zinc-400'}`}>
-                          ${c.deuda_acumulada.toLocaleString('es-AR')}
-                        </span>
+                        {esBecado ? (
+                          <div className="font-mono font-bold text-xs text-emerald-700">
+                            $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Becado)</span>
+                          </div>
+                        ) : (
+                          <span className={`font-mono font-bold ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-zinc-400'}`}>
+                            ${c.deuda_acumulada.toLocaleString('es-AR')}
+                          </span>
+                        )}
                       </td>
                       <td className="p-4 cursor-pointer font-mono text-zinc-600" onClick={() => onSelectCliente(c)}>{c.ultimo_mes_pagado || 'Sin pagos'}</td>
                       <td className="p-4">

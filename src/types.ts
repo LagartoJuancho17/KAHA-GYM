@@ -35,7 +35,8 @@ export interface Cliente {
   ultimo_mes_pagado: string; // Formato 'YYYY-MM'
   turnos_fijos: string[]; // IDs de los turnos asignados (si es FIJO)
   turno_variable?: string; // ID del turno variable asignado en tiempo real
-  exencion_cobro?: 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO';
+  exencion_cobro?: 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO' | 'BECADO';
+  deuda_perdonada?: number; // Monto de deuda real perdonado/becado (para mostrar tachado)
   reservas_individuales?: ReservaIndividual[];
   clases_suspendidas?: ClaseSuspendida[];
   creado_at: string;
