@@ -3,6 +3,14 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useGym } from '../../GymContext';
 import { MedioPago } from '../../types';
 import { X, Trash2, Search, Users, Check, Plus, Calendar } from 'lucide-react';
+import {
+  sincronizarMedioYDestino,
+  validarPartes,
+  restoSinAsignar,
+  asignarPartesACobros,
+  ParteDePago,
+  DestinoPago
+} from '../../lib/pagoDividido';
 
 interface PagoFormModalProps {
   onClose: () => void;
@@ -29,6 +37,10 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
   
   const [esPagoMultiple, setEsPagoMultiple] = useState(false);
   const [beneficiarios, setBeneficiarios] = useState<BeneficiarioItem[]>([]);
+
+  // Pago repartido en varios medios (ej: mitad efectivo, mitad transferencia).
+  const [usaVariosMedios, setUsaVariosMedios] = useState(false);
+  const [partes, setPartes] = useState<ParteDePago[]>([]);
   const [formErr, setFormErr] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
@@ -42,9 +54,88 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
   const [isBeneficiarioDropdownOpen, setIsBeneficiarioDropdownOpen] = useState(false);
   const beneficiarioRef = useRef<HTMLDivElement>(null);
 
-  const genId = () => typeof crypto !== 'undefined' && crypto.randomUUID 
-    ? crypto.randomUUID() 
+  const genId = () => typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
     : `b-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const totalACobrar = useMemo(
+    () => beneficiarios.reduce((acc, b) => acc + (parseFloat(b.monto) || 0), 0),
+    [beneficiarios]
+  );
+  const validacionPartes = useMemo(
+    () => validarPartes(partes, totalACobrar),
+    [partes, totalACobrar]
+  );
+  const resto = useMemo(() => restoSinAsignar(partes, totalACobrar), [partes, totalACobrar]);
+
+  // Vía de pago y destino se mueven juntos: efectivo en uno implica efectivo en
+  // el otro, y salir de efectivo por un lado saca al otro. Ver lib/pagoDividido.
+  const cambiarMedioODestino = (
+    cambio: { medio?: MedioPago; destino?: DestinoPago },
+    campoTocado: 'medio' | 'destino'
+  ) => {
+    setPagoForm(prev => {
+      const sincronizado = sincronizarMedioYDestino(
+        {
+          medio: cambio.medio ?? prev.medio_pago,
+          destino: cambio.destino ?? prev.destino_transferencia
+        },
+        campoTocado
+      );
+      return { ...prev, medio_pago: sincronizado.medio, destino_transferencia: sincronizado.destino };
+    });
+  };
+
+  const activarVariosMedios = (activar: boolean) => {
+    setUsaVariosMedios(activar);
+    setFormErr('');
+    if (activar) {
+      // Arranca con lo que ya estaba elegido como primer medio, así no se pierde
+      // lo que el operador venía cargando.
+      setPartes([
+        { id: genId(), medio: pagoForm.medio_pago, destino: pagoForm.destino_transferencia, monto: totalACobrar }
+      ]);
+    } else {
+      setPartes([]);
+    }
+  };
+
+  const cambiarParte = (
+    id: string,
+    cambio: Partial<Pick<ParteDePago, 'medio' | 'destino' | 'monto'>>,
+    campoTocado: 'medio' | 'destino' | 'monto'
+  ) => {
+    setPartes(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      if (campoTocado === 'monto') return { ...p, monto: cambio.monto ?? 0 };
+      const sincronizado = sincronizarMedioYDestino(
+        { medio: cambio.medio ?? p.medio, destino: cambio.destino ?? p.destino },
+        campoTocado
+      );
+      return { ...p, medio: sincronizado.medio, destino: sincronizado.destino };
+    }));
+  };
+
+  const agregarParte = () => {
+    setPartes(prev => [
+      ...prev,
+      { id: genId(), medio: 'TRANSFERENCIA', destino: 'RULO', monto: restoSinAsignar(prev, totalACobrar) }
+    ]);
+  };
+
+  const quitarParte = (id: string) => {
+    setPartes(prev => (prev.length <= 1 ? prev : prev.filter(p => p.id !== id)));
+  };
+
+  const completarConElResto = () => {
+    setPartes(prev => {
+      if (prev.length === 0) return prev;
+      const faltante = restoSinAsignar(prev, totalACobrar);
+      if (faltante <= 0) return prev;
+      const ultimo = prev.length - 1;
+      return prev.map((p, i) => (i === ultimo ? { ...p, monto: Number((p.monto + faltante).toFixed(2)) } : p));
+    });
+  };
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -182,15 +273,37 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
       if (!b.mes_correspondiente) { setFormErr('Todos los pagos deben tener un mes asignado.'); return; }
     }
 
-    const payloadList = beneficiarios.map(b => ({
-      cliente_id: b.cliente_id,
-      monto: parseFloat(b.monto),
-      medio_pago: pagoForm.medio_pago,
-      mes_correspondiente: b.mes_correspondiente,
-      hash_transaccion: pagoForm.hash_transaccion.trim() || undefined,
-      destino_transferencia: pagoForm.destino_transferencia,
-      registrado_por: 'operator@gimnasio.com.ar'
-    }));
+    // Con varios medios, cada medio genera su propia fila de pago. Guardarlo así
+    // (y no como una fila con un campo raro) hace que el balance por medio y por
+    // destino siga saliendo de una suma simple, sin tocar ningún reporte.
+    let payloadList;
+    if (usaVariosMedios) {
+      const chequeo = validarPartes(partes, totalACobrar);
+      if (!chequeo.ok) { setFormErr(chequeo.motivo || 'Revisá los medios de pago.'); return; }
+
+      payloadList = asignarPartesACobros(
+        beneficiarios.map(b => ({
+          cliente_id: b.cliente_id,
+          mes_correspondiente: b.mes_correspondiente,
+          monto: parseFloat(b.monto)
+        })),
+        partes
+      ).map(f => ({
+        ...f,
+        hash_transaccion: pagoForm.hash_transaccion.trim() || undefined,
+        registrado_por: 'operator@gimnasio.com.ar'
+      }));
+    } else {
+      payloadList = beneficiarios.map(b => ({
+        cliente_id: b.cliente_id,
+        monto: parseFloat(b.monto),
+        medio_pago: pagoForm.medio_pago,
+        mes_correspondiente: b.mes_correspondiente,
+        hash_transaccion: pagoForm.hash_transaccion.trim() || undefined,
+        destino_transferencia: pagoForm.destino_transferencia,
+        registrado_por: 'operator@gimnasio.com.ar'
+      }));
+    }
 
     // Registro atómico por lote para evitar colisiones de hash en Supabase y sobrescrituras de estado
     const res = registrarPagosMultiples(payloadList, 'operator@gimnasio.com.ar');
@@ -238,6 +351,8 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     setSearchPagadorText('');
     setSearchBeneficiarioText('');
     setEsPagoMultiple(false);
+    setUsaVariosMedios(false);
+    setPartes([]);
     setTimeout(() => {
       onSuccess(generatedReceipts);
       setFormSuccess('');
@@ -584,13 +699,118 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
               )}
             </div>
 
+            {/* PAGO CON VARIOS MEDIOS (ej: mitad efectivo, mitad transferencia) */}
+            <div className="pt-1">
+              <label
+                className="flex items-center gap-2 cursor-pointer select-none bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2"
+                htmlFor="chk-varios-medios"
+              >
+                <input
+                  type="checkbox"
+                  id="chk-varios-medios"
+                  checked={usaVariosMedios}
+                  onChange={e => activarVariosMedios(e.target.checked)}
+                  className="w-4 h-4 accent-zinc-900 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-zinc-800">Pagó con más de un medio</span>
+                <span className="text-[11px] text-zinc-500">ej: una parte en efectivo y otra por transferencia</span>
+              </label>
+            </div>
+
+            {usaVariosMedios ? (
+              <div className="space-y-2 border border-zinc-200 rounded-xl p-3 bg-white">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase text-zinc-500">Medios usados</span>
+                  <span className={`text-[11px] font-mono font-bold ${validacionPartes.ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    ${validacionPartes.suma.toLocaleString('es-AR')} de ${totalACobrar.toLocaleString('es-AR')}
+                  </span>
+                </div>
+
+                {partes.map((p, idx) => (
+                  <div key={p.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-center">
+                    <select
+                      value={p.medio}
+                      onChange={e => cambiarParte(p.id, { medio: e.target.value as MedioPago }, 'medio')}
+                      className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                      id={`parte-medio-${idx}`}
+                    >
+                      <option value="EFECTIVO">Efectivo</option>
+                      <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+                      <option value="MERCADO_PAGO">Mercado Pago</option>
+                      <option value="UALA">Uala</option>
+                      <option value="OTRO">Otro</option>
+                    </select>
+
+                    <select
+                      value={p.destino}
+                      onChange={e => cambiarParte(p.id, { destino: e.target.value as DestinoPago }, 'destino')}
+                      className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                      id={`parte-destino-${idx}`}
+                    >
+                      <option value="RULO">🟡 Rulo</option>
+                      <option value="JUANCHI">🟣 Juanchi</option>
+                      <option value="EFECTIVO">💵 Efectivo (caja)</option>
+                    </select>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={p.monto || ''}
+                      onChange={e => cambiarParte(p.id, { monto: parseFloat(e.target.value) || 0 }, 'monto')}
+                      placeholder="Monto"
+                      className="w-full sm:w-32 border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden font-medium"
+                      id={`parte-monto-${idx}`}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => quitarParte(p.id)}
+                      disabled={partes.length <= 1}
+                      className="p-2 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer border-none bg-transparent"
+                      title="Quitar este medio"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={agregarParte}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 text-[11px] font-bold cursor-pointer transition-colors"
+                    id="btn-agregar-medio"
+                  >
+                    <Plus className="w-3 h-3" /> Agregar medio
+                  </button>
+
+                  {resto > 0 && (
+                    <button
+                      type="button"
+                      onClick={completarConElResto}
+                      className="px-2.5 py-1.5 rounded-lg border border-lime-300 bg-lime-50 text-lime-900 hover:bg-lime-100 text-[11px] font-bold cursor-pointer transition-colors"
+                      id="btn-completar-resto"
+                    >
+                      Poner el resto (${resto.toLocaleString('es-AR')}) en el último
+                    </button>
+                  )}
+                </div>
+
+                {!validacionPartes.ok && validacionPartes.motivo && (
+                  <p className="text-[11px] text-rose-700 font-semibold">{validacionPartes.motivo}</p>
+                )}
+              </div>
+            ) : null}
+
             {/* DATOS DE LA TRANSACCIÓN: VÍA, DESTINO, REF */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 pt-1">
-              <div className="space-y-1">
+              <div className={`space-y-1 ${usaVariosMedios ? 'opacity-40 pointer-events-none' : ''}`}>
                 <label className="text-zinc-500 font-bold block text-[10px] uppercase">Vía de Pago</label>
-                <select 
-                  value={pagoForm.medio_pago} 
-                  onChange={e => setPagoForm(prev => ({ ...prev, medio_pago: e.target.value as MedioPago }))} 
+                <select
+                  value={pagoForm.medio_pago}
+                  onChange={e => cambiarMedioODestino({ medio: e.target.value as MedioPago }, 'medio')}
+                  disabled={usaVariosMedios}
                   className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
                 >
                   <option value="EFECTIVO">Efectivo</option>
@@ -601,14 +821,15 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                 </select>
               </div>
 
-              <div className="space-y-1">
+              <div className={`space-y-1 ${usaVariosMedios ? 'opacity-40 pointer-events-none' : ''}`}>
                 <label className="text-violet-700 font-bold block text-[10px] uppercase">Destino (Juanchi / Rulo / Efectivo)</label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {(['RULO', 'JUANCHI', 'EFECTIVO'] as const).map(dest => (
                     <button
                       key={dest}
                       type="button"
-                      onClick={() => setPagoForm(prev => ({ ...prev, destino_transferencia: dest }))}
+                      onClick={() => cambiarMedioODestino({ destino: dest }, 'destino')}
+                      disabled={usaVariosMedios}
                       className={`py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                         pagoForm.destino_transferencia === dest
                           ? dest === 'JUANCHI'

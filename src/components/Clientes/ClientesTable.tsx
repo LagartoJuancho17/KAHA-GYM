@@ -1,9 +1,11 @@
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User, RotateCcw, Clock, PauseCircle } from 'lucide-react';
+import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User, RotateCcw, Clock, PauseCircle, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
+import { ordenarSocios, alternarOrden, ORDEN_POR_DEFECTO, CampoOrdenSocios, OrdenSocios } from '../../lib/ordenSocios';
+import { estaEnReposo } from '../../lib/reposo';
 
 interface ClientesTableProps {
   clientesFiltrados: Cliente[];
@@ -23,6 +25,11 @@ interface ClientesTableProps {
 
 // Estado (badge) unificado para tabla y cards
 const getEstadoBadge = (c: Cliente): { badgeClass: string; estadoLabel: string } => {
+  // El reposo manda sobre cualquier otro estado: si no, un socio congelado se
+  // lee como "Inactivo" y no se distingue de una baja definitiva.
+  if (estaEnReposo(c)) {
+    return { badgeClass: 'bg-amber-100 text-amber-900 border-amber-300 font-bold', estadoLabel: 'En reposo' };
+  }
   if (c.autorizado === false) {
     return { badgeClass: 'bg-amber-100 text-amber-900 border-amber-200 animate-pulse', estadoLabel: 'Pendiente' };
   }
@@ -207,7 +214,16 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
 }) => {
   const { planes, turnos } = useGym();
 
-  const totalPaginas = Math.ceil(clientesFiltrados.length / filasPorPagina) || 1;
+  const [orden, setOrden] = React.useState<OrdenSocios>(ORDEN_POR_DEFECTO);
+
+  // El orden se aplica sobre TODA la lista filtrada, no sobre la página actual:
+  // ordenar sólo lo visible daría un ranking distinto en cada página.
+  const clientesOrdenados = useMemo(
+    () => ordenarSocios(clientesFiltrados, orden),
+    [clientesFiltrados, orden]
+  );
+
+  const totalPaginas = Math.ceil(clientesOrdenados.length / filasPorPagina) || 1;
 
   React.useEffect(() => {
     if (pagina > totalPaginas) {
@@ -215,10 +231,44 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
     }
   }, [pagina, totalPaginas, setPagina]);
 
+  const cambiarOrden = (campo: CampoOrdenSocios) => {
+    setOrden(prev => alternarOrden(prev, campo));
+    setPagina(1); // el primero del nuevo orden está en la página 1, no donde estabas
+  };
+
   const clientesPaginados = useMemo(() => {
     const inicio = (pagina - 1) * filasPorPagina;
-    return clientesFiltrados.slice(inicio, inicio + filasPorPagina);
-  }, [clientesFiltrados, pagina, filasPorPagina]);
+    return clientesOrdenados.slice(inicio, inicio + filasPorPagina);
+  }, [clientesOrdenados, pagina, filasPorPagina]);
+
+  const EncabezadoOrdenable: React.FC<{ campo: CampoOrdenSocios; children: React.ReactNode; className?: string }> = ({
+    campo,
+    children,
+    className = ''
+  }) => {
+    const activo = orden.campo === campo;
+    return (
+      <th className={`p-4 ${className}`}>
+        <button
+          type="button"
+          onClick={() => cambiarOrden(campo)}
+          className={`inline-flex items-center gap-1 cursor-pointer border-none bg-transparent p-0 font-semibold transition-colors ${
+            activo ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-900'
+          }`}
+          title={`Ordenar por ${String(children)}`}
+          aria-sort={activo ? (orden.direccion === 'asc' ? 'ascending' : 'descending') : 'none'}
+          id={`orden-socios-${campo.toLowerCase()}`}
+        >
+          <span>{children}</span>
+          {activo
+            ? (orden.direccion === 'asc'
+                ? <ArrowUp className="w-3 h-3" />
+                : <ArrowDown className="w-3 h-3" />)
+            : <ChevronsUpDown className="w-3 h-3 opacity-40" />}
+        </button>
+      </th>
+    );
+  };
 
   // Datos derivados de cada socio (compartidos entre card y fila)
   const getSocioData = (c: Cliente) => {
@@ -248,6 +298,40 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
 
   return (
     <div className="space-y-3">
+
+      {/* ===== BARRA DE ORDEN =====
+          En la tabla se puede ordenar clickeando el encabezado, pero las cards
+          de mobile no tienen encabezado, y ni fecha de ingreso ni nombre de pila
+          tienen columna propia. Esta barra cubre los cuatro criterios. */}
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px]" id="barra-orden-socios">
+        <span className="text-zinc-400 font-medium uppercase tracking-wider mr-0.5">Ordenar por</span>
+        {([
+          ['INGRESO', 'Ingreso'],
+          ['APELLIDO', 'Apellido'],
+          ['NOMBRE', 'Nombre'],
+          ['DEUDA', 'Deuda']
+        ] as Array<[CampoOrdenSocios, string]>).map(([campo, etiqueta]) => {
+          const activo = orden.campo === campo;
+          return (
+            <button
+              key={campo}
+              type="button"
+              onClick={() => cambiarOrden(campo)}
+              className={`px-2.5 py-1 rounded-lg border font-semibold transition-all cursor-pointer inline-flex items-center gap-1 ${
+                activo
+                  ? 'bg-zinc-900 text-white border-zinc-900'
+                  : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900'
+              }`}
+              id={`chip-orden-${campo.toLowerCase()}`}
+            >
+              <span>{etiqueta}</span>
+              {activo && (orden.direccion === 'asc'
+                ? <ArrowUp className="w-3 h-3" />
+                : <ArrowDown className="w-3 h-3" />)}
+            </button>
+          );
+        })}
+      </div>
 
       {/* ===== VISTA CARDS (mobile / tablet) ===== */}
       <div className="lg:hidden space-y-3">
@@ -364,11 +448,11 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
           <table className="w-full text-left border-collapse text-xs min-w-[720px]">
             <thead>
               <tr className="bg-zinc-50 text-zinc-500 font-sans font-medium uppercase tracking-wider border-b border-zinc-200">
-                <th className="p-4">Socio</th>
+                <EncabezadoOrdenable campo="APELLIDO">Socio</EncabezadoOrdenable>
                 <th className="p-4">Celular</th>
                 <th className="p-4">Días Fijos Asignados</th>
                 <th className="p-4">Plan sugerido</th>
-                <th className="p-4">Deuda</th>
+                <EncabezadoOrdenable campo="DEUDA">Deuda</EncabezadoOrdenable>
                 <th className="p-4">Último Mes Pago</th>
                 <th className="p-4 text-center">Acciones</th>
               </tr>

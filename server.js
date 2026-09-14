@@ -491,6 +491,202 @@ app.post('/api/send-monthly-email', async (req, res) => {
   }
 });
 
+// ============================================================================
+// COBRANZA AUTOMÁTICA (día 5 y día 10)
+//
+// Calendario acordado con Juanchi:
+//   día 1  -> la cuota del mes ya figura como deuda (lo hace la app, no un cron)
+//   día 5  -> aviso al socio con la fecha límite
+//   día 10 -> reporte a los administradores
+//
+// Los dispara pg_cron (ver migración 017). Los endpoints son idempotentes por
+// día: el segundo llamado del mismo día no manda nada. Eso cubre el reintento
+// del cron y también que alguien golpee la URL de prafuera.
+// ============================================================================
+
+const DIA_BAJA_RESERVA = 10;
+
+// Fecha de hoy en Argentina (UTC-3 fijo, sin horario de verano desde 2009).
+// new Date().toISOString() da el día equivocado entre las 21:00 y la medianoche.
+function hoyArgentinaISO() {
+  return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// Devuelve true si este tipo de envío ya corrió hoy. El candado es la PK de
+// envios_automaticos: si el insert choca, ya se mandó.
+async function tomarCandadoDelDia(tipo) {
+  if (!supabase) return { ok: false, motivo: 'sin_supabase' };
+  const fecha = hoyArgentinaISO();
+  const { error } = await supabase.from('envios_automaticos').insert({ tipo, fecha });
+  if (error) {
+    if (error.code === '23505') return { ok: false, motivo: 'ya_enviado_hoy', fecha };
+    return { ok: false, motivo: 'error_candado', detalle: error.message };
+  }
+  return { ok: true, fecha };
+}
+
+async function registrarResultadoEnvio(tipo, fecha, enviados, errores, detalle) {
+  if (!supabase) return;
+  await supabase.from('envios_automaticos')
+    .update({ enviados, errores, detalle })
+    .eq('tipo', tipo).eq('fecha', fecha);
+}
+
+// Socios que están debiendo. Misma regla que src/lib/recordatorioDeuda.ts:
+// deja afuera a los dados de baja, a los que están en reposo y a los exentos.
+async function sociosQueDeben() {
+  if (!supabase) return [];
+  const { data: clientes, error } = await supabase
+    .from('clientes')
+    .select('id, nombre, apellido, email, telefono, deuda_acumulada, estado, ultimo_mes_pagado, exencion_cobro, reposo, activo')
+    .eq('activo', true);
+  if (error) {
+    console.error('>> [cobranza] Error al leer clientes:', error.message);
+    return [];
+  }
+
+  const hoy = hoyArgentinaISO();
+  const mesActual = hoy.slice(0, 7);
+  const diaDelMes = Number(hoy.slice(8, 10));
+
+  return (clientes || []).filter(c => {
+    if (c.reposo) return false; // cuenta congelada: no se le reclama
+    const exento = c.exencion_cobro && c.exencion_cobro !== 'NINGUNA';
+    const deuda = Number(c.deuda_acumulada || 0);
+    if (exento && deuda <= 0) return false;
+    if (deuda > 0 || c.estado === 'CON_DEUDA' || c.estado === 'MOROSO') return true;
+    const pagoEsteMes = c.ultimo_mes_pagado && c.ultimo_mes_pagado >= mesActual;
+    return diaDelMes >= 6 && !pagoEsteMes;
+  });
+}
+
+async function enviarMailSimple({ email, asunto, titulo, cuerpo }) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const esInvitado = cleanEmail.startsWith('invitado-') && cleanEmail.endsWith('@kaha.com');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail) || esInvitado) {
+    return { ok: false, reason: 'sin_email_valido' };
+  }
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, reason: 'sin_api_key' };
+  const from = process.env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>';
+
+  const html = `<!doctype html><html><body style="margin:0;background:#062319;font-family:Inter,Arial,sans-serif;">
+    <div style="max-width:540px;margin:0 auto;padding:24px;">
+      <div style="background:#043d2f;border:1px solid #059669;border-radius:24px 24px 0 0;padding:28px;text-align:center;">
+        <div style="display:inline-block;background:#10b981;color:#043d2f;font-size:11px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;padding:4px 12px;border-radius:9999px;margin-bottom:12px;font-family:monospace;">KAHA GYM</div>
+        <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:900;letter-spacing:-0.03em;">${titulo}</h1>
+      </div>
+      <div style="background:#064e3b;border:1px solid #059669;border-top:none;border-radius:0 0 24px 24px;padding:28px;">
+        <div style="color:#ecfdf5;font-size:14px;line-height:1.7;white-space:pre-line;">${cuerpo}</div>
+      </div>
+    </div>
+  </body></html>`;
+
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [cleanEmail], subject: asunto, html })
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) return { ok: false, reason: 'resend_error', detail: data };
+  return { ok: true, id: data.id };
+}
+
+// --- DÍA 5: aviso al socio con la fecha límite ---
+app.post('/api/cron/aviso-deuda', async (req, res) => {
+  try {
+    const candado = await tomarCandadoDelDia('AVISO_DIA_5');
+    if (!candado.ok) {
+      console.log(`>> [aviso-deuda] No se envía: ${candado.motivo}`);
+      return res.status(200).json({ ok: true, omitido: true, motivo: candado.motivo });
+    }
+
+    const deudores = await sociosQueDeben();
+    console.log(`>> [aviso-deuda] ${deudores.length} socio(s) con deuda.`);
+
+    let enviados = 0, errores = 0;
+    for (const socio of deudores) {
+      const cuerpo =
+        `Hola ${socio.nombre}! 👋\n\n` +
+        `Todavía no nos figura el pago de la cuota de este mes.\n\n` +
+        `Si no llegamos a registrarlo antes del día ${DIA_BAJA_RESERVA}, tu turno fijo queda liberado ` +
+        `para que lo tome otra persona.\n\n` +
+        `Si tuviste alguna dificultad o necesitás unos días más, escribinos y lo vemos. ` +
+        `Con que nos avises alcanza para que te lo guardemos. 🤝\n\n` +
+        `¡Gracias por ser parte de KAHA! 💚`;
+
+      const r = await enviarMailSimple({
+        email: socio.email,
+        asunto: '💚 Recordatorio de tu cuota — KAHA GYM',
+        titulo: 'Recordatorio de tu cuota',
+        cuerpo
+      });
+      if (r.ok) enviados++; else errores++;
+    }
+
+    await registrarResultadoEnvio('AVISO_DIA_5', candado.fecha, enviados, errores, {
+      socios: deudores.map(d => ({ id: d.id, nombre: `${d.nombre} ${d.apellido}` }))
+    });
+
+    console.log(`>> [aviso-deuda] ${enviados} enviados, ${errores} errores.`);
+    return res.status(200).json({ ok: true, enviados, errores, total: deudores.length });
+  } catch (err) {
+    console.error('>> [aviso-deuda] Error general:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// --- DÍA 10: reporte a los administradores ---
+app.post('/api/cron/reporte-morosos', async (req, res) => {
+  try {
+    const candado = await tomarCandadoDelDia('REPORTE_DIA_10');
+    if (!candado.ok) {
+      console.log(`>> [reporte-morosos] No se envía: ${candado.motivo}`);
+      return res.status(200).json({ ok: true, omitido: true, motivo: candado.motivo });
+    }
+
+    const deudores = await sociosQueDeben();
+    const admins = (process.env.ADMIN_EMAILS || 'totoarr17@gmail.com,jmferrariprofe@gmail.com')
+      .split(',').map(s => s.trim()).filter(Boolean);
+
+    const totalDeuda = deudores.reduce((acc, d) => acc + Number(d.deuda_acumulada || 0), 0);
+    const filas = deudores
+      .sort((a, b) => Number(b.deuda_acumulada || 0) - Number(a.deuda_acumulada || 0))
+      .map(d => `• ${d.apellido}, ${d.nombre} — $${Number(d.deuda_acumulada || 0).toLocaleString('es-AR')} — ${d.telefono || 'sin tel'}`)
+      .join('\n');
+
+    const cuerpo = deudores.length === 0
+      ? 'No hay socios con deuda este mes. 🎉'
+      : `Hoy es ${candado.fecha}, día ${DIA_BAJA_RESERVA}: estos socios siguen sin pagar.\n\n` +
+        `${filas}\n\n` +
+        `Total adeudado: $${totalDeuda.toLocaleString('es-AR')}\n` +
+        `Socios: ${deudores.length}\n\n` +
+        `Entrá a la app para decidir a quién se le da de baja el turno y a quién se le perdona.`;
+
+    let enviados = 0, errores = 0;
+    for (const admin of admins) {
+      const r = await enviarMailSimple({
+        email: admin,
+        asunto: `📋 Morosos al día ${DIA_BAJA_RESERVA} — ${deudores.length} socio(s)`,
+        titulo: `Reporte de morosos`,
+        cuerpo
+      });
+      if (r.ok) enviados++; else errores++;
+    }
+
+    await registrarResultadoEnvio('REPORTE_DIA_10', candado.fecha, enviados, errores, {
+      morosos: deudores.length,
+      total_deuda: totalDeuda
+    });
+
+    console.log(`>> [reporte-morosos] ${deudores.length} morosos, ${enviados} mails enviados.`);
+    return res.status(200).json({ ok: true, morosos: deudores.length, enviados, errores });
+  } catch (err) {
+    console.error('>> [reporte-morosos] Error general:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Serve static assets from build output folder
 app.use(express.static(path.join(__dirname, 'dist')));
 

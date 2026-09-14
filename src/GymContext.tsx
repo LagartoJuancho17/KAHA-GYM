@@ -15,6 +15,7 @@ import { mergeLogs, logsFaltantesEnDb, parsearLogsGuardados, normalizarIdsLegacy
 import { calcularOcupacion, conflictosAlAgregarFijo, reservasPropiasDuplicadas } from './lib/ocupacion';
 import { clavePrioridad, esperaDelTurno, proximoEnEntrar, ordenarEsperaSemanal } from './lib/listaEspera';
 import { hoyArgentina, fechasFuturasDelTurno } from './lib/fechas';
+import { iniciarReposo } from './lib/reposo';
 import { calcularDeudaYEstadoCliente } from './lib/calculoDeuda';
 
 interface GymContextType {
@@ -69,6 +70,8 @@ interface GymContextType {
   updateCliente: (id: string, updates: Partial<Cliente>, extraLog?: string) => { success: boolean; message: string };
   autorizarCliente: (id: string, planId?: string, tipo?: TipoCliente) => { success: boolean; message: string };
   bajaLogicaCliente: (id: string) => void;
+  ponerEnReposo: (id: string, motivo?: string) => void;
+  sacarDeReposo: (id: string) => void;
   altaCliente: (id: string) => void;
   eliminarCliente: (id: string) => void;
   perdonarDeudaSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
@@ -471,7 +474,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           creado_at: c.creado_at,
           precio_personalizado: c.precio_personalizado != null ? Number(c.precio_personalizado) : undefined,
           dias_personalizados: c.dias_personalizados != null ? Number(c.dias_personalizados) : undefined,
-          nota_plan_personalizado: c.nota_plan_personalizado || undefined
+          nota_plan_personalizado: c.nota_plan_personalizado || undefined,
+          reposo: c.reposo || null
         };
 
         const calculo = calcularDeudaYEstadoCliente(rawCliente, planesList, mesActual, diaHoy);
@@ -1699,6 +1703,173 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_BAJA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
     addToast('delete', 'Socio dado de baja exitosamente.');
+  };
+
+  /**
+   * Poner en reposo: congelar la cuenta en vez de borrarla.
+   *
+   * Hace lo que hoy el admin hace a mano (sacarlo de los turnos, sacarlo de la
+   * lista de deudores) pero sin borrar la ficha: queda 6 meses por si vuelve.
+   *
+   * La deuda que ya tenía NO se toca. Reposo congela, no perdona: mientras esté
+   * en reposo no se le suma cuota ni le llegan avisos, pero el número queda
+   * registrado. Para perdonarla existe "perdonar deuda", que lo deja auditado.
+   */
+  const ponerEnReposo = (id: string, motivo?: string) => {
+    const cliente = clientes.find(c => c.id === id);
+    if (!cliente) return;
+
+    const hoy = hoyArgentina();
+    const turnosQueTenia = turnos
+      .filter(t => t.asignados_ids.includes(id))
+      .map(t => t.id);
+
+    const datosReposo = iniciarReposo(hoy, motivo, turnosQueTenia);
+
+    let updatedClientes = clientes.map(c =>
+      c.id === id
+        ? { ...c, activo: false, estado: 'INACTIVO' as EstadoCliente, turnos_fijos: [], reposo: datosReposo }
+        : c
+    );
+
+    // Libera los turnos y promueve de la espera igual que una baja: el lugar
+    // físico queda disponible desde hoy, no dentro de 6 meses.
+    const promovidosInfo: Array<{ clienteId: string; turnoId: string; clienteNombre: string }> = [];
+    const updatedTurnos = turnos.map(t => {
+      const estabaEnAsignados = t.asignados_ids.includes(id);
+      const filtradoAsignados = t.asignados_ids.filter(cid => cid !== id);
+      let nuevaWaitlist = t.lista_espera_ids.filter(cid => cid !== id);
+      let nuevosAsignados = [...filtradoAsignados];
+
+      if (estabaEnAsignados && nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
+        const ordenada = ordenarEsperaSemanal(nuevaWaitlist, t.id, sociosPrioritarios);
+        const promovidoId = ordenada[0];
+        nuevosAsignados.push(promovidoId);
+        nuevaWaitlist = nuevaWaitlist.filter(cid => cid !== promovidoId);
+        const promCli = updatedClientes.find(c => c.id === promovidoId);
+        promovidosInfo.push({
+          clienteId: promovidoId,
+          turnoId: t.id,
+          clienteNombre: promCli ? `${promCli.nombre} ${promCli.apellido}` : 'Socio'
+        });
+      }
+
+      return { ...t, asignados_ids: nuevosAsignados, lista_espera_ids: nuevaWaitlist };
+    });
+
+    if (promovidosInfo.length > 0) {
+      updatedClientes = updatedClientes.map(c => {
+        const promos = promovidosInfo.filter(p => p.clienteId === c.id);
+        if (promos.length === 0) return c;
+        const newTurnosFijos = [...c.turnos_fijos];
+        promos.forEach(p => { if (!newTurnosFijos.includes(p.turnoId)) newTurnosFijos.push(p.turnoId); });
+        return { ...c, tipo: 'FIJO' as TipoCliente, turnos_fijos: newTurnosFijos };
+      });
+    }
+
+    const updatedWaitlistReservas = waitlistReservas.filter(w => w.cliente_id !== id);
+
+    saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+    setWaitlistReservas(updatedWaitlistReservas);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updatedWaitlistReservas));
+
+    if (supabase) {
+      supabase.from('clientes')
+        .update({ activo: false, estado: 'INACTIVO', reposo: datosReposo })
+        .eq('id', id)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error al poner en reposo en Supabase:', error);
+            addToast('error', 'El reposo no se guardó en la base. Reintentá.');
+          }
+        });
+      supabase.from('asignaciones_turnos').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error('Error al liberar turnos por reposo:', error);
+      });
+      supabase.from('lista_espera_turnos').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error('Error al limpiar espera semanal por reposo:', error);
+      });
+      supabase.from('lista_espera_reservas').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error('Error al limpiar espera por fecha en reposo:', error);
+      });
+
+      promovidosInfo.forEach(({ clienteId: promId, turnoId: tId, clienteNombre }) => {
+        resolveTurnoUuid(tId).then((turnoUuid) => {
+          if (!turnoUuid) return;
+          supabase.from('lista_espera_turnos').delete()
+            .eq('cliente_id', promId).eq('turno_id', turnoUuid)
+            .then(({ error }) => { if (error) console.error('Error al remover de espera tras reposo:', error); });
+          supabase.from('asignaciones_turnos').insert({ cliente_id: promId, turno_id: turnoUuid })
+            .then(({ error }) => { if (error) console.error('Error al promover tras reposo:', error); });
+        });
+        notificarAltaWaitlist(promId, tId);
+        addAuditLog('LISTA_ESPERA_PROMOCION_AUTO', {
+          cliente_id: promId,
+          cliente_nombre: clienteNombre,
+          turno_id: tId,
+          motivo: 'Cupo liberado por reposo de socio'
+        });
+        addToast('success', `¡Cupo liberado! Se promovió automáticamente a ${clienteNombre}.`);
+      });
+    }
+
+    addAuditLog('SOCIO_EN_REPOSO', {
+      cliente_id: id,
+      cliente: `${cliente.nombre} ${cliente.apellido}`,
+      desde: datosReposo.desde,
+      hasta: datosReposo.hasta,
+      motivo: motivo || undefined,
+      turnos_liberados: turnosQueTenia,
+      deuda_congelada: cliente.deuda_acumulada || 0
+    });
+    addToast('success', `${cliente.nombre} queda en reposo hasta el ${datosReposo.hasta}. La ficha no se borra.`);
+  };
+
+  /**
+   * Volver del reposo: reactiva la ficha tal cual estaba.
+   * No devuelve los turnos automáticamente porque en 6 meses lo más probable es
+   * que los haya tomado otro; el admin se los reasigna desde la grilla.
+   */
+  const sacarDeReposo = (id: string) => {
+    const cliente = clientes.find(c => c.id === id);
+    if (!cliente) return;
+
+    const turnosQueTenia = cliente.reposo?.turnos_liberados || [];
+
+    const updatedClientes = clientes.map(c =>
+      c.id === id
+        ? { ...c, activo: true, estado: (c.deuda_acumulada > 0 ? 'CON_DEUDA' : 'ACTIVO') as EstadoCliente, reposo: null }
+        : c
+    );
+
+    saveState(updatedClientes);
+
+    if (supabase) {
+      supabase.from('clientes')
+        .update({
+          activo: true,
+          estado: cliente.deuda_acumulada > 0 ? 'CON_DEUDA' : 'ACTIVO',
+          reposo: null
+        })
+        .eq('id', id)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error al reactivar del reposo en Supabase:', error);
+            addToast('error', 'La reactivación no se guardó en la base. Reintentá.');
+          }
+        });
+    }
+
+    addAuditLog('SOCIO_VUELVE_DE_REPOSO', {
+      cliente_id: id,
+      cliente: `${cliente.nombre} ${cliente.apellido}`,
+      turnos_que_tenia: turnosQueTenia
+    });
+    addToast('success',
+      turnosQueTenia.length > 0
+        ? `${cliente.nombre} vuelve. Tenía: ${turnosQueTenia.join(', ')}. Reasignale los turnos desde la grilla.`
+        : `${cliente.nombre} vuelve a estar activo.`
+    );
   };
 
   const altaCliente = (id: string) => {
@@ -5022,7 +5193,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
-      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, bajaClasesSocio, importarClientesCSV,
+      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, ponerEnReposo, sacarDeReposo, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, darDeBajaTurnosFijosSocio, darDeBajaTurnosFijosMultiple, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,

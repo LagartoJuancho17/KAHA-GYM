@@ -20,6 +20,15 @@ export interface ClaseSuspendida {
   creado_at: string;
 }
 
+// Cuenta congelada: sale de los turnos y deja de generar deuda, pero la ficha
+// se conserva 6 meses por si el socio vuelve. Ver src/lib/reposo.ts.
+export interface DatosReposo {
+  desde: string;  // 'YYYY-MM-DD'
+  hasta: string;  // 'YYYY-MM-DD'
+  motivo?: string;
+  turnos_liberados?: string[];
+}
+
 export interface Cliente {
   id: string;
   codigo_socio?: string; // ID / código de socio personalizado, ej: "SOC-001"
@@ -46,6 +55,7 @@ export interface Cliente {
   dias_personalizados?: number | null;   // Si está definido, reemplaza plan.dias_por_semana para este socio
   nota_plan_personalizado?: string | null; // Descripción/motivo del plan especial
   foto_url?: string; // URL o DataURL en base64 de la foto de perfil del socio
+  reposo?: DatosReposo | null; // Cuenta congelada temporalmente (no borrada)
 }
 
 export interface Plan {

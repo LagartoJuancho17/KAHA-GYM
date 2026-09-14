@@ -1,9 +1,11 @@
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard } from 'lucide-react';
+import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard, PauseCircle, RotateCcw } from 'lucide-react';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
+import { estaEnReposo, etiquetaReposo, calcularFinDeReposo, MESES_DE_REPOSO } from '../../lib/reposo';
+import { hoyArgentina } from '../../lib/fechas';
 
 interface ClienteProfileModalProps {
   isOpen: boolean;
@@ -36,12 +38,22 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   onManageTurnos,
   onAssignPlan
 }) => {
-  const { clientes, planes, pagos, turnos, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, googleUser } = useGym();
+  const { clientes, planes, pagos, turnos, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, ponerEnReposo, sacarDeReposo, googleUser } = useGym();
+
+  const [confirmandoReposo, setConfirmandoReposo] = React.useState(false);
+  const [motivoReposo, setMotivoReposo] = React.useState('');
+
+  React.useEffect(() => {
+    if (!isOpen) { setConfirmandoReposo(false); setMotivoReposo(''); }
+  }, [isOpen, clienteId]);
 
   if (!isOpen || !clienteId) return null;
 
   const selectedCliente = clientes.find(c => c.id === clienteId);
   if (!selectedCliente) return null;
+
+  const enReposo = estaEnReposo(selectedCliente);
+  const hoy = hoyArgentina();
 
   const plan = planes.find(p => p.id === selectedCliente.plan_id);
   const esBecado = selectedCliente.exencion_cobro === 'BECADO' || selectedCliente.exencion_cobro === 'PERDONADO';
@@ -95,7 +107,27 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
 
         {/* Content body */}
         <div className="p-6 space-y-6 overflow-y-auto flex-1">
-          
+
+          {/* Cuenta congelada */}
+          {enReposo && selectedCliente.reposo && (
+            <div className="border border-amber-300 bg-amber-50 rounded-xl p-4 flex items-start gap-3" id="banner-reposo">
+              <PauseCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-950 space-y-1">
+                <p className="font-bold">Cuenta en reposo · {etiquetaReposo(selectedCliente, hoy)}</p>
+                <p className="text-amber-900">
+                  Desde el {selectedCliente.reposo.desde} hasta el {selectedCliente.reposo.hasta}.
+                  {selectedCliente.reposo.motivo ? ` Motivo: ${selectedCliente.reposo.motivo}.` : ''}
+                </p>
+                {(selectedCliente.reposo.turnos_liberados || []).length > 0 && (
+                  <p className="text-amber-900">
+                    Turnos que tenía: {(selectedCliente.reposo.turnos_liberados || []).join(', ')}
+                  </p>
+                )}
+                <p className="text-amber-900">No se le suma cuota ni le llegan avisos de deuda mientras esté en reposo.</p>
+              </div>
+            </div>
+          )}
+
           {/* Información Personal */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
@@ -421,8 +453,83 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
             })()}
           </div>
 
+          {/* Confirmación de reposo */}
+          {confirmandoReposo && !enReposo && (
+            <div className="border border-amber-300 bg-amber-50 rounded-xl p-4 space-y-3" id="confirmar-reposo">
+              <div className="flex items-start gap-2">
+                <PauseCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-950 space-y-1">
+                  <p className="font-bold">Poner a {selectedCliente.nombre} en reposo por {MESES_DE_REPOSO} meses</p>
+                  <ul className="list-disc list-inside space-y-0.5 text-amber-900">
+                    <li>Se libera{selectedCliente.turnos_fijos.length === 1 ? '' : 'n'} su{selectedCliente.turnos_fijos.length === 1 ? '' : 's'} turno{selectedCliente.turnos_fijos.length === 1 ? '' : 's'} fijo{selectedCliente.turnos_fijos.length === 1 ? '' : 's'} ahora mismo</li>
+                    <li>Deja de figurar entre los deudores y no se le suma la cuota</li>
+                    <li>La ficha NO se borra: queda hasta el {calcularFinDeReposo(hoy)}</li>
+                    {selectedCliente.deuda_acumulada > 0 && (
+                      <li className="font-semibold">
+                        Queda congelada la deuda actual de ${selectedCliente.deuda_acumulada.toLocaleString('es-AR')} (no se perdona)
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={motivoReposo}
+                onChange={e => setMotivoReposo(e.target.value)}
+                placeholder="Motivo (opcional). Ej: cambio de trabajo"
+                className="w-full border border-amber-300 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                id="input-motivo-reposo"
+              />
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => { setConfirmandoReposo(false); setMotivoReposo(''); }}
+                  className="px-3 py-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    ponerEnReposo(selectedCliente.id, motivoReposo);
+                    setConfirmandoReposo(false);
+                    setMotivoReposo('');
+                    onClose();
+                  }}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                  id="btn-confirmar-reposo"
+                >
+                  Confirmar reposo
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Footer Actions */}
-          <div className="pt-4 border-t border-zinc-100 flex gap-3 justify-end bg-zinc-50 -mx-6 -mb-6 p-6">
+          <div className="pt-4 border-t border-zinc-100 flex flex-wrap gap-3 justify-end bg-zinc-50 -mx-6 -mb-6 p-6">
+            {enReposo ? (
+              <button
+                onClick={() => {
+                  sacarDeReposo(selectedCliente.id);
+                  onClose();
+                }}
+                className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold font-sans flex items-center gap-1.5 transition-colors cursor-pointer mr-auto"
+                id="btn-reactivar-reposo"
+              >
+                <RotateCcw className="w-4 h-4 text-emerald-600" />
+                <span>Reactivar cuenta</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmandoReposo(true)}
+                className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold font-sans flex items-center gap-1.5 transition-colors cursor-pointer mr-auto"
+                id="btn-poner-en-reposo"
+                title="Congela la cuenta 6 meses sin borrar la ficha"
+              >
+                <PauseCircle className="w-4 h-4 text-amber-600" />
+                <span>Poner en reposo</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 onDeleteClick(selectedCliente);

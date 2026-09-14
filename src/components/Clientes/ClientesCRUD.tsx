@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Plus, ChevronDown, Upload, Download, AlertCircle, Check, X } from 'lucide-react';
+import { Plus, ChevronDown, Upload, Download, AlertCircle, Check, X, PauseCircle } from 'lucide-react';
+import { estaEnReposo } from '../../lib/reposo';
 
 // Import subcomponents
 import { ClientesFilter } from './ClientesFilter';
@@ -60,6 +61,7 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
   const [selectedProfesores, setSelectedProfesores] = useState<string[]>([]);
   const [matchModoProfe, setMatchModoProfe] = useState<'O' | 'Y'>('O');
   const [verInactivos, setVerInactivos] = useState(false);
+  const [verEnReposo, setVerEnReposo] = useState(false);
   const [pagina, setPagina] = useState(1);
   const filasPorPagina = 20;
 
@@ -168,6 +170,14 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
       });
     }
 
+    // Socios en reposo: no son bajas, son cuentas congeladas que hay que poder
+    // volver a encontrar para reactivarlas. Por eso tienen su propia vista en vez
+    // de mezclarse con los activos (inflarían los conteos) o desaparecer del todo.
+    if (verEnReposo) {
+      return result.filter(c => estaEnReposo(c));
+    }
+    result = result.filter(c => !estaEnReposo(c));
+
     // Filtrar solo clientes activos
     result = result.filter(c => c.activo);
 
@@ -179,7 +189,9 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     });
 
     return result;
-  }, [clientes, buscar, filtroEstado, selectedProfesores, matchModoProfe, turnos]);
+  }, [clientes, buscar, filtroEstado, selectedProfesores, matchModoProfe, turnos, verEnReposo]);
+
+  const cantidadEnReposo = useMemo(() => clientes.filter(c => estaEnReposo(c)).length, [clientes]);
 
   // --- EXPORTAR LISTADO MÉTODOS ---
   const handleExportCSV = () => {
@@ -355,6 +367,35 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
         matchModoProfe={matchModoProfe}
         setMatchModoProfe={setMatchModoProfe}
       />
+
+      {/* VISTA DE CUENTAS EN REPOSO
+          Sin esto un socio en reposo queda invisible y no hay forma de
+          reactivarlo, que es justamente para lo que se guarda la ficha. */}
+      {(cantidadEnReposo > 0 || verEnReposo) && (
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+          <div className="flex items-center gap-2 text-xs text-amber-950">
+            <PauseCircle className="w-4 h-4 text-amber-700 shrink-0" />
+            <span className="font-semibold">
+              {cantidadEnReposo} {cantidadEnReposo === 1 ? 'cuenta congelada' : 'cuentas congeladas'} en reposo
+            </span>
+            <span className="text-amber-800 hidden sm:inline">
+              · no se les cobra ni ocupan turno, y la ficha se guarda 6 meses
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVerEnReposo(v => !v)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+              verEnReposo
+                ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'
+                : 'bg-white text-amber-900 border-amber-300 hover:bg-amber-100'
+            }`}
+            id="btn-ver-en-reposo"
+          >
+            {verEnReposo ? 'Volver a los socios activos' : 'Ver las cuentas en reposo'}
+          </button>
+        </div>
+      )}
 
       {/* TABLA PRINCIPAL */}
       <ClientesTable 

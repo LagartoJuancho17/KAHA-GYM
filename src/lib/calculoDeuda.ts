@@ -40,6 +40,21 @@ export function calcularDeudaYEstadoCliente(
   mesActual: string,
   diaDelMes: number
 ): ResultadoCalculoDeuda {
+  // Socio en reposo: la cuenta está congelada a propósito. No se le imputa la
+  // cuota del mes, si no vuelve a los 6 meses debiendo cuotas que nunca usó.
+  // Va explícito y antes que todo lo demás: hoy el reposo además deja al socio
+  // inactivo y caería igual en el chequeo de abajo, pero esa es una decisión que
+  // puede cambiar, y la regla "en reposo no se cobra" no depende de aquélla.
+  if (cliente.reposo?.desde) {
+    return {
+      deuda_acumulada: Number(cliente.deuda_acumulada || 0),
+      estado: 'INACTIVO',
+      esBecado: cliente.exencion_cobro === 'BECADO' || cliente.exencion_cobro === 'PERDONADO',
+      deuda_perdonada: cliente.deuda_perdonada,
+      pagoEsteMes: Boolean(cliente.ultimo_mes_pagado && cliente.ultimo_mes_pagado >= mesActual)
+    };
+  }
+
   // Si el cliente está inactivo (baja manual), se respeta
   if (!cliente.activo || cliente.estado === 'INACTIVO') {
     return {

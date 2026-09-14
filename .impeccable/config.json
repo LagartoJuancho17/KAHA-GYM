@@ -23,6 +23,12 @@
         "value": "text-zinc-400 on bg-zinc-900",
         "createdAt": "2026-09-08T16:24:29.845Z",
         "reason": "mismo patron ya evaluado (Dashboard.tsx): zinc-400 sobre zinc-900 es ~7.5:1 de contraste, header oscuro preexistente, no tocado en su estilo por este fix"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-zinc-400 hover:text-rose-600 bg-transparent",
+        "createdAt": "2026-09-14T18:05:59.442Z",
+        "reason": "boton de borrar: el gris va sobre fondo transparente y en hover cambian texto Y fondo juntos (rose-600 sobre rose-50), nunca hay gris sobre color. Mismo patron ya sancionado en SocioReservas.tsx"
       }
     ]
   }
