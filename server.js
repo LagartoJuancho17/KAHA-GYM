@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeArgPhone, isSendablePhone } from './services/notify/phone.js';
+import { normalizarSupabaseUrl } from './services/supabase/baseUrl.js';
 
 // Load environment variables from .env
 dotenv.config();
@@ -18,8 +19,18 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 // Initialize Supabase Client
-const supabaseUrl = process.env.SUPABASE_URL;
+// La URL se normaliza porque en producción viene con "/rest/v1" pegado y
+// supabase-js lo vuelve a agregar: la API respondía PGRST125 y fallaba TODA
+// operación del servidor contra Supabase. Ver services/supabase/baseUrl.js.
+const supabaseUrl = normalizarSupabaseUrl(process.env.SUPABASE_URL);
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (process.env.SUPABASE_URL && supabaseUrl !== process.env.SUPABASE_URL.trim()) {
+  console.warn(
+    `>> [supabase] SUPABASE_URL venía como "${process.env.SUPABASE_URL}" y se normalizó a "${supabaseUrl}". ` +
+    `Conviene dejar en la variable sólo el dominio.`
+  );
+}
 
 const supabase = (supabaseUrl && supabaseServiceKey) 
   ? createClient(supabaseUrl, supabaseServiceKey) 
