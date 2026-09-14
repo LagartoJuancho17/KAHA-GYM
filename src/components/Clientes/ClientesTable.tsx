@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User } from 'lucide-react';
+import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User, RotateCcw } from 'lucide-react';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 
@@ -80,7 +80,7 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
   onSelectCliente, onManageTurnos, onStartEdit, onDeleteClick,
   onStartAuthorization, onOpenBajaClases, onAssignPlan
 }) => {
-  const { autorizarCliente } = useGym();
+  const { autorizarCliente, perdonarDeudaSocio, revertirPerdonDeuda, googleUser } = useGym();
   return (
     <div className="relative shrink-0">
       <button
@@ -141,6 +141,23 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
               <CalendarX className="w-3.5 h-3.5 text-rose-500" />
               Ausencia / Vacaciones / Viaje
             </button>
+            {c.exencion_cobro !== 'BECADO' && c.exencion_cobro !== 'PERDONADO' ? (
+              <button
+                onClick={() => { close(); perdonarDeudaSocio(c.id, googleUser?.email); }}
+                className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 text-emerald-800 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+              >
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                Perdonar Deuda (Becar $0)
+              </button>
+            ) : (
+              <button
+                onClick={() => { close(); revertirPerdonDeuda(c.id, googleUser?.email); }}
+                className="w-full text-left px-4 py-2.5 hover:bg-amber-50 text-amber-900 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                Quitar Beca / Restablecer
+              </button>
+            )}
             <button
               onClick={() => { close(); onDeleteClick(c); }}
               className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 hover:text-red-700 font-medium flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"

@@ -72,6 +72,7 @@ interface GymContextType {
   altaCliente: (id: string) => void;
   eliminarCliente: (id: string) => void;
   perdonarDeudaSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
+  revertirPerdonDeuda: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
   bajaClasesSocio: (clienteId: string, clases: { turno_id: string; fecha: string }[], opciones?: { esBajaTemporal?: boolean; exencionCobro?: 'SUSPENDIDO' | 'POSTERGADO' | 'NINGUNA' }) => { success: boolean; message: string };
   importarClientesCSV: (clientesImportados: Array<{ nombre: string; apellido: string; email: string; telefono: string; tipo: TipoCliente; plan_nombre: string }>) => { procesados: number; insertados: number; errores: string[] };
 
@@ -472,11 +473,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         const calculo = calcularDeudaYEstadoCliente(rawCliente, planesList, mesActual, diaHoy);
+        const ultimoMes = (calculo.esBecado || rawCliente.exencion_cobro === 'BECADO' || rawCliente.exencion_cobro === 'PERDONADO') &&
+          (!rawCliente.ultimo_mes_pagado || rawCliente.ultimo_mes_pagado < mesActual)
+            ? mesActual
+            : rawCliente.ultimo_mes_pagado;
         return {
           ...rawCliente,
           deuda_acumulada: calculo.deuda_acumulada,
           estado: calculo.estado,
-          deuda_perdonada: calculo.deuda_perdonada ?? rawCliente.deuda_perdonada
+          deuda_perdonada: calculo.deuda_perdonada ?? rawCliente.deuda_perdonada,
+          ultimo_mes_pagado: ultimoMes
         };
       });
 
@@ -875,11 +881,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const clientesSincronizados = rawLoadedClientes.map(c => {
         const res = calcularDeudaYEstadoCliente(c, planesActivos, mesActual, diaHoy);
+        const ultimoMes = (res.esBecado || c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO') &&
+          (!c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual)
+            ? mesActual
+            : c.ultimo_mes_pagado;
         return {
           ...c,
           deuda_acumulada: res.deuda_acumulada,
           estado: res.estado,
-          deuda_perdonada: res.deuda_perdonada ?? c.deuda_perdonada
+          deuda_perdonada: res.deuda_perdonada ?? c.deuda_perdonada,
+          ultimo_mes_pagado: ultimoMes
         };
       });
 
@@ -1832,6 +1843,32 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast('success', `Se perdonó la deuda de ${cli.nombre} ${cli.apellido} (Estado: Becado).`);
     return { success: true, message: `Deuda perdonada a ${cli.nombre} ${cli.apellido}.` };
+  };
+
+  const revertirPerdonDeuda = (clienteId: string, userEmail?: string) => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return { success: false, message: 'Socio no encontrado' };
+
+    const plan = planes.find(p => p.id === cli.plan_id);
+    const cuota = cli.precio_personalizado != null ? Number(cli.precio_personalizado) : (plan ? Number(plan.precio) : 0);
+    const montoRestaurado = cli.deuda_perdonada && cli.deuda_perdonada > 0 ? cli.deuda_perdonada : cuota;
+
+    updateCliente(clienteId, {
+      deuda_acumulada: montoRestaurado,
+      exencion_cobro: 'NINGUNA',
+      deuda_perdonada: undefined,
+      estado: 'MOROSO'
+    }, `Beca retirada. Deuda restablecida en $${montoRestaurado.toLocaleString('es-AR')}`);
+
+    addAuditLog('BECA_REVOCADA', {
+      cliente_id: clienteId,
+      cliente_nombre: `${cli.nombre} ${cli.apellido}`,
+      monto_deuda_restablecido: montoRestaurado,
+      fecha: new Date().toISOString()
+    }, userEmail);
+
+    addToast('success', `Se quitó la condición de becado a ${cli.nombre} ${cli.apellido}. Deuda restablecida: $${montoRestaurado.toLocaleString('es-AR')}.`);
+    return { success: true, message: `Beca revocada a ${cli.nombre} ${cli.apellido}.` };
   };
 
   // IMPORTACIÓN MASIVA CSV CLIENTES
@@ -4772,7 +4809,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
-      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, perdonarDeudaSocio, bajaClasesSocio, importarClientesCSV,
+      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, darDeBajaTurnosFijosSocio, darDeBajaTurnosFijosMultiple, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,

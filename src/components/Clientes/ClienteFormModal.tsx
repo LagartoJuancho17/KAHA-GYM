@@ -158,6 +158,9 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
     const apellido = parts.length > 1 ? parts.pop()! : '';
     const nombre = parts.join(' ');
 
+    const esBeca = clienteForm.exencion_cobro === 'BECADO' || clienteForm.exencion_cobro === 'PERDONADO';
+    const deudaFinal = esBeca ? 0 : (Number(clienteForm.deuda_acumulada) || 0);
+
     const payload = {
       nombre, apellido,
       codigo_socio: clienteForm.codigo_socio,
@@ -166,7 +169,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       tipo: clienteForm.tipo,
       plan_id: clienteForm.plan_id || planes[0]?.id || '',
       exencion_cobro: clienteForm.exencion_cobro,
-      deuda_acumulada: clienteForm.deuda_acumulada,
+      deuda_acumulada: deudaFinal,
       precio_personalizado: isCustomPlan && clienteForm.precio_personalizado !== '' ? Number(clienteForm.precio_personalizado) : null,
       dias_personalizados: isCustomPlan && clienteForm.dias_personalizados !== '' ? Number(clienteForm.dias_personalizados) : null,
       nota_plan_personalizado: isCustomPlan ? (clienteForm.nota_plan_personalizado || null) : null
@@ -175,10 +178,13 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
     if (editingClienteId) {
       const existing = clientes.find(c => c.id === editingClienteId);
       let nuevoEstado = existing?.estado || 'ACTIVO';
-      const nuevaDeuda = Number(clienteForm.deuda_acumulada) || 0;
-      if (nuevaDeuda > 0 && nuevoEstado === 'ACTIVO') nuevoEstado = 'CON_DEUDA';
-      else if (nuevaDeuda === 0 && nuevoEstado !== 'INACTIVO') nuevoEstado = 'ACTIVO';
-      const res = updateCliente(editingClienteId, { ...payload, estado: nuevoEstado });
+      if (deudaFinal > 0 && nuevoEstado === 'ACTIVO') nuevoEstado = 'CON_DEUDA';
+      else if (deudaFinal === 0 && nuevoEstado !== 'INACTIVO') nuevoEstado = 'ACTIVO';
+      const updatesToSave: any = { ...payload, estado: nuevoEstado };
+      if (esBeca) {
+        updatesToSave.ultimo_mes_pagado = new Date().toISOString().slice(0, 7);
+      }
+      const res = updateCliente(editingClienteId, updatesToSave);
       if (res.success) { setFormSuccess(res.message); setTimeout(() => handleClose(), 1200); }
       else setFormError(res.message);
     } else {
@@ -327,7 +333,19 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
 
             <div className="space-y-1">
               <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Excepción / Exención de Cobro</label>
-              <select value={clienteForm.exencion_cobro} onChange={(e) => setClienteForm(prev => ({ ...prev, exencion_cobro: e.target.value as any }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer" id="form-exencion-cobro">
+              <select
+                value={clienteForm.exencion_cobro}
+                onChange={(e) => {
+                  const val = e.target.value as any;
+                  setClienteForm(prev => ({
+                    ...prev,
+                    exencion_cobro: val,
+                    deuda_acumulada: (val === 'BECADO' || val === 'PERDONADO') ? 0 : prev.deuda_acumulada
+                  }));
+                }}
+                className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer"
+                id="form-exencion-cobro"
+              >
                 <option value="NINGUNA">Ninguna (Control estándar)</option>
                 <option value="BECADO">Becado (Deuda $0)</option>
                 <option value="SUSPENDIDO">Suspensión momentánea</option>

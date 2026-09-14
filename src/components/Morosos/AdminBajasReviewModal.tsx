@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   AlertTriangle, X, UserMinus, ShieldCheck, Mail, Search, 
   Check, CheckSquare, Square, MessageCircle, AlertCircle, 
-  Clock, Sparkles, RefreshCw, Send
+  Clock, Sparkles, RefreshCw, Send, RotateCcw, Loader2 
 } from 'lucide-react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
@@ -23,10 +23,11 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
   isOpen, onClose, onOpenEmailModal 
 }) => {
   const { 
-    clientes, planes, eliminarCliente, perdonarDeudaSocio,
-    darDeBajaTurnosFijosMultiple, addAuditLog, addToast, googleUser 
+    clientes, planes, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda,
+    addAuditLog, addToast, googleUser 
   } = useGym();
 
+  const [tabActiva, setTabActiva] = useState<'PENDIENTES' | 'BECADOS'>('PENDIENTES');
   const [searchText, setSearchText] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dobleCheckConfig, setDobleCheckConfig] = useState<MorososDobleCheckConfig | null>(null);
@@ -36,31 +37,38 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
   const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
   const mesNombre = hoy.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
-  // Candidatos a baja de turno fijo: activos, con turnos fijos asignados y sin abonar el mes actual
-  const candidatosBaja = useMemo(() => {
+  // Candidatos a baja de turno fijo: activos, con turnos fijos asignados, sin abonar y sin exención/beca activa
+  const candidatosPendientes = useMemo(() => {
     return clientes.filter(c => {
       if (!c.activo) return false;
       if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
+      if (c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO') return false;
       const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual;
       return noPago;
     });
   }, [clientes, mesActual]);
 
+  // Alumnos con turnos fijos asignados que están Becados o Perdonados (cuota perdonada / deuda $0)
+  const sociosBecados = useMemo(() => {
+    return clientes.filter(c => {
+      if (!c.activo) return false;
+      if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
+      return c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO';
+    });
+  }, [clientes]);
+
+  const listaActual = tabActiva === 'PENDIENTES' ? candidatosPendientes : sociosBecados;
+
   const filteredCandidatos = useMemo(() => {
-    if (!searchText.trim()) return candidatosBaja;
+    if (!searchText.trim()) return listaActual;
     const q = searchText.toLowerCase();
-    return candidatosBaja.filter(c => 
+    return listaActual.filter(c => 
       c.nombre.toLowerCase().includes(q) ||
       c.apellido.toLowerCase().includes(q) ||
       c.email.toLowerCase().includes(q) ||
       c.turnos_fijos.some(t => t.toLowerCase().includes(q))
     );
-  }, [candidatosBaja, searchText]);
-
-  // Socios que continúan pendientes de regularizar (no fueron perdonados ni eliminados)
-  const pendientesAviso = useMemo(() => {
-    return candidatosBaja.filter(c => c.exencion_cobro !== 'BECADO' && c.exencion_cobro !== 'PERDONADO');
-  }, [candidatosBaja]);
+  }, [listaActual, searchText]);
 
   if (!isOpen) return null;
 
@@ -93,7 +101,7 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
 
   const handleEliminarMultiple = () => {
     if (selectedIds.length === 0) return;
-    const selectedClients = candidatosBaja.filter(c => selectedIds.includes(c.id));
+    const selectedClients = listaActual.filter(c => selectedIds.includes(c.id));
     setDobleCheckConfig({
       tipo: 'BAJA_MASIVA_TURNOS',
       titulo: `Eliminar ${selectedIds.length} Socios Seleccionados`,
@@ -107,8 +115,18 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
     });
   };
 
+  const handlePerdonarDeuda = (clienteId: string) => {
+    perdonarDeudaSocio(clienteId, googleUser?.email);
+    setSelectedIds(prev => prev.filter(id => id !== clienteId));
+  };
+
+  const handleRevertirBeca = (clienteId: string) => {
+    revertirPerdonDeuda(clienteId, googleUser?.email);
+    setSelectedIds(prev => prev.filter(id => id !== clienteId));
+  };
+
   const handleFinalizarRevision = async () => {
-    if (pendientesAviso.length === 0) {
+    if (candidatosPendientes.length === 0) {
       addToast('success', 'Todos los casos fueron revisados (perdonados o eliminados).');
       onClose();
       return;
@@ -116,7 +134,7 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
 
     setEnviandoAvisos(true);
     try {
-      const destinatarios = pendientesAviso
+      const destinatarios = candidatosPendientes
         .filter(c => c.email && c.email.includes('@') && !c.email.endsWith('@example.com'))
         .map(c => ({
           email: c.email.trim(),
@@ -145,8 +163,8 @@ Equipo KAHA 💚`;
           body: JSON.stringify({ asunto, mensaje, destinatarios })
         });
         if (res.ok) {
-          const d = await res.json();
-          if (d.ok) sent = true;
+          const data = await res.json();
+          if (data.success) sent = true;
         }
       } catch (e) {
         console.warn('API local no disponible, intentando Supabase Edge Function:', e);
@@ -182,7 +200,7 @@ Equipo KAHA 💚`;
     }
   };
 
-  const totalDeudaCandidatos = candidatosBaja.reduce((acc, c) => acc + (c.deuda_acumulada || 0), 0);
+  const totalDeudaCandidatos = candidatosPendientes.reduce((acc, c) => acc + (c.deuda_acumulada || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/65 backdrop-blur-xs animate-fade-in">
@@ -217,35 +235,35 @@ Equipo KAHA 💚`;
           </button>
         </div>
 
-        {/* TOOLBAR & SEARCH */}
-        <div className="p-4 sm:p-5 bg-zinc-50 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-72">
-              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Buscar por socio, email o turno..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-zinc-200 rounded-xl text-xs font-sans focus:outline-hidden focus:border-red-500"
-              />
-            </div>
-            {candidatosBaja.length > 0 && (
-              <button
-                onClick={handleToggleSelectAll}
-                className="px-3 py-1.5 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              >
-                {selectedIds.length === filteredCandidatos.length && filteredCandidatos.length > 0 ? (
-                  <CheckSquare className="w-3.5 h-3.5 text-red-600" />
-                ) : (
-                  <Square className="w-3.5 h-3.5 text-zinc-400" />
-                )}
-                <span>Seleccionar ({selectedIds.length})</span>
-              </button>
-            )}
+        {/* PESTAÑAS PENDIENTES / BECADOS */}
+        <div className="px-4 sm:px-6 pt-3 pb-2 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setTabActiva('PENDIENTES'); setSelectedIds([]); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                tabActiva === 'PENDIENTES'
+                  ? 'bg-zinc-900 text-white border-zinc-900 shadow-2xs'
+                  : 'bg-white text-zinc-600 hover:bg-zinc-100 border-zinc-200'
+              }`}
+            >
+              <AlertTriangle className={`w-3.5 h-3.5 ${tabActiva === 'PENDIENTES' ? 'text-amber-400' : 'text-amber-600'}`} />
+              <span>Pendientes de Regularizar ({candidatosPendientes.length})</span>
+            </button>
+
+            <button
+              onClick={() => { setTabActiva('BECADOS'); setSelectedIds([]); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                tabActiva === 'BECADOS'
+                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                  : 'bg-white text-emerald-800 hover:bg-emerald-50 border-emerald-200'
+              }`}
+            >
+              <Check className={`w-3.5 h-3.5 ${tabActiva === 'BECADOS' ? 'text-white' : 'text-emerald-600'}`} />
+              <span>Socios Becados / Exentos ({sociosBecados.length})</span>
+            </button>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 onClose();
@@ -256,7 +274,38 @@ Equipo KAHA 💚`;
               <Mail className="w-3.5 h-3.5 text-amber-600" />
               <span>Enviar Reporte a Admins</span>
             </button>
+          </div>
+        </div>
 
+        {/* TOOLBAR & SEARCH */}
+        <div className="p-4 sm:p-5 bg-white border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-72">
+              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder={tabActiva === 'PENDIENTES' ? 'Buscar pendiente por socio, email o turno...' : 'Buscar becado por socio, email...'}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-sans focus:outline-hidden focus:border-zinc-900"
+              />
+            </div>
+            {filteredCandidatos.length > 0 && (
+              <button
+                onClick={handleToggleSelectAll}
+                className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border-none"
+              >
+                {selectedIds.length === filteredCandidatos.length && selectedIds.length > 0 ? (
+                  <CheckSquare className="w-3.5 h-3.5 text-red-600" />
+                ) : (
+                  <Square className="w-3.5 h-3.5 text-zinc-400" />
+                )}
+                <span>Seleccionar ({selectedIds.length})</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             {selectedIds.length > 0 && (
               <button
                 onClick={handleEliminarMultiple}
@@ -274,9 +323,15 @@ Equipo KAHA 💚`;
           {filteredCandidatos.length === 0 ? (
             <div className="text-center py-12 bg-zinc-50 border border-dashed border-zinc-200 rounded-2xl p-6">
               <ShieldCheck className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-              <p className="font-bold text-sm text-zinc-800">¡Al día! No hay socios con turnos fijos pendientes de baja</p>
+              <p className="font-bold text-sm text-zinc-800">
+                {tabActiva === 'PENDIENTES' 
+                  ? '¡Al día! No hay socios con turnos fijos pendientes de regularizar' 
+                  : 'No hay socios con turnos fijos registrados bajo condición de becados'}
+              </p>
               <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
-                Todos los alumnos con turnos fijos tienen su cuota abonada o cuentan con excepciones registradas.
+                {tabActiva === 'PENDIENTES'
+                  ? 'Todos los alumnos con turnos fijos tienen su cuota abonada o cuentan con excepciones y becas registradas.'
+                  : 'Los socios perdonados aparecerán en esta sección y no se les enviará intimación de baja.'}
               </p>
             </div>
           ) : (
@@ -317,7 +372,7 @@ Equipo KAHA 💚`;
                         )}
                         {esBecado && (
                           <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase">
-                            Becado
+                            Becado (Deuda $0)
                           </span>
                         )}
                       </div>
@@ -327,8 +382,8 @@ Equipo KAHA 💚`;
                         <span>·</span>
                         {esBecado ? (
                           <span className="font-mono text-emerald-700 font-bold flex items-center gap-1.5">
-                            Deuda: $0 
-                            <span className="text-zinc-400 font-normal line-through text-xs">({formatoDeuda.textoTachado})</span>
+                            Deuda actual: <span className="bg-emerald-100 text-emerald-900 font-extrabold px-1.5 py-0.5 rounded">$0</span>
+                            <span className="text-zinc-400 font-normal line-through decoration-rose-500 decoration-2 text-xs">({formatoDeuda.textoTachado})</span>
                             <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">Becado</span>
                           </span>
                         ) : (
@@ -344,7 +399,11 @@ Equipo KAHA 💚`;
                         {c.turnos_fijos.map(tf => (
                           <span 
                             key={tf}
-                            className="bg-red-50 border border-red-200 text-red-800 text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg"
+                            className={`border text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg ${
+                              esBecado 
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                                : 'bg-red-50 border border-red-200 text-red-800'
+                            }`}
                           >
                             {tf}
                           </span>
@@ -368,21 +427,25 @@ Equipo KAHA 💚`;
                       </a>
                     )}
 
-                    {/* Botón Perdonar Deuda */}
+                    {/* Botón Perdonar Deuda / Quitar Beca */}
                     {!esBecado ? (
                       <button
-                        onClick={() => perdonarDeudaSocio(c.id, googleUser?.email)}
-                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-                        title="Perdonar deuda (asigna deuda $0 y condición de Becado)"
+                        onClick={() => handlePerdonarDeuda(c.id)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs border-none"
+                        title="Perdonar deuda (pone deuda en $0 y asigna condición de Becado)"
                       >
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Perdonar deuda</span>
+                        <Check className="w-3.5 h-3.5 text-white" />
+                        <span>Perdonar deuda ($0)</span>
                       </button>
                     ) : (
-                      <span className="px-2.5 py-1 bg-emerald-100/70 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>Becado ($0)</span>
-                      </span>
+                      <button
+                        onClick={() => handleRevertirBeca(c.id)}
+                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="Quitar condición de becado y restablecer deuda normal"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Quitar Beca / Restablecer</span>
+                      </button>
                     )}
 
                     {/* Botón Eliminar Usuario */}
@@ -402,45 +465,55 @@ Equipo KAHA 💚`;
         </div>
 
         {/* FOOTER */}
-        <div className="p-4 sm:p-5 bg-zinc-50 border-t border-zinc-200 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="text-xs text-zinc-500">
-            Total en revisión: <strong className="text-zinc-900">{candidatosBaja.length} socios</strong> · Pendientes de regularizar: <strong className="text-red-700 font-bold">{pendientesAviso.length}</strong> · Deuda: <strong className="font-mono text-red-600">${totalDeudaCandidatos.toLocaleString('es-AR')}</strong>
+        <div className="p-4 sm:p-5 bg-zinc-50 border-t border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-3 font-sans text-xs">
+          <div className="text-zinc-600 text-center sm:text-left space-y-0.5">
+            <p>
+              Pendientes de regularizar: <strong className="text-zinc-950 font-bold">{candidatosPendientes.length} socios</strong>
+              {' · '}
+              Deuda total adeudada: <strong className="text-red-700 font-mono font-bold">${totalDeudaCandidatos.toLocaleString('es-AR')}</strong>
+            </p>
+            <p className="text-[11px] text-zinc-400">
+              {sociosBecados.length > 0 && `${sociosBecados.length} socio(s) con turnos fijos becados ($0) fuera de revisión de baja.`}
+            </p>
           </div>
+
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              className="px-4 py-2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Cerrar
             </button>
+
             <button
               onClick={handleFinalizarRevision}
-              disabled={enviandoAvisos}
-              className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer border-none"
+              disabled={enviandoAvisos || candidatosPendientes.length === 0}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer border-none"
+              title="Finalizar revisión y despachar email de advertencia de baja a todos los no perdonados"
             >
               {enviandoAvisos ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Enviando avisos...</span>
-                </>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
               ) : (
-                <>
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Finalizar y Enviar Aviso ({pendientesAviso.length})</span>
-                </>
+                <Send className="w-4 h-4 text-white" />
               )}
+              <span>
+                {enviandoAvisos 
+                  ? 'Enviando avisos...' 
+                  : `Finalizar y Enviar Aviso (${candidatosPendientes.length})`}
+              </span>
             </button>
           </div>
         </div>
 
       </div>
 
-      {/* MODAL DE DOBLE CHECKEO PARA BAJAS Y PRÓRROGAS */}
-      <MorososDobleCheckModal
-        config={dobleCheckConfig}
-        onClose={() => setDobleCheckConfig(null)}
-      />
-
+      {/* MODAL DE DOBLE CONFIRMACIÓN */}
+      {dobleCheckConfig && (
+        <MorososDobleCheckModal
+          config={dobleCheckConfig}
+          onClose={() => setDobleCheckConfig(null)}
+        />
+      )}
     </div>
   );
 };

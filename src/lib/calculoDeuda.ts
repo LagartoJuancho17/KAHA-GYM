@@ -23,6 +23,7 @@ export interface ResultadoCalculoDeuda {
   esBecado: boolean;
   deuda_perdonada?: number;
   pagoEsteMes: boolean;
+  ultimo_mes_pagado?: string;
 }
 
 /**
@@ -62,7 +63,8 @@ export function calcularDeudaYEstadoCliente(
       estado: 'ACTIVO',
       esBecado: true,
       deuda_perdonada: deudaOriginal,
-      pagoEsteMes: true
+      pagoEsteMes: true,
+      ultimo_mes_pagado: mesActual
     };
   }
 

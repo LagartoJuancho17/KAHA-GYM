@@ -36,7 +36,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   onManageTurnos,
   onAssignPlan
 }) => {
-  const { clientes, planes, pagos, turnos } = useGym();
+  const { clientes, planes, pagos, turnos, perdonarDeudaSocio, revertirPerdonDeuda, googleUser } = useGym();
 
   if (!isOpen || !clienteId) return null;
 
@@ -125,17 +125,36 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
               <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Tipo de Membresía</span>
               <span className="font-bold text-zinc-900 block">{selectedCliente.tipo}</span>
             </div>
-            <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-              <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Deuda Acumulada</span>
-              {esBecado ? (
-                <span className="font-mono font-bold block text-emerald-700">
-                  $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Becado)</span>
-                </span>
-              ) : (
-                <span className={`font-mono font-bold block ${selectedCliente.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                  ${selectedCliente.deuda_acumulada.toLocaleString('es-AR')}
-                </span>
-              )}
+            <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 flex flex-col justify-between">
+              <div>
+                <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Deuda Acumulada</span>
+                {esBecado ? (
+                  <span className="font-mono font-bold block text-emerald-700">
+                    $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through decoration-rose-500 decoration-2">{formatoDeuda.textoTachado}</span> - Becado)</span>
+                  </span>
+                ) : (
+                  <span className={`font-mono font-bold block ${selectedCliente.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    ${selectedCliente.deuda_acumulada.toLocaleString('es-AR')}
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 pt-1.5 border-t border-zinc-200/60">
+                {!esBecado ? (
+                  <button
+                    onClick={() => perdonarDeudaSocio(selectedCliente.id, googleUser?.email)}
+                    className="w-full text-center px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[9px] font-bold border border-emerald-300 transition-colors cursor-pointer"
+                  >
+                    Perdonar Deuda (Becar $0)
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => revertirPerdonDeuda(selectedCliente.id, googleUser?.email)}
+                    className="w-full text-center px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded text-[9px] font-bold border border-amber-300 transition-colors cursor-pointer"
+                  >
+                    Quitar Beca / Restablecer
+                  </button>
+                )}
+              </div>
             </div>
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 col-span-2">
               <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Exención / Excepción de Cobro</span>
