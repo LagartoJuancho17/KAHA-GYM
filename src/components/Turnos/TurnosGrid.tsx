@@ -14,6 +14,7 @@ import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { SociosPrioritariosModal } from './SociosPrioritariosModal';
 import { SearchableSelect } from '../Common/SearchableSelect';
 import { History, Crown } from 'lucide-react';
+import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 
 export const TurnosGrid: React.FC = () => {
   const { 
@@ -25,7 +26,7 @@ export const TurnosGrid: React.FC = () => {
 
   const [showPrioritariosModal, setShowPrioritariosModal] = useState(false);
   const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('TIEMPO_REAL');
-  const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(0);
+  const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(() => semanaOffsetInicial());
   
   // Real-time week helper notifications
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
@@ -77,7 +78,8 @@ export const TurnosGrid: React.FC = () => {
 
   // Helper to calculate the current/selected week's dates
   const weekDates = useMemo(() => {
-    const today = new Date();
+    const [y, m, d] = hoyArgentina().split('-').map(Number);
+    const today = new Date(y, m - 1, d);
     const currentDay = today.getDay();
     const datesMap: Record<string, string> = {};
     const DAYS = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
@@ -466,19 +468,33 @@ export const TurnosGrid: React.FC = () => {
                 Semana Anterior
               </button>
               <div className="text-center">
-                <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block font-mono">Semana Visualizada</span>
-                <span className="text-xs font-bold text-white">
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Semana Visualizada</span>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {etiquetaSemanaRelativa(realtimeWeekOffset)}
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-white mt-0.5 block">
                   {(() => {
-                    const monday = new Date();
-                    const currentDay = monday.getDay();
-                    const diff = currentDay === 0 ? -6 : 1 - currentDay;
-                    monday.setDate(monday.getDate() + diff + (realtimeWeekOffset * 7));
-                    const friday = new Date(monday);
-                    friday.setDate(monday.getDate() + 4);
+                    const lunes = weekDates['LUNES'];
+                    const viernes = weekDates['VIERNES'];
+                    if (!lunes || !viernes) return '';
+                    const [yL, mL, dL] = lunes.split('-').map(Number);
+                    const [yV, mV, dV] = viernes.split('-').map(Number);
+                    const dateL = new Date(yL, mL - 1, dL);
+                    const dateV = new Date(yV, mV - 1, dV);
                     const opt: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
-                    return `${monday.toLocaleDateString('es-AR', opt)} al ${friday.toLocaleDateString('es-AR', opt)}`;
+                    return `${dateL.toLocaleDateString('es-AR', opt)} al ${dateV.toLocaleDateString('es-AR', opt)}`;
                   })()}
                 </span>
+                {realtimeWeekOffset !== semanaOffsetInicial() && (
+                  <button
+                    onClick={() => setRealtimeWeekOffset(semanaOffsetInicial())}
+                    className="text-[10px] text-emerald-400/80 hover:text-emerald-300 underline mt-0.5 cursor-pointer block mx-auto transition-colors"
+                  >
+                    Volver a {semanaOffsetInicial() === 1 ? 'semana por arrancar' : 'semana en curso'}
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => setRealtimeWeekOffset(prev => prev + 1)}

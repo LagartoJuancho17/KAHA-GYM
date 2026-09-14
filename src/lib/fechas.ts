@@ -21,6 +21,56 @@ export function hoyArgentina(epochMs: number = Date.now()): string {
   return local.toISOString().slice(0, 10);
 }
 
+/**
+ * Determina el offset inicial de semana para la Turnera (0 = semana en curso, 1 = semana siguiente).
+ * 
+ * Regla de negocio:
+ * Desde el sábado al mediodía (>= 12:00 hs) en adelante y durante todo el domingo (hora Argentina),
+ * la vista inicial de la Turnera se posiciona automáticamente en la semana siguiente (+1).
+ * De lunes a viernes (y sábados antes de las 12:00 hs), inicia en la semana actual (0).
+ */
+export function semanaOffsetInicial(epochMs: number = Date.now()): number {
+  const local = new Date(epochMs - OFFSET_ARGENTINA_MS);
+  const day = local.getUTCDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  const hour = local.getUTCHours(); // 0..23
+
+  // Domingo completo: semana siguiente (+1)
+  if (day === 0) {
+    return 1;
+  }
+  // Sábado desde las 12:00 hs en adelante: semana siguiente (+1)
+  if (day === 6 && hour >= 12) {
+    return 1;
+  }
+  // Resto de la semana (Lunes a Viernes, o Sábado antes de las 12:00 hs): semana en curso (0)
+  return 0;
+}
+
+/**
+ * Devuelve un texto descriptivo de la semana visualizada en relación con el momento actual.
+ * Ayuda a que el usuario identifique al instante si está viendo la semana por arrancar, la actual, etc.
+ */
+export function etiquetaSemanaRelativa(offset: number, epochMs: number = Date.now()): string {
+  const local = new Date(epochMs - OFFSET_ARGENTINA_MS);
+  const day = local.getUTCDay();
+  const hour = local.getUTCHours();
+  const esFinDeSemana = day === 0 || (day === 6 && hour >= 12);
+
+  if (offset === 0) {
+    return esFinDeSemana ? 'Semana que finalizó' : 'Semana en curso';
+  }
+  if (offset === 1) {
+    return esFinDeSemana ? 'Semana por arrancar' : 'Próxima semana';
+  }
+  if (offset === -1) {
+    return 'Semana anterior';
+  }
+  if (offset > 1) {
+    return `+${offset} semanas`;
+  }
+  return `${offset} semanas`;
+}
+
 const DIAS_SEMANA: Record<string, number> = {
   DOMINGO: 0, LUNES: 1, MARTES: 2, MIERCOLES: 3, JUEVES: 4, VIERNES: 5, SABADO: 6
 };

@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { ChevronLeft, ChevronRight, Info, Calendar, RefreshCw, X, Clock, MessageCircle, Check } from 'lucide-react';
+import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 
 interface SocioCalendarioProps {
   socio: Cliente;
@@ -32,7 +33,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija, agregarListaEsperaReserva, removerListaEsperaReserva
   } = useGym();
 
-  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [weekOffset, setWeekOffset] = useState<number>(() => semanaOffsetInicial());
   const [activeDay, setActiveDay] = useState<'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES'>(() => getTodayDayName());
   const [bookingTurnId, setBookingTurnId] = useState<string | null>(null);
   const [reprogramTurnId, setReprogramTurnId] = useState<string | null>(null);
@@ -237,10 +238,23 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             Semana Anterior
           </button>
           <div className="text-center">
-            <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest block font-mono">Semana Seleccionada</span>
-            <span className="text-xs font-bold text-slate-800">
+            <div className="flex items-center justify-center gap-1.5">
+              <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest font-mono">Semana Seleccionada</span>
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                {etiquetaSemanaRelativa(weekOffset)}
+              </span>
+            </div>
+            <span className="text-xs font-bold text-slate-800 mt-0.5 block">
               {getWeekRangeLabel(weekOffset)}
             </span>
+            {weekOffset !== semanaOffsetInicial() && (
+              <button
+                onClick={() => setWeekOffset(semanaOffsetInicial())}
+                className="text-[10px] text-emerald-600 hover:text-emerald-800 underline mt-0.5 cursor-pointer block mx-auto transition-colors"
+              >
+                Volver a {semanaOffsetInicial() === 1 ? 'semana por arrancar' : 'semana en curso'}
+              </button>
+            )}
           </div>
           <button
             onClick={() => {
@@ -264,7 +278,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             const datesInSelectedWeek = getAvailableDatesForTurn(dia).filter(isDateInSelectedWeek);
             const dateStr = datesInSelectedWeek[0] || '';
             const dayNumber = dateStr ? new Date(dateStr + 'T00:00:00').getDate() : null;
-            const isToday = weekOffset === 0 && getTodayDayName() === dia;
+            const isToday = dateStr === hoyArgentina();
 
             return (
               <button

@@ -56,3 +56,56 @@ test('fechasFuturasDelTurno tolera turno inválido o vacío', () => {
   assert.deepEqual(fechasFuturasDelTurno('', '2026-09-11'), []);
   assert.deepEqual(fechasFuturasDelTurno('INVALIDO-10:00', '2026-09-11'), []);
 });
+
+import { semanaOffsetInicial, etiquetaSemanaRelativa } from './fechas';
+
+test('semanaOffsetInicial: sábado antes del mediodía muestra la semana actual (0)', () => {
+  // Sábado 2026-09-12 11:59:00 ARG = 14:59:00 UTC
+  const sabadoManiana = epoch('2026-09-12T14:59:00.000Z');
+  assert.equal(semanaOffsetInicial(sabadoManiana), 0);
+  assert.equal(etiquetaSemanaRelativa(0, sabadoManiana), 'Semana en curso');
+});
+
+test('semanaOffsetInicial: sábado desde las 12:00 hs muestra la semana por arrancar (+1)', () => {
+  // Sábado 2026-09-12 12:00:00 ARG = 15:00:00 UTC
+  const sabadoMediodia = epoch('2026-09-12T15:00:00.000Z');
+  assert.equal(semanaOffsetInicial(sabadoMediodia), 1);
+  assert.equal(etiquetaSemanaRelativa(1, sabadoMediodia), 'Semana por arrancar');
+
+  // Sábado 2026-09-12 20:30:00 ARG = 23:30:00 UTC
+  const sabadoNoche = epoch('2026-09-12T23:30:00.000Z');
+  assert.equal(semanaOffsetInicial(sabadoNoche), 1);
+});
+
+test('semanaOffsetInicial: domingo durante todo el día muestra la semana por arrancar (+1)', () => {
+  // Domingo 2026-09-13 01:00:00 ARG = 04:00:00 UTC
+  const domingoMadrugada = epoch('2026-09-13T04:00:00.000Z');
+  assert.equal(semanaOffsetInicial(domingoMadrugada), 1);
+
+  // Domingo 2026-09-13 18:00:00 ARG = 21:00:00 UTC
+  const domingoTarde = epoch('2026-09-13T21:00:00.000Z');
+  assert.equal(semanaOffsetInicial(domingoTarde), 1);
+  assert.equal(etiquetaSemanaRelativa(1, domingoTarde), 'Semana por arrancar');
+  assert.equal(etiquetaSemanaRelativa(0, domingoTarde), 'Semana que finalizó');
+
+  // Domingo 2026-09-13 23:59:00 ARG = 2026-09-14T02:59:00 UTC
+  const domingoNoche = epoch('2026-09-14T02:59:00.000Z');
+  assert.equal(semanaOffsetInicial(domingoNoche), 1);
+});
+
+test('semanaOffsetInicial: lunes a viernes muestra la semana en curso (0)', () => {
+  // Lunes 2026-09-14 00:01:00 ARG = 03:01:00 UTC
+  const lunesMadrugada = epoch('2026-09-14T03:01:00.000Z');
+  assert.equal(semanaOffsetInicial(lunesMadrugada), 0);
+  assert.equal(etiquetaSemanaRelativa(0, lunesMadrugada), 'Semana en curso');
+  assert.equal(etiquetaSemanaRelativa(1, lunesMadrugada), 'Próxima semana');
+
+  // Miércoles 2026-09-16 16:00:00 ARG = 19:00:00 UTC
+  const miercoles = epoch('2026-09-16T19:00:00.000Z');
+  assert.equal(semanaOffsetInicial(miercoles), 0);
+
+  // Viernes 2026-09-11 20:00:00 ARG = 23:00:00 UTC
+  const viernes = epoch('2026-09-11T23:00:00.000Z');
+  assert.equal(semanaOffsetInicial(viernes), 0);
+});
+

@@ -98,11 +98,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ? Math.round((morososCount / totalActivosCount) * 100) 
     : 0;
 
-  // Candidatos a baja de turno fijo (Día 10 en adelante): socios activos con turnos fijos asignados y sin pagar este mes
+  // Candidatos a baja de turno fijo (Día 10 en adelante): socios activos con turnos fijos asignados y sin pagar este mes (excluye becados/exentos)
   const candidatosBajaFijos = clientesActivosFicha.filter(c => {
     if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
     const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual;
-    return noPago;
+    const estaExento = c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO';
+    return noPago && !estaExento;
   });
 
   // Ingresos reales de este mes
