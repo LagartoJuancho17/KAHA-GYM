@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User, RotateCcw } from 'lucide-react';
+import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User, RotateCcw, Clock, PauseCircle } from 'lucide-react';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 
@@ -80,7 +80,7 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
   onSelectCliente, onManageTurnos, onStartEdit, onDeleteClick,
   onStartAuthorization, onOpenBajaClases, onAssignPlan
 }) => {
-  const { autorizarCliente, perdonarDeudaSocio, revertirPerdonDeuda, googleUser } = useGym();
+  const { autorizarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, googleUser } = useGym();
   return (
     <div className="relative shrink-0">
       <button
@@ -156,6 +156,24 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
               >
                 <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
                 Quitar Beca / Restablecer
+              </button>
+            )}
+            {c.exencion_cobro !== 'POSTERGADO' && (
+              <button
+                onClick={() => { close(); prorrogarDeudaSocio(c.id, googleUser?.email); }}
+                className="w-full text-left px-4 py-2.5 hover:bg-cyan-50 text-cyan-800 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+              >
+                <Clock className="w-3.5 h-3.5 text-cyan-600" />
+                Prorrogar Deuda (1 sem)
+              </button>
+            )}
+            {c.exencion_cobro !== 'SUSPENDIDO' && (
+              <button
+                onClick={() => { close(); pausarSocio(c.id, googleUser?.email); }}
+                className="w-full text-left px-4 py-2.5 hover:bg-amber-50 text-amber-800 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+              >
+                <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
+                Pausar Socio (Cobro susp.)
               </button>
             )}
             <button

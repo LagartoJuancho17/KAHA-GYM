@@ -22,7 +22,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
   const { 
     turnos, clientes, planes, recuperos, waitlistReservas,
     suspenderClaseFija, revertirSuspensionClaseFija, cancelarReservaIndividual, removerListaEsperaReserva,
-    programarRecuperoPendiente
+    removerAsignacionFija, programarRecuperoPendiente
   } = useGym();
 
   // --- RECOVERY PORTAL STATES ---
@@ -229,6 +229,10 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
   const misWaitlists = useMemo(() => {
     return (waitlistReservas || []).filter(w => w.cliente_id === socio.id);
   }, [waitlistReservas, socio]);
+
+  const misWaitlistsFijas = useMemo(() => {
+    return (turnos || []).filter(t => (t.lista_espera_ids || []).includes(socio.id));
+  }, [turnos, socio.id]);
 
   const pendingRecuperos = useMemo(() => {
     return (recuperos || []).filter(
@@ -499,55 +503,98 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
       </div>
 
       {/* 2. MIS LISTAS DE ESPERA ACTIVAS */}
-      {misWaitlists.length > 0 && (
-        <div className="bg-teal-50/50 border border-teal-200 p-5 rounded-2xl">
-          <div className="flex items-center gap-2 mb-3">
+      {(misWaitlists.length > 0 || misWaitlistsFijas.length > 0) && (
+        <div className="bg-teal-50/50 border border-teal-200 p-5 rounded-2xl space-y-4">
+          <div className="flex items-center gap-2">
             <Clock className="w-5.5 h-5.5 text-teal-600 animate-pulse" />
             <h3 className="text-xs font-black uppercase text-teal-800 tracking-wider font-mono">
               Mis Reservas en Lista de Espera
             </h3>
           </div>
-          <p className="text-[11px] text-teal-700 font-sans mb-4 leading-relaxed">
+          <p className="text-[11px] text-teal-700 font-sans leading-relaxed">
             Estás anotado en la lista de espera para los siguientes turnos. Si se libera un cupo por cancelación o suspensión de clase, serás promovido automáticamente y recibirás una notificación.
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {misWaitlists.map(w => {
-              const turn = turnos.find(t => t.id === w.turno_id);
-              const dateFormatted = new Date(w.fecha + 'T00:00:00').toLocaleDateString('es-AR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'short'
-              });
-              return (
-                <div key={w.id} className="bg-white border border-teal-100 rounded-xl p-2.5 sm:p-3.5 shadow-3xs flex justify-between items-center gap-1.5 min-w-0">
-                  <div className="min-w-0">
-                    <p className="text-[10px] sm:text-xs font-bold text-slate-800 capitalize truncate">
-                      {dateFormatted}
-                    </p>
-                    <p className="text-[9px] sm:text-[10px] text-slate-500 font-mono mt-0.5 truncate">
-                      {turn ? `${turn.hora.slice(0, 5)} hs` : 'Turno'}
-                    </p>
+          {misWaitlistsFijas.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">
+                ★ En Espera de Matriz Fija (Prioridad Máxima Semanal)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {misWaitlistsFijas.map(turn => (
+                  <div key={turn.id} className="bg-indigo-50/80 border border-indigo-200 rounded-xl p-3 shadow-3xs flex justify-between items-center gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-indigo-950 capitalize truncate">
+                        {turn.dia} - {turn.hora.slice(0, 5)} hs
+                      </p>
+                      <p className="text-[10px] text-indigo-700 font-medium mt-0.5">
+                        Prioridad semanal activa en turnera
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`¿Confirmas salir de la lista de espera fija de ${turn.dia} ${turn.hora.slice(0, 5)} hs?`)) {
+                          removerAsignacionFija(socio.id, turn.id);
+                          setSuccessMessage('Has salido de la lista de espera fija.');
+                          setTimeout(() => setSuccessMessage(null), 3500);
+                        }
+                      }}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-rose-100 shrink-0"
+                    >
+                      Salir
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      const res = removerListaEsperaReserva(socio.id, w.turno_id, w.fecha);
-                      if (res.success) {
-                        setSuccessMessage(res.message);
-                        setTimeout(() => setSuccessMessage(null), 3500);
-                      } else {
-                        setErrorMessage(res.message);
-                        setTimeout(() => setErrorMessage(null), 3500);
-                      }
-                    }}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-rose-100 shrink-0"
-                  >
-                    Salir
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {misWaitlists.length > 0 && (
+            <div className="space-y-2">
+              {misWaitlistsFijas.length > 0 && (
+                <span className="text-[10px] font-bold text-teal-900 uppercase tracking-wider block">
+                  En Espera de Turnos Específicos
+                </span>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {misWaitlists.map(w => {
+                  const turn = turnos.find(t => t.id === w.turno_id);
+                  const dateFormatted = new Date(w.fecha + 'T00:00:00').toLocaleDateString('es-AR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'short'
+                  });
+                  return (
+                    <div key={w.id} className="bg-white border border-teal-100 rounded-xl p-2.5 sm:p-3.5 shadow-3xs flex justify-between items-center gap-1.5 min-w-0">
+                      <div className="min-w-0">
+                        <p className="text-[10px] sm:text-xs font-bold text-slate-800 capitalize truncate">
+                          {dateFormatted}
+                        </p>
+                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                          {turn ? `${turn.hora.slice(0, 5)} hs` : 'Turno'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const res = removerListaEsperaReserva(socio.id, w.turno_id, w.fecha);
+                          if (res.success) {
+                            setSuccessMessage(res.message);
+                            setTimeout(() => setSuccessMessage(null), 3500);
+                          } else {
+                            setErrorMessage(res.message);
+                            setTimeout(() => setErrorMessage(null), 3500);
+                          }
+                        }}
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 font-bold px-2 py-1 rounded-lg text-[9px] transition-all cursor-pointer border border-rose-100 shrink-0"
+                      >
+                        Salir
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

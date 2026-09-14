@@ -552,7 +552,8 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                 {getAvailableDatesForTurn(selectedBookingTurno.dia).filter(isDateInSelectedWeek).map(dateStr => {
                   const occupiedCount = getOccupiedCountOnDate(selectedBookingTurno.id, dateStr);
                   const isFullOnDate = occupiedCount >= selectedBookingTurno.cupo_maximo;
-                  const inWaitlist = (waitlistReservas || []).some(
+                  const isMatrizFijaWaitlist = (selectedBookingTurno.lista_espera_ids || []).includes(socio.id);
+                  const inWaitlist = isMatrizFijaWaitlist || (waitlistReservas || []).some(
                     w => w.cliente_id === socio.id && w.turno_id === selectedBookingTurno.id && w.fecha === dateStr
                   );
 
@@ -677,7 +678,11 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                           {isFullOnDate ? (
                             <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                               <span className="text-[10px] text-slate-500 italic">Sin cupos disponibles.</span>
-                              {inWaitlist ? (
+                              {isMatrizFijaWaitlist ? (
+                                <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-bold px-3 py-1.5 rounded-xl">
+                                  <span>★ En espera fija (prioridad máxima)</span>
+                                </div>
+                              ) : inWaitlist ? (
                                 <button
                                   onClick={() => {
                                     const res = removerListaEsperaReserva(socio.id, selectedBookingTurno.id, dateStr);

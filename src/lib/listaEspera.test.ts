@@ -195,3 +195,81 @@ test('Socio con Prioridad que ya tiene reserva en una fecha puntual no entra en 
   assert.equal(espera21.length, 1);
   assert.equal(espera21[0].cliente_id, 'juana');
 });
+
+// --- Lista de Espera de Matriz Fija con prioridad en Turnera semanal --------
+
+test('Matriz Fija: Alumno en lista_espera_ids (Jaqueline Sadras) figura automáticamente en Turnera semanal', () => {
+  const turnos = [
+    { id: 'LUNES-07:30', lista_espera_ids: ['jaqueline'] }
+  ];
+  const clientes = [
+    { id: 'jaqueline', activo: true, turnos_fijos: [] }
+  ];
+  const esperaSemana1 = esperaDelTurno([], 'LUNES-07:30', '2026-09-14', new Set(), { clientes, turnos });
+  assert.equal(esperaSemana1.length, 1);
+  assert.equal(esperaSemana1[0].cliente_id, 'jaqueline');
+  assert.equal((esperaSemana1[0] as any).esMatrizFija, true);
+
+  const esperaSemana2 = esperaDelTurno([], 'LUNES-07:30', '2026-09-21', new Set(), { clientes, turnos });
+  assert.equal(esperaSemana2.length, 1);
+  assert.equal(esperaSemana2[0].cliente_id, 'jaqueline');
+});
+
+test('Matriz Fija: tiene prioridad sobre quien pidió Lista de Espera puntual de Turnera', () => {
+  const turnos = [
+    { id: 'LUNES-07:30', lista_espera_ids: ['jaqueline'] }
+  ];
+  const clientes = [
+    { id: 'jaqueline', activo: true, turnos_fijos: [] },
+    { id: 'casual', activo: true, turnos_fijos: [] }
+  ];
+  // 'casual' se anotó antes en la turnera
+  const filaTurnera = [
+    w('1', 'casual', '2026-09-01T10:00:00Z', 'LUNES-07:30', '2026-09-14')
+  ];
+
+  const espera = esperaDelTurno(filaTurnera, 'LUNES-07:30', '2026-09-14', new Set(), { clientes, turnos });
+  assert.equal(espera.length, 2);
+  assert.equal(espera[0].cliente_id, 'jaqueline', 'Jaqueline de Matriz Fija entra con prioridad P1');
+  assert.equal(espera[1].cliente_id, 'casual', 'El alumno casual de turnera queda P2');
+});
+
+test('Matriz Fija: si hay múltiples en espera fija, mantiene su orden relativo', () => {
+  const turnos = [
+    { id: 'LUNES-07:30', lista_espera_ids: ['socio1', 'socio2'] }
+  ];
+  const clientes = [
+    { id: 'socio1', activo: true, turnos_fijos: [] },
+    { id: 'socio2', activo: true, turnos_fijos: [] },
+    { id: 'socio3_casual', activo: true, turnos_fijos: [] }
+  ];
+  const filaTurnera = [
+    w('1', 'socio3_casual', '2026-09-01T08:00:00Z', 'LUNES-07:30', '2026-09-14')
+  ];
+
+  const espera = esperaDelTurno(filaTurnera, 'LUNES-07:30', '2026-09-14', new Set(), { clientes, turnos });
+  assert.equal(espera.length, 3);
+  assert.equal(espera[0].cliente_id, 'socio1');
+  assert.equal(espera[1].cliente_id, 'socio2');
+  assert.equal(espera[2].cliente_id, 'socio3_casual');
+});
+
+test('Matriz Fija: no se sintetiza si ya tiene reserva confirmada en esa fecha puntual', () => {
+  const turnos = [
+    { id: 'LUNES-07:30', lista_espera_ids: ['jaqueline'] }
+  ];
+  const clientes = [
+    {
+      id: 'jaqueline',
+      activo: true,
+      reservas_individuales: [{ turno_id: 'LUNES-07:30', fecha: '2026-09-14' }]
+    }
+  ];
+  const espera14 = esperaDelTurno([], 'LUNES-07:30', '2026-09-14', new Set(), { clientes, turnos });
+  assert.equal(espera14.length, 0, 'No figura en lista de espera el día que ya tiene reserva');
+
+  const espera21 = esperaDelTurno([], 'LUNES-07:30', '2026-09-21', new Set(), { clientes, turnos });
+  assert.equal(espera21.length, 1, 'Figura en espera para la fecha siguiente');
+  assert.equal(espera21[0].cliente_id, 'jaqueline');
+});
+

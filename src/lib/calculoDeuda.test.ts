@@ -100,3 +100,29 @@ test('formatearDeudaVisual formatea correctamente socios normales y becados', ()
   assert.equal(becado.esBecado, true);
   assert.equal(becado.labelCompleto, '$0 ($45.000 - Becado)');
 });
+
+test('socio con exención POSTERGADO no es imputado como moroso y mantiene su deuda previa', () => {
+  const res = calcularDeudaYEstadoCliente(
+    { ...mockBaseCliente, deuda_acumulada: 0, exencion_cobro: 'POSTERGADO', ultimo_mes_pagado: '2026-07' },
+    mockPlanes,
+    '2026-09',
+    10
+  );
+
+  assert.equal(res.deuda_acumulada, 0);
+  assert.equal(res.estado, 'ACTIVO');
+  assert.equal(res.esBecado, false);
+});
+
+test('socio con exención SUSPENDIDO (pausado) no es imputado como moroso y mantiene estado ACTIVO', () => {
+  const res = calcularDeudaYEstadoCliente(
+    { ...mockBaseCliente, deuda_acumulada: 0, exencion_cobro: 'SUSPENDIDO', ultimo_mes_pagado: '2026-07' },
+    mockPlanes,
+    '2026-09',
+    10
+  );
+
+  assert.equal(res.deuda_acumulada, 0);
+  assert.equal(res.estado, 'ACTIVO');
+  assert.equal(res.esBecado, false);
+});

@@ -68,6 +68,16 @@ export function calcularDeudaYEstadoCliente(
     };
   }
 
+  // 1b. Socio con exención de cobro POSTERGADO o SUSPENDIDO
+  if (cliente.exencion_cobro === 'POSTERGADO' || cliente.exencion_cobro === 'SUSPENDIDO') {
+    return {
+      deuda_acumulada: Number(cliente.deuda_acumulada || 0),
+      estado: 'ACTIVO',
+      esBecado: false,
+      pagoEsteMes: false
+    };
+  }
+
   // 2. Socio no pagó el mes actual
   if (!pagoEsteMes) {
     // Si la deuda acumulada guardada era 0, desde el día 1 se imputa la cuota del mes

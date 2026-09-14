@@ -23,9 +23,9 @@ const formatWspPhone = (phone?: string) => {
 
 export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selectedSlot, onClose }) => {
   const {
-    turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva, sociosPrioritarios,
+    turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva, removerAsignacionFija, sociosPrioritarios,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
-    actualizarEstadoRecupero, addCliente, notificarBajaClase
+    actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
@@ -71,31 +71,35 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   // Lista de espera para este turno y fecha
   const waitlistItems = useMemo(() => {
-    // Mismo orden que usa la promocion automatica: VIP primero, despues por llegada.
-    // Si la turnera mostrara otro orden, el admin veria una cosa y entraria otra.
-    return esperaDelTurno(waitlistReservas, selectedSlot.id, selectedSlot.date, sociosPrioritarios, { clientes })
+    const turnoActual = turnos.find(t => t.id === selectedSlot.id);
+    // Mismo orden que usa la promocion automatica: Matriz Fija y VIP primero, despues por llegada.
+    return esperaDelTurno(waitlistReservas, selectedSlot.id, selectedSlot.date, sociosPrioritarios, { clientes, turnos })
       .map(w => {
         const cl = clientes.find(c => c.id === w.cliente_id);
+        const esMatrizFija = Boolean((w as any).esMatrizFija || turnoActual?.lista_espera_ids?.includes(w.cliente_id));
         return {
           id: w.id,
           clienteId: w.cliente_id,
           nombre: cl ? `${cl.apellido}, ${cl.nombre}` : 'Socio',
           creado_at: w.creado_at,
-          prioritario: esPrioritario(w.cliente_id, selectedSlot.id, sociosPrioritarios)
+          prioritario: esPrioritario(w.cliente_id, selectedSlot.id, sociosPrioritarios, turnoActual?.lista_espera_ids),
+          esMatrizFija
         };
       });
-  }, [waitlistReservas, selectedSlot.id, selectedSlot.date, clientes, sociosPrioritarios]);
+  }, [waitlistReservas, selectedSlot.id, selectedSlot.date, clientes, sociosPrioritarios, turnos]);
   
-  // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date, and not already in waitlist
+  // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date. When full, exclude already on waitlist.
   const candidateClients = useMemo(() => {
+    const turnoActual = turnos.find(t => t.id === selectedSlot.id);
+    const listaFija = turnoActual?.lista_espera_ids || [];
     return clientes.filter(c => {
-      const alreadyInWaitlist = waitlistReservas.some(w => w.cliente_id === c.id && w.turno_id === selectedSlot.id && w.fecha === selectedSlot.date);
+      const alreadyInWaitlist = waitlistReservas.some(w => w.cliente_id === c.id && w.turno_id === selectedSlot.id && w.fecha === selectedSlot.date) || listaFija.includes(c.id);
       return c.activo && 
         !c.turnos_fijos.includes(selectedSlot.id) && 
         !(c.reservas_individuales || []).some(r => r.turno_id === selectedSlot.id && r.fecha === selectedSlot.date) &&
-        !alreadyInWaitlist;
+        (!isFull || !alreadyInWaitlist);
     });
-  }, [clientes, selectedSlot.id, selectedSlot.date, waitlistReservas]);
+  }, [clientes, selectedSlot.id, selectedSlot.date, waitlistReservas, turnos, isFull]);
 
   const filteredCandidates = useMemo(() => {
     if (!searchQuery.trim()) return candidateClients;
@@ -169,6 +173,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
     const res = await crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
     if (res.success) {
+      removerListaEsperaReserva(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
       setRealtimeSuccess(`✅ ¡Confirmado! ${res.message}`);
       setRealtimeCandidateClient('');
       setGuestName('');
@@ -442,44 +447,104 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                   <ListOrdered className="w-4 h-4 text-amber-600" />
                   <span>Lista de Espera ({waitlistItems.length})</span>
                 </div>
-                <span className="text-[10px] text-amber-700 font-semibold">
-                  Auto-promoción al liberarse un cupo
-                </span>
+                {!isFull ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 animate-pulse">
+                    ¡Hay cupo disponible!
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-amber-700 font-semibold">
+                    Auto-promoción al liberarse un cupo
+                  </span>
+                )}
               </div>
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
                 {waitlistItems.map((wl, idx) => (
                   <div key={wl.id} className={`flex justify-between items-center p-2 rounded-lg text-xs shadow-2xs ${
-                    wl.prioritario ? 'bg-violet-50 border border-violet-300' : 'bg-white border border-amber-200/80'
+                    wl.esMatrizFija
+                      ? 'bg-indigo-50 border border-indigo-300'
+                      : wl.prioritario 
+                        ? 'bg-violet-50 border border-violet-300' 
+                        : 'bg-white border border-amber-200/80'
                   }`}>
                     <div className="flex items-center gap-2">
                       <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                        wl.prioritario ? 'bg-violet-200 text-violet-900' : 'bg-amber-100 text-amber-800'
+                        wl.esMatrizFija
+                          ? 'bg-indigo-200 text-indigo-900'
+                          : wl.prioritario 
+                            ? 'bg-violet-200 text-violet-900' 
+                            : 'bg-amber-100 text-amber-800'
                       }`}>
                         P{idx + 1}
                       </span>
                       <span className="font-semibold text-zinc-900">{wl.nombre}</span>
                       {/* Marca visible para que el admin entienda por que este socio esta arriba. */}
-                      {wl.prioritario && (
+                      {wl.esMatrizFija ? (
+                        <span
+                          className="text-[9px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded-full tracking-wide flex items-center gap-1"
+                          title="Espera en Matriz Fija: máxima prioridad en todas las semanas si se libera un lugar"
+                        >
+                          MATRIZ FIJA (PRIORIDAD)
+                        </span>
+                      ) : wl.prioritario ? (
                         <span
                           className="text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full tracking-wide"
                           title="Prioridad máxima en este turno: entra primero en todas las semanas si se libera un lugar"
                         >
                           PRIORIDAD
                         </span>
-                      )}
+                      ) : null}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
-                        setRealtimeSuccess('Socio retirado de la lista de espera.');
-                        setTimeout(() => setRealtimeSuccess(null), 2500);
-                      }}
-                      className="text-zinc-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer border-none bg-transparent"
-                      title="Retirar de lista de espera"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {!isFull && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setRealtimeError(null);
+                            setRealtimeSuccess(null);
+                            const turnoObj = turnos.find(t => t.id === selectedSlot.id);
+                            const hayLugarFijo = turnoObj ? (turnoObj.asignados_ids || []).length < turnoObj.cupo_maximo : false;
+
+                            if (wl.esMatrizFija && hayLugarFijo) {
+                              asignarClienteFijo(wl.clienteId, selectedSlot.id);
+                              if (wl.id && !wl.id.startsWith('matriz-auto-')) {
+                                removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
+                              }
+                              setRealtimeSuccess(`✅ ¡${wl.nombre} promovido a cupo fijo exitosamente!`);
+                            } else {
+                              const res = await crearReservaIndividual(wl.clienteId, selectedSlot.id, selectedSlot.date);
+                              if (res.success) {
+                                removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
+                                setRealtimeSuccess(`✅ ¡${wl.nombre} asignado a la clase exitosamente!`);
+                              } else {
+                                setRealtimeError(res.message);
+                              }
+                            }
+                            setTimeout(() => setRealtimeSuccess(null), 4000);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-xs cursor-pointer border-none transition-all"
+                          title="Asignar cupo disponible a este socio"
+                        >
+                          <UserCheck className="w-3 h-3" />
+                          <span>Promover</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (wl.esMatrizFija) {
+                            removerAsignacionFija(wl.clienteId, selectedSlot.id);
+                          } else {
+                            removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
+                          }
+                          setRealtimeSuccess('Socio retirado de la lista de espera.');
+                          setTimeout(() => setRealtimeSuccess(null), 2500);
+                        }}
+                        className="text-zinc-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer border-none bg-transparent"
+                        title="Retirar de lista de espera"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

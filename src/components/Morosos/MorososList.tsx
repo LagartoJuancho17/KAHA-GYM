@@ -2,7 +2,7 @@
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Receipt, UserCheck, UserMinus, MessageCircle } from 'lucide-react';
+import { Receipt, UserCheck, UserMinus, MessageCircle, Check, Clock, PauseCircle } from 'lucide-react';
 import { generarMensajeWhatsAppRecordatorio } from '../../lib/recordatorioDeuda';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
@@ -28,7 +28,7 @@ export const MorososList: React.FC<MorososListProps> = ({
   onAltaClick,
   onBajaSocioClick
 }) => {
-  const { planes } = useGym();
+  const { planes, perdonarDeudaSocio, prorrogarDeudaSocio, pausarSocio, googleUser } = useGym();
 
   return (
     <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs text-xs font-sans">
@@ -147,6 +147,33 @@ export const MorososList: React.FC<MorososListProps> = ({
                         >
                           <Receipt className="w-3.5 h-3.5 text-white" />
                           <span>Registrar Cobro</span>
+                        </button>
+                        <button
+                          onClick={() => perdonarDeudaSocio(c.id, googleUser?.email)}
+                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          id={`btn-perdonar-moroso-${c.id}`}
+                          title="Perdonar Deuda (Becar socio y saldar deuda en $0)"
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Perdonar Deuda</span>
+                        </button>
+                        <button
+                          onClick={() => prorrogarDeudaSocio(c.id, googleUser?.email)}
+                          className="px-2.5 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-300 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          id={`btn-prorrogar-moroso-${c.id}`}
+                          title="Prorrogar Deuda 1 Semana (Conservar turnos y postergar cobro)"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-cyan-600" />
+                          <span>Prorrogar 1 sem</span>
+                        </button>
+                        <button
+                          onClick={() => pausarSocio(c.id, googleUser?.email)}
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          id={`btn-pausar-moroso-${c.id}`}
+                          title="Pausar Socio (Suspensión momentánea de cobro)"
+                        >
+                          <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Pausar Socio</span>
                         </button>
                         {(() => {
                           const waPhone = normalizarTelefonoWhatsApp(c.telefono);

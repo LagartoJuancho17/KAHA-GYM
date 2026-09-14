@@ -73,6 +73,8 @@ interface GymContextType {
   eliminarCliente: (id: string) => void;
   perdonarDeudaSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
   revertirPerdonDeuda: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
+  prorrogarDeudaSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
+  pausarSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
   bajaClasesSocio: (clienteId: string, clases: { turno_id: string; fecha: string }[], opciones?: { esBajaTemporal?: boolean; exencionCobro?: 'SUSPENDIDO' | 'POSTERGADO' | 'NINGUNA' }) => { success: boolean; message: string };
   importarClientesCSV: (clientesImportados: Array<{ nombre: string; apellido: string; email: string; telefono: string; tipo: TipoCliente; plan_nombre: string }>) => { procesados: number; insertados: number; errores: string[] };
 
@@ -1541,8 +1543,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'nombre', 'apellido', 'email', 'telefono', 'tipo', 'estado',
         'plan_id', 'activo', 'deuda_acumulada', 'ultimo_mes_pagado',
         'exencion_cobro', 'autorizado',
-        'precio_personalizado', 'dias_personalizados', 'nota_plan_personalizado',
-        'deuda_perdonada'
+        'precio_personalizado', 'dias_personalizados', 'nota_plan_personalizado'
       ];
       const payload: any = {};
       Object.keys(updates).forEach(key => {
@@ -1558,8 +1559,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabase.from('clientes').update(payload).eq('id', id).then(({ error }) => {
           if (error) {
             console.error("Error al actualizar cliente en Supabase:", error);
-            // Si falta la columna en Supabase (error 42703), reintentar sin las columnas no existentes para guardar el resto
-            if (error.code === '42703' || error.message?.includes('precio_personalizado') || error.message?.includes('dias_personalizados') || error.message?.includes('deuda_perdonada')) {
+            // Si falta la columna en Supabase (error 42703 o PGRST204), reintentar sin las columnas no existentes para guardar el resto
+            if (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('precio_personalizado') || error.message?.includes('dias_personalizados') || error.message?.includes('deuda_perdonada')) {
               console.warn("Reintentando actualización de cliente sin campos extendidos...");
               const safePayload = { ...payload };
               delete safePayload.precio_personalizado;
@@ -1567,7 +1568,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               delete safePayload.nota_plan_personalizado;
               delete safePayload.deuda_perdonada;
               if (Object.keys(safePayload).length > 0) {
-                supabase.from('clientes').update(safePayload).eq('id', id);
+                supabase.from('clientes').update(safePayload).eq('id', id).then(({ error: retryErr }) => {
+                  if (retryErr) console.error("Error en reintento de cliente en Supabase:", retryErr);
+                });
               }
             }
           }
@@ -1580,7 +1583,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const bajaLogicaCliente = (id: string) => {
-    const updatedClientes = clientes.map(c => {
+    let updatedClientes = clientes.map(c => {
       if (c.id === id) {
         // Cambiar estado a INACTIVO y poner activo = false
         return { ...c, activo: false, estado: 'INACTIVO' as EstadoCliente };
@@ -1588,14 +1591,56 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
 
-    // Remover al cliente de todas sus asignaciones fijas de turno
+    const promovidosInfo: Array<{ clienteId: string; turnoId: string; clienteNombre: string }> = [];
+
+    // Remover al cliente de todas sus asignaciones fijas de turno y auto-promover si hay lista de espera
     const updatedTurnos = turnos.map(t => {
+      const estabaEnAsignados = t.asignados_ids.includes(id);
+      const filtradoAsignados = t.asignados_ids.filter(cid => cid !== id);
+      let nuevaWaitlist = t.lista_espera_ids.filter(cid => cid !== id);
+      let nuevosAsignados = [...filtradoAsignados];
+
+      // Auto-promover si se liberó lugar de un asignado fijo y hay cupo libre
+      if (estabaEnAsignados && nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
+        const ordenada = ordenarEsperaSemanal(nuevaWaitlist, t.id, sociosPrioritarios);
+        const promovidoId = ordenada[0];
+        nuevosAsignados.push(promovidoId);
+        nuevaWaitlist = nuevaWaitlist.filter(cid => cid !== promovidoId);
+
+        const promCli = updatedClientes.find(c => c.id === promovidoId);
+        promovidosInfo.push({
+          clienteId: promovidoId,
+          turnoId: t.id,
+          clienteNombre: promCli ? `${promCli.nombre} ${promCli.apellido}` : 'Socio'
+        });
+      }
+
       return {
         ...t,
-        asignados_ids: t.asignados_ids.filter(cid => cid !== id),
-        lista_espera_ids: t.lista_espera_ids.filter(cid => cid !== id),
+        asignados_ids: nuevosAsignados,
+        lista_espera_ids: nuevaWaitlist,
       };
     });
+
+    if (promovidosInfo.length > 0) {
+      updatedClientes = updatedClientes.map(c => {
+        const promos = promovidosInfo.filter(p => p.clienteId === c.id);
+        if (promos.length > 0) {
+          const newTurnosFijos = [...c.turnos_fijos];
+          promos.forEach(p => {
+            if (!newTurnosFijos.includes(p.turnoId)) {
+              newTurnosFijos.push(p.turnoId);
+            }
+          });
+          return {
+            ...c,
+            tipo: 'FIJO' as TipoCliente,
+            turnos_fijos: newTurnosFijos
+          };
+        }
+        return c;
+      });
+    }
 
     // Espera por fecha y prioridad VIP: se limpian también, sino quedan filas
     // huérfanas apuntando a un socio inactivo. La de espera por fecha además
@@ -1628,6 +1673,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       supabase.from('socios_prioritarios').delete().eq('cliente_id', id).then(({ error }) => {
         if (error) console.error("Error al remover prioridad VIP en Supabase:", error);
       });
+
+      if (promovidosInfo.length > 0) {
+        promovidosInfo.forEach(({ clienteId: promId, turnoId: tId, clienteNombre }) => {
+          resolveTurnoUuid(tId).then((turnoUuid) => {
+            if (!turnoUuid) return;
+            supabase.from('lista_espera_turnos').delete()
+              .eq('cliente_id', promId).eq('turno_id', turnoUuid)
+              .then(({ error }) => { if (error) console.error('Error al remover de lista espera en Supabase:', error); });
+            supabase.from('asignaciones_turnos').insert({ cliente_id: promId, turno_id: turnoUuid })
+              .then(({ error }) => { if (error) console.error('Error al promover a asignados en Supabase:', error); });
+          });
+          notificarAltaWaitlist(promId, tId);
+          addAuditLog('LISTA_ESPERA_PROMOCION_AUTO', {
+            cliente_id: promId,
+            cliente_nombre: clienteNombre,
+            turno_id: tId,
+            motivo: 'Cupo liberado por baja de socio'
+          });
+          addToast('success', `¡Cupo liberado! Se promovió automáticamente a ${clienteNombre}.`);
+        });
+      }
     }
 
     const c = clientes.find(cl => cl.id === id);
@@ -1779,16 +1845,58 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const eliminarCliente = (id: string) => {
-    const updatedClientes = clientes.filter(c => c.id !== id);
+    let updatedClientes = clientes.filter(c => c.id !== id);
 
-    // Desasignar de todos los turnos fijos y variables
+    const promovidosInfo: Array<{ clienteId: string; turnoId: string; clienteNombre: string }> = [];
+
+    // Desasignar de todos los turnos fijos y variables y auto-promover si hay lista de espera
     const updatedTurnos = turnos.map(t => {
+      const estabaEnAsignados = t.asignados_ids.includes(id);
+      const filtradoAsignados = t.asignados_ids.filter(cid => cid !== id);
+      let nuevaWaitlist = t.lista_espera_ids.filter(cid => cid !== id);
+      let nuevosAsignados = [...filtradoAsignados];
+
+      // Auto-promover si se liberó lugar de un asignado fijo y hay cupo libre
+      if (estabaEnAsignados && nuevaWaitlist.length > 0 && nuevosAsignados.length < t.cupo_maximo) {
+        const ordenada = ordenarEsperaSemanal(nuevaWaitlist, t.id, sociosPrioritarios);
+        const promovidoId = ordenada[0];
+        nuevosAsignados.push(promovidoId);
+        nuevaWaitlist = nuevaWaitlist.filter(cid => cid !== promovidoId);
+
+        const promCli = updatedClientes.find(c => c.id === promovidoId);
+        promovidosInfo.push({
+          clienteId: promovidoId,
+          turnoId: t.id,
+          clienteNombre: promCli ? `${promCli.nombre} ${promCli.apellido}` : 'Socio'
+        });
+      }
+
       return {
         ...t,
-        asignados_ids: t.asignados_ids.filter(cid => cid !== id),
-        lista_espera_ids: t.lista_espera_ids.filter(cid => cid !== id)
+        asignados_ids: nuevosAsignados,
+        lista_espera_ids: nuevaWaitlist
       };
     });
+
+    if (promovidosInfo.length > 0) {
+      updatedClientes = updatedClientes.map(c => {
+        const promos = promovidosInfo.filter(p => p.clienteId === c.id);
+        if (promos.length > 0) {
+          const newTurnosFijos = [...c.turnos_fijos];
+          promos.forEach(p => {
+            if (!newTurnosFijos.includes(p.turnoId)) {
+              newTurnosFijos.push(p.turnoId);
+            }
+          });
+          return {
+            ...c,
+            tipo: 'FIJO' as TipoCliente,
+            turnos_fijos: newTurnosFijos
+          };
+        }
+        return c;
+      });
+    }
 
     // En la base, socios_prioritarios y lista_espera_reservas tienen
     // ON DELETE CASCADE por cliente_id: al borrar la fila de clientes se limpian
@@ -1809,6 +1917,30 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       supabase.from('clientes').delete().eq('id', id).then(({ error }) => {
         if (error) console.error("Error al eliminar cliente de Supabase:", error);
       });
+      supabase.from('asignaciones_turnos').delete().eq('cliente_id', id).then(({ error }) => {
+        if (error) console.error("Error al remover asignaciones fijas en Supabase:", error);
+      });
+
+      if (promovidosInfo.length > 0) {
+        promovidosInfo.forEach(({ clienteId: promId, turnoId: tId, clienteNombre }) => {
+          resolveTurnoUuid(tId).then((turnoUuid) => {
+            if (!turnoUuid) return;
+            supabase.from('lista_espera_turnos').delete()
+              .eq('cliente_id', promId).eq('turno_id', turnoUuid)
+              .then(({ error }) => { if (error) console.error('Error al remover de lista espera en Supabase:', error); });
+            supabase.from('asignaciones_turnos').insert({ cliente_id: promId, turno_id: turnoUuid })
+              .then(({ error }) => { if (error) console.error('Error al promover a asignados en Supabase:', error); });
+          });
+          notificarAltaWaitlist(promId, tId);
+          addAuditLog('LISTA_ESPERA_PROMOCION_AUTO', {
+            cliente_id: promId,
+            cliente_nombre: clienteNombre,
+            turno_id: tId,
+            motivo: 'Cupo liberado por eliminación de socio'
+          });
+          addToast('success', `¡Cupo liberado! Se promovió automáticamente a ${clienteNombre}.`);
+        });
+      }
     }
 
     const c = clientes.find(cl => cl.id === id);
@@ -1833,6 +1965,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       estado: 'ACTIVO'
     }, `Deuda perdonada ($${montoPerdonado.toLocaleString('es-AR')}) - Asignada condición de Becado`);
 
+    if (supabase) {
+      supabase.from('clientes').update({
+        deuda_acumulada: 0,
+        exencion_cobro: 'BECADO',
+        ultimo_mes_pagado: mesActual,
+        estado: 'ACTIVO'
+      }).eq('id', clienteId).then(({ error }) => {
+        if (error) console.error("Error al persistir condición de becado en Supabase:", error);
+      });
+    }
+
     addAuditLog('DEUDA_PERDONADA_BECADO', {
       cliente_id: clienteId,
       cliente_nombre: `${cli.nombre} ${cli.apellido}`,
@@ -1851,24 +1994,90 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const plan = planes.find(p => p.id === cli.plan_id);
     const cuota = cli.precio_personalizado != null ? Number(cli.precio_personalizado) : (plan ? Number(plan.precio) : 0);
-    const montoRestaurado = cli.deuda_perdonada && cli.deuda_perdonada > 0 ? cli.deuda_perdonada : cuota;
+    const montoRestaurado = cli.deuda_perdonada && cli.deuda_perdonada > 0 ? cli.deuda_perdonada : (cli.deuda_acumulada > 0 ? cli.deuda_acumulada : cuota);
 
     updateCliente(clienteId, {
       deuda_acumulada: montoRestaurado,
       exencion_cobro: 'NINGUNA',
       deuda_perdonada: undefined,
       estado: 'MOROSO'
-    }, `Beca retirada. Deuda restablecida en $${montoRestaurado.toLocaleString('es-AR')}`);
+    }, `Exención/prórroga retirada. Deuda restablecida en $${montoRestaurado.toLocaleString('es-AR')}`);
 
-    addAuditLog('BECA_REVOCADA', {
+    if (supabase) {
+      supabase.from('clientes').update({
+        deuda_acumulada: montoRestaurado,
+        exencion_cobro: 'NINGUNA',
+        estado: 'MOROSO'
+      }).eq('id', clienteId).then(({ error }) => {
+        if (error) console.error("Error al persistir revocación de exención en Supabase:", error);
+      });
+    }
+
+    addAuditLog('EXENCION_REVOCADA', {
       cliente_id: clienteId,
       cliente_nombre: `${cli.nombre} ${cli.apellido}`,
       monto_deuda_restablecido: montoRestaurado,
       fecha: new Date().toISOString()
     }, userEmail);
 
-    addToast('success', `Se quitó la condición de becado a ${cli.nombre} ${cli.apellido}. Deuda restablecida: $${montoRestaurado.toLocaleString('es-AR')}.`);
-    return { success: true, message: `Beca revocada a ${cli.nombre} ${cli.apellido}.` };
+    addToast('success', `Se restableció la condición normal a ${cli.nombre} ${cli.apellido}. Deuda: $${montoRestaurado.toLocaleString('es-AR')}.`);
+    return { success: true, message: `Condición normal restablecida a ${cli.nombre} ${cli.apellido}.` };
+  };
+
+  const prorrogarDeudaSocio = (clienteId: string, userEmail?: string) => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return { success: false, message: 'Socio no encontrado' };
+
+    updateCliente(clienteId, {
+      exencion_cobro: 'POSTERGADO',
+      estado: 'ACTIVO'
+    }, 'Prórroga de deuda otorgada por 1 semana');
+
+    if (supabase) {
+      supabase.from('clientes').update({
+        exencion_cobro: 'POSTERGADO',
+        estado: 'ACTIVO'
+      }).eq('id', clienteId).then(({ error }) => {
+        if (error) console.error("Error al persistir prórroga en Supabase:", error);
+      });
+    }
+
+    addAuditLog('DEUDA_PRORROGADA_1_SEMANA', {
+      cliente_id: clienteId,
+      cliente_nombre: `${cli.nombre} ${cli.apellido}`,
+      fecha: new Date().toISOString()
+    }, userEmail);
+
+    addToast('success', `Se prorrogó la deuda 1 semana a ${cli.nombre} ${cli.apellido}. Turnos fijos conservados.`);
+    return { success: true, message: `Prórroga de 1 semana otorgada a ${cli.nombre} ${cli.apellido}.` };
+  };
+
+  const pausarSocio = (clienteId: string, userEmail?: string) => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return { success: false, message: 'Socio no encontrado' };
+
+    updateCliente(clienteId, {
+      exencion_cobro: 'SUSPENDIDO',
+      estado: 'ACTIVO'
+    }, 'Membresía pausada (suspensión momentánea de cobro)');
+
+    if (supabase) {
+      supabase.from('clientes').update({
+        exencion_cobro: 'SUSPENDIDO',
+        estado: 'ACTIVO'
+      }).eq('id', clienteId).then(({ error }) => {
+        if (error) console.error("Error al persistir pausa de socio en Supabase:", error);
+      });
+    }
+
+    addAuditLog('SOCIO_PAUSADO', {
+      cliente_id: clienteId,
+      cliente_nombre: `${cli.nombre} ${cli.apellido}`,
+      fecha: new Date().toISOString()
+    }, userEmail);
+
+    addToast('success', `Se pausó la membresía de ${cli.nombre} ${cli.apellido}. Cobro suspendido.`);
+    return { success: true, message: `Socio pausado: ${cli.nombre} ${cli.apellido}.` };
   };
 
   // IMPORTACIÓN MASIVA CSV CLIENTES
@@ -3079,7 +3288,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let nextWaitlistEntry: (typeof waitlistReservas)[number] | undefined;
 
     while (true) {
-      const waitingList = esperaDelTurno(esperaLocal, turnoId, fecha, sociosPrioritarios, { clientes: currentClientes });
+      const waitingList = esperaDelTurno(esperaLocal, turnoId, fecha, sociosPrioritarios, { clientes: currentClientes, turnos });
       if (waitingList.length === 0) {
         candidateClient = undefined;
         break;
@@ -3101,7 +3310,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (entradasAEliminar.length > 0) {
       setWaitlistReservas(esperaLocal);
       localStorage.setItem('gym_waitlist_reservas', JSON.stringify(esperaLocal));
-      entradasAEliminar.forEach(e => persistirEsperaEnSupabase('baja', e.cliente_id, turnoId, fecha));
+      entradasAEliminar.forEach(e => {
+        if (!e.id.startsWith('matriz-auto-') && !e.id.startsWith('vip-auto-')) {
+          persistirEsperaEnSupabase('baja', e.cliente_id, turnoId, fecha);
+        }
+      });
     }
 
     if (!candidateClient || !nextWaitlistEntry) return currentClientes;
@@ -3145,7 +3358,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // en este mismo llamado), no sobre el `waitlistReservas` del closure: ese
     // sigue siendo la foto vieja hasta el proximo render, y filtrar desde ahi
     // resucitaria las entradas invalidas que recien se habian sacado.
-    const newWl = esperaLocal.filter(w => w.id !== nextWaitlistEntry!.id);
+    const newWl = esperaLocal.filter(w => w.id !== nextWaitlistEntry!.id && !(w.cliente_id === nextWaitlistEntry!.cliente_id && w.turno_id === turnoId && w.fecha === fecha));
     setWaitlistReservas(newWl);
     localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
     persistirEsperaEnSupabase('baja', nextWaitlistEntry.cliente_id, turnoId, fecha);
@@ -4809,7 +5022,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
-      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, bajaClasesSocio, importarClientesCSV,
+      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, darDeBajaTurnosFijosSocio, darDeBajaTurnosFijosMultiple, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,

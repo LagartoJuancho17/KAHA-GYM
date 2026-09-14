@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   AlertTriangle, X, UserMinus, ShieldCheck, Mail, Search, 
   Check, CheckSquare, Square, MessageCircle, AlertCircle, 
-  Clock, Sparkles, RefreshCw, Send, RotateCcw, Loader2 
+  Clock, Sparkles, RefreshCw, Send, RotateCcw, Loader2, PauseCircle 
 } from 'lucide-react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
@@ -24,10 +24,11 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
 }) => {
   const { 
     clientes, planes, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda,
+    prorrogarDeudaSocio, pausarSocio,
     addAuditLog, addToast, googleUser 
   } = useGym();
 
-  const [tabActiva, setTabActiva] = useState<'PENDIENTES' | 'BECADOS'>('PENDIENTES');
+  const [tabActiva, setTabActiva] = useState<'PENDIENTES' | 'EXENTOS'>('PENDIENTES');
   const [searchText, setSearchText] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dobleCheckConfig, setDobleCheckConfig] = useState<MorososDobleCheckConfig | null>(null);
@@ -37,27 +38,27 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
   const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
   const mesNombre = hoy.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
-  // Candidatos a baja de turno fijo: activos, con turnos fijos asignados, sin abonar y sin exención/beca activa
+  // Candidatos a baja de turno fijo: activos, con turnos fijos asignados, sin abonar y sin exención activa
   const candidatosPendientes = useMemo(() => {
     return clientes.filter(c => {
       if (!c.activo) return false;
       if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
-      if (c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO') return false;
+      if (c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO' || c.exencion_cobro === 'SUSPENDIDO') return false;
       const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual;
       return noPago;
     });
   }, [clientes, mesActual]);
 
-  // Alumnos con turnos fijos asignados que están Becados o Perdonados (cuota perdonada / deuda $0)
-  const sociosBecados = useMemo(() => {
+  // Alumnos con turnos fijos asignados que cuentan con excepción (Becados, Prorrogados o Pausados)
+  const sociosExentos = useMemo(() => {
     return clientes.filter(c => {
       if (!c.activo) return false;
       if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
-      return c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO';
+      return c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO' || c.exencion_cobro === 'SUSPENDIDO';
     });
   }, [clientes]);
 
-  const listaActual = tabActiva === 'PENDIENTES' ? candidatosPendientes : sociosBecados;
+  const listaActual = tabActiva === 'PENDIENTES' ? candidatosPendientes : sociosExentos;
 
   const filteredCandidatos = useMemo(() => {
     if (!searchText.trim()) return listaActual;
@@ -120,14 +121,45 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
     setSelectedIds(prev => prev.filter(id => id !== clienteId));
   };
 
-  const handleRevertirBeca = (clienteId: string) => {
+  const handleProrrogarDeuda = (clienteId: string) => {
+    prorrogarDeudaSocio(clienteId, googleUser?.email);
+    setSelectedIds(prev => prev.filter(id => id !== clienteId));
+  };
+
+  const handlePausarSocio = (clienteId: string) => {
+    pausarSocio(clienteId, googleUser?.email);
+    setSelectedIds(prev => prev.filter(id => id !== clienteId));
+  };
+
+  const handleRevertirExencion = (clienteId: string) => {
     revertirPerdonDeuda(clienteId, googleUser?.email);
     setSelectedIds(prev => prev.filter(id => id !== clienteId));
   };
 
+  const handlePerdonarMultiple = () => {
+    if (selectedIds.length === 0) return;
+    selectedIds.forEach(id => perdonarDeudaSocio(id, googleUser?.email));
+    addToast('success', `Se perdonó la deuda a ${selectedIds.length} socio(s) (Estado: Becado).`);
+    setSelectedIds([]);
+  };
+
+  const handleProrrogarMultiple = () => {
+    if (selectedIds.length === 0) return;
+    selectedIds.forEach(id => prorrogarDeudaSocio(id, googleUser?.email));
+    addToast('success', `Se prorrogó la deuda 1 semana a ${selectedIds.length} socio(s).`);
+    setSelectedIds([]);
+  };
+
+  const handlePausarMultiple = () => {
+    if (selectedIds.length === 0) return;
+    selectedIds.forEach(id => pausarSocio(id, googleUser?.email));
+    addToast('success', `Se pausó la membresía a ${selectedIds.length} socio(s).`);
+    setSelectedIds([]);
+  };
+
   const handleFinalizarRevision = async () => {
     if (candidatosPendientes.length === 0) {
-      addToast('success', 'Todos los casos fueron revisados (perdonados o eliminados).');
+      addToast('success', 'Todos los casos fueron revisados (perdonados, prorrogados, pausados o eliminados).');
       onClose();
       return;
     }
@@ -223,7 +255,7 @@ Equipo KAHA 💚`;
                 </span>
               </div>
               <p className="text-zinc-300 text-xs mt-1">
-                Alumnos con turnos fijos asignados sin abonar la cuota de <span className="font-semibold text-white capitalize">{mesNombre}</span>. Podés perdonar la deuda (becar) o eliminar el usuario. Al finalizar, quienes no hayan sido perdonados recibirán un aviso automático por correo.
+                Alumnos con turnos fijos asignados sin abonar la cuota de <span className="font-semibold text-white capitalize">{mesNombre}</span>. Podés perdonar la deuda (becar), prorrogar la deuda 1 semana, pausar al socio o eliminar el usuario. Al finalizar, quienes no hayan sido perdonados, prorrogados ni pausados recibirán un aviso automático por correo.
               </p>
             </div>
           </div>
@@ -235,7 +267,7 @@ Equipo KAHA 💚`;
           </button>
         </div>
 
-        {/* PESTAÑAS PENDIENTES / BECADOS */}
+        {/* PESTAÑAS PENDIENTES / EXENTOS */}
         <div className="px-4 sm:px-6 pt-3 pb-2 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <button
@@ -251,15 +283,15 @@ Equipo KAHA 💚`;
             </button>
 
             <button
-              onClick={() => { setTabActiva('BECADOS'); setSelectedIds([]); }}
+              onClick={() => { setTabActiva('EXENTOS'); setSelectedIds([]); }}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                tabActiva === 'BECADOS'
+                tabActiva === 'EXENTOS'
                   ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
                   : 'bg-white text-emerald-800 hover:bg-emerald-50 border-emerald-200'
               }`}
             >
-              <Check className={`w-3.5 h-3.5 ${tabActiva === 'BECADOS' ? 'text-white' : 'text-emerald-600'}`} />
-              <span>Socios Becados / Exentos ({sociosBecados.length})</span>
+              <Check className={`w-3.5 h-3.5 ${tabActiva === 'EXENTOS' ? 'text-white' : 'text-emerald-600'}`} />
+              <span>Socios Exentos / Protegidos ({sociosExentos.length})</span>
             </button>
           </div>
 
@@ -284,7 +316,7 @@ Equipo KAHA 💚`;
               <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder={tabActiva === 'PENDIENTES' ? 'Buscar pendiente por socio, email o turno...' : 'Buscar becado por socio, email...'}
+                placeholder={tabActiva === 'PENDIENTES' ? 'Buscar pendiente por socio, email o turno...' : 'Buscar protegido/exento por socio, email...'}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-sans focus:outline-hidden focus:border-zinc-900"
@@ -305,14 +337,57 @@ Equipo KAHA 💚`;
             )}
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {selectedIds.length > 0 && (
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+            {selectedIds.length > 0 && tabActiva === 'PENDIENTES' && (
+              <>
+                <button
+                  onClick={handlePerdonarMultiple}
+                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-sm cursor-pointer border-none"
+                  title="Perdonar deuda a todos los seleccionados"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Perdonar ({selectedIds.length})</span>
+                </button>
+
+                <button
+                  onClick={handleProrrogarMultiple}
+                  className="px-2.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-sm cursor-pointer border-none"
+                  title="Prorrogar deuda 1 semana a todos los seleccionados"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Prorrogar 1 sem ({selectedIds.length})</span>
+                </button>
+
+                <button
+                  onClick={handlePausarMultiple}
+                  className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-sm cursor-pointer border-none"
+                  title="Pausar socios seleccionados"
+                >
+                  <PauseCircle className="w-3.5 h-3.5" />
+                  <span>Pausar ({selectedIds.length})</span>
+                </button>
+
+                <button
+                  onClick={handleEliminarMultiple}
+                  className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-sm cursor-pointer border-none"
+                  title="Eliminar socios seleccionados"
+                >
+                  <UserMinus className="w-3.5 h-3.5" />
+                  <span>Eliminar ({selectedIds.length})</span>
+                </button>
+              </>
+            )}
+            {selectedIds.length > 0 && tabActiva === 'EXENTOS' && (
               <button
-                onClick={handleEliminarMultiple}
-                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
+                onClick={() => {
+                  selectedIds.forEach(id => revertirPerdonDeuda(id, googleUser?.email));
+                  setSelectedIds([]);
+                }}
+                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-sm cursor-pointer border-none"
+                title="Restablecer condición normal a los seleccionados"
               >
-                <UserMinus className="w-3.5 h-3.5" />
-                <span>Eliminar seleccionados ({selectedIds.length})</span>
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restablecer ({selectedIds.length})</span>
               </button>
             )}
           </div>
@@ -326,12 +401,12 @@ Equipo KAHA 💚`;
               <p className="font-bold text-sm text-zinc-800">
                 {tabActiva === 'PENDIENTES' 
                   ? '¡Al día! No hay socios con turnos fijos pendientes de regularizar' 
-                  : 'No hay socios con turnos fijos registrados bajo condición de becados'}
+                  : 'No hay socios con turnos fijos registrados bajo condición de exención o prórroga'}
               </p>
               <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
                 {tabActiva === 'PENDIENTES'
-                  ? 'Todos los alumnos con turnos fijos tienen su cuota abonada o cuentan con excepciones y becas registradas.'
-                  : 'Los socios perdonados aparecerán en esta sección y no se les enviará intimación de baja.'}
+                  ? 'Todos los alumnos con turnos fijos tienen su cuota abonada o cuentan con excepciones, prórrogas o pausas registradas.'
+                  : 'Los socios perdonados, prorrogados o pausados aparecerán en esta sección y no se les enviará intimación de baja.'}
               </p>
             </div>
           ) : (
@@ -339,6 +414,9 @@ Equipo KAHA 💚`;
               const pl = planes.find(p => p.id === c.plan_id);
               const isSelected = selectedIds.includes(c.id);
               const esBecado = c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO';
+              const esPostergado = c.exencion_cobro === 'POSTERGADO';
+              const esSuspendido = c.exencion_cobro === 'SUSPENDIDO';
+              const esExento = esBecado || esPostergado || esSuspendido;
               const cuota = precioPlanSocio(c, planes);
               const formatoDeuda = formatearDeudaVisual(c, cuota);
               const waPhone = normalizarTelefonoWhatsApp(c.telefono);
@@ -347,7 +425,7 @@ Equipo KAHA 💚`;
                 <div 
                   key={c.id} 
                   className={`bg-white border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all shadow-2xs hover:shadow-xs ${
-                    isSelected ? 'border-red-400 ring-2 ring-red-500/15 bg-red-50/20' : esBecado ? 'border-emerald-300 bg-emerald-50/20' : 'border-zinc-200'
+                    isSelected ? 'border-red-400 ring-2 ring-red-500/15 bg-red-50/20' : esExento ? 'border-emerald-300 bg-emerald-50/20' : 'border-zinc-200'
                   }`}
                 >
                   <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -375,6 +453,18 @@ Equipo KAHA 💚`;
                             Becado (Deuda $0)
                           </span>
                         )}
+                        {esPostergado && (
+                          <span className="bg-cyan-100 text-cyan-800 border border-cyan-300 text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5 text-cyan-700" />
+                            Prorrogado 1 sem
+                          </span>
+                        )}
+                        {esSuspendido && (
+                          <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase flex items-center gap-1">
+                            <PauseCircle className="w-2.5 h-2.5 text-amber-700" />
+                            Socio Pausado
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2 text-[11px] text-zinc-500 flex-wrap">
@@ -385,6 +475,16 @@ Equipo KAHA 💚`;
                             Deuda actual: <span className="bg-emerald-100 text-emerald-900 font-extrabold px-1.5 py-0.5 rounded">$0</span>
                             <span className="text-zinc-400 font-normal line-through decoration-rose-500 decoration-2 text-xs">({formatoDeuda.textoTachado})</span>
                             <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">Becado</span>
+                          </span>
+                        ) : esPostergado ? (
+                          <span className="font-mono text-cyan-800 font-bold flex items-center gap-1.5">
+                            <span>Deuda: ${c.deuda_acumulada.toLocaleString('es-AR')}</span>
+                            <span className="bg-cyan-100 text-cyan-800 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">Prórroga activa</span>
+                          </span>
+                        ) : esSuspendido ? (
+                          <span className="font-mono text-amber-800 font-bold flex items-center gap-1.5">
+                            <span>Deuda: ${c.deuda_acumulada.toLocaleString('es-AR')}</span>
+                            <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">Pausa activa</span>
                           </span>
                         ) : (
                           <span className="font-mono text-red-600 font-bold">Deuda: {formatoDeuda.textoVisible}</span>
@@ -400,7 +500,7 @@ Equipo KAHA 💚`;
                           <span 
                             key={tf}
                             className={`border text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg ${
-                              esBecado 
+                              esExento 
                                 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
                                 : 'bg-red-50 border border-red-200 text-red-800'
                             }`}
@@ -413,7 +513,7 @@ Equipo KAHA 💚`;
                   </div>
 
                   {/* Acciones por fila */}
-                  <div className="flex items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-zinc-100 justify-end">
+                  <div className="flex items-center gap-1.5 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-zinc-100 justify-end flex-wrap">
                     {/* Botón WhatsApp corregido con normalización internacional (549) */}
                     {waPhone && (
                       <a
@@ -427,36 +527,58 @@ Equipo KAHA 💚`;
                       </a>
                     )}
 
-                    {/* Botón Perdonar Deuda / Quitar Beca */}
-                    {!esBecado ? (
-                      <button
-                        onClick={() => handlePerdonarDeuda(c.id)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs border-none"
-                        title="Perdonar deuda (pone deuda en $0 y asigna condición de Becado)"
-                      >
-                        <Check className="w-3.5 h-3.5 text-white" />
-                        <span>Perdonar deuda ($0)</span>
-                      </button>
+                    {!esExento ? (
+                      <>
+                        {/* 1. Perdonar deuda */}
+                        <button
+                          onClick={() => handlePerdonarDeuda(c.id)}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs border-none"
+                          title="Perdonar deuda (pone deuda en $0 y asigna condición de Becado)"
+                        >
+                          <Check className="w-3.5 h-3.5 text-white" />
+                          <span>Perdonar deuda</span>
+                        </button>
+
+                        {/* 2. Prorrogar deuda 1 semana */}
+                        <button
+                          onClick={() => handleProrrogarDeuda(c.id)}
+                          className="px-2.5 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title="Prorrogar deuda por 1 semana (conserva turnos y no envía aviso de baja)"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-cyan-700" />
+                          <span>Prorrogar 1 sem</span>
+                        </button>
+
+                        {/* 3. Pausar socio */}
+                        <button
+                          onClick={() => handlePausarSocio(c.id)}
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title="Pausar socio (suspensión momentánea de cobro)"
+                        >
+                          <PauseCircle className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Pausar socio</span>
+                        </button>
+
+                        {/* 4. Eliminar usuario */}
+                        <button
+                          onClick={() => handleEliminarIndividual(c)}
+                          className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-2xs cursor-pointer border-none"
+                          title="Eliminar usuario del sistema y liberar turnos fijos asignados"
+                        >
+                          <UserMinus className="w-3.5 h-3.5 text-white" />
+                          <span>Eliminar usuario</span>
+                        </button>
+                      </>
                     ) : (
                       <button
-                        onClick={() => handleRevertirBeca(c.id)}
+                        onClick={() => handleRevertirExencion(c.id)}
                         className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                        title="Quitar condición de becado y restablecer deuda normal"
+                        title="Restablecer condición normal (quitar exención/prórroga/pausa)"
                       >
                         <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Quitar Beca / Restablecer</span>
+                        <span>Restablecer condición</span>
                       </button>
                     )}
-
-                    {/* Botón Eliminar Usuario */}
-                    <button
-                      onClick={() => handleEliminarIndividual(c)}
-                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all shadow-2xs cursor-pointer border-none"
-                      title="Eliminar usuario del sistema"
-                    >
-                      <UserMinus className="w-3.5 h-3.5" />
-                      <span>Eliminar usuario</span>
-                    </button>
                   </div>
                 </div>
               );
@@ -473,7 +595,7 @@ Equipo KAHA 💚`;
               Deuda total adeudada: <strong className="text-red-700 font-mono font-bold">${totalDeudaCandidatos.toLocaleString('es-AR')}</strong>
             </p>
             <p className="text-[11px] text-zinc-400">
-              {sociosBecados.length > 0 && `${sociosBecados.length} socio(s) con turnos fijos becados ($0) fuera de revisión de baja.`}
+              {sociosExentos.length > 0 && `${sociosExentos.length} socio(s) protegidos/exentos (becados, prórrogas o pausados) fuera de revisión de baja.`}
             </p>
           </div>
 

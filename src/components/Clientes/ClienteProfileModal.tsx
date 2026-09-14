@@ -36,7 +36,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   onManageTurnos,
   onAssignPlan
 }) => {
-  const { clientes, planes, pagos, turnos, perdonarDeudaSocio, revertirPerdonDeuda, googleUser } = useGym();
+  const { clientes, planes, pagos, turnos, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, googleUser } = useGym();
 
   if (!isOpen || !clienteId) return null;
 
@@ -138,7 +138,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                   </span>
                 )}
               </div>
-              <div className="mt-2 pt-1.5 border-t border-zinc-200/60">
+              <div className="mt-2 pt-1.5 border-t border-zinc-200/60 flex flex-col gap-1">
                 {!esBecado ? (
                   <button
                     onClick={() => perdonarDeudaSocio(selectedCliente.id, googleUser?.email)}
@@ -152,6 +152,22 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                     className="w-full text-center px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded text-[9px] font-bold border border-amber-300 transition-colors cursor-pointer"
                   >
                     Quitar Beca / Restablecer
+                  </button>
+                )}
+                {selectedCliente.exencion_cobro !== 'POSTERGADO' && (
+                  <button
+                    onClick={() => prorrogarDeudaSocio(selectedCliente.id, googleUser?.email)}
+                    className="w-full text-center px-2 py-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-800 rounded text-[9px] font-bold border border-cyan-300 transition-colors cursor-pointer"
+                  >
+                    Prorrogar Deuda (1 semana)
+                  </button>
+                )}
+                {selectedCliente.exencion_cobro !== 'SUSPENDIDO' && (
+                  <button
+                    onClick={() => pausarSocio(selectedCliente.id, googleUser?.email)}
+                    className="w-full text-center px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded text-[9px] font-bold border border-amber-300 transition-colors cursor-pointer"
+                  >
+                    Pausar Socio (Cobro suspendido)
                   </button>
                 )}
               </div>

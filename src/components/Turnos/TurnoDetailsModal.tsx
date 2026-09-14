@@ -547,17 +547,31 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                           {cl.nombre} {cl.apellido}
                           {vip && <span className="ml-1.5 text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full">PRIORIDAD</span>}
                         </span>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`¿Está seguro que desea retirar a ${cl.nombre} ${cl.apellido} de la lista de espera de este turno?`)) {
-                              removerAsignacionFija(cId, turnoId);
-                            }
-                          }}
-                          className="text-zinc-400 hover:text-red-600 p-1 hover:bg-amber-100/70 rounded transition-colors cursor-pointer border-none bg-transparent"
-                          title="Retirar de la lista de espera"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {selectedTurno.asignados_ids.length < selectedTurno.cupo_maximo && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                asignarClienteFijo(cId, turnoId);
+                              }}
+                              className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-xs cursor-pointer border-none transition-all"
+                              title="Asignar cupo fijo a este socio"
+                            >
+                              Promover
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`¿Está seguro que desea retirar a ${cl.nombre} ${cl.apellido} de la lista de espera de este turno?`)) {
+                                removerAsignacionFija(cId, turnoId);
+                              }
+                            }}
+                            className="text-zinc-400 hover:text-red-600 p-1 hover:bg-amber-100/70 rounded transition-colors cursor-pointer border-none bg-transparent"
+                            title="Retirar de la lista de espera"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

@@ -14,13 +14,14 @@ import { PagoReceiptModal } from './PagoReceiptModal';
 import { PagosTable } from './PagosTable';
 import { PagoDeleteModal } from './PagoDeleteModal';
 import { PagoEditModal } from './PagoEditModal';
+import { BalanceTab } from './BalanceTab';
 
 interface PagosLogProps {
   showAddPagoModal: boolean;
   setShowAddPagoModal: (show: boolean) => void;
 }
 
-type SubTab = 'INGRESOS' | 'EGRESOS' | 'LIQUIDACION';
+type SubTab = 'INGRESOS' | 'EGRESOS' | 'LIQUIDACION' | 'BALANCE';
 
 // Days of week -> index
 const DIA_IDX: Record<string, number> = {
@@ -300,16 +301,16 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="min-w-0">
             <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Finanzas &amp; Pagos</h2>
-            <p className="text-zinc-500 font-sans text-sm font-medium">Ingresos, egresos y liquidación de profesores</p>
+            <p className="text-zinc-500 font-sans text-sm font-medium">Ingresos, egresos, liquidación y balance general</p>
           </div>
 
           {/* SUB-TABS (Grid on mobile for 100% width distribution) */}
-          <div className="grid grid-cols-3 bg-zinc-100 p-1 rounded-xl border border-zinc-200 gap-1 w-full sm:w-auto">
-            {([['INGRESOS', 'Ingresos'], ['EGRESOS', 'Egresos'], ['LIQUIDACION', 'Liquidación']] as [SubTab, string][]).map(([key, label]) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 bg-zinc-100 p-1 rounded-xl border border-zinc-200 gap-1 w-full sm:w-auto">
+            {([['INGRESOS', 'Ingresos'], ['EGRESOS', 'Egresos'], ['LIQUIDACION', 'Liquidación'], ['BALANCE', 'Balance']] as [SubTab, string][]).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setActiveSubTab(key)}
-                className={`py-2 px-1 text-center rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer border-none bg-transparent truncate ${
+                className={`py-2 px-2 text-center rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer border-none bg-transparent truncate ${
                   activeSubTab === key ? 'bg-white text-zinc-950 shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-800'
                 }`}
               >
@@ -694,6 +695,14 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             </div>
           )}
         </div>
+      )}
+
+      {/* SUB-TAB: BALANCE GENERAL */}
+      {activeSubTab === 'BALANCE' && (
+        <BalanceTab 
+          mostrarBalance={mostrarBalance} 
+          onToggleBalance={handleToggleBalance} 
+        />
       )}
 
       {/* MODAL REGISTRAR NOVEDAD PROFESOR */}
