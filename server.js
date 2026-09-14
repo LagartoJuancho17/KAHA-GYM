@@ -32,9 +32,15 @@ if (process.env.SUPABASE_URL && supabaseUrl !== process.env.SUPABASE_URL.trim())
   );
 }
 
-const supabase = (supabaseUrl && supabaseServiceKey) 
-  ? createClient(supabaseUrl, supabaseServiceKey) 
+const supabase = (supabaseUrl && supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey)
   : null;
+
+// Sólo el host, nunca la clave: sirve para diagnosticar a qué proyecto pega el
+// servidor sin exponer nada sensible.
+const supabaseHost = (() => {
+  try { return supabaseUrl ? new URL(supabaseUrl).host : null; } catch { return null; }
+})();
 
 // Expose the secure API endpoint for Mercado Pago Checkout Pro
 app.post('/api/create-preference', async (req, res) => {
@@ -611,7 +617,15 @@ app.post('/api/cron/aviso-deuda', async (req, res) => {
       console.log(`>> [aviso-deuda] No se envía: ${candado.motivo}`, candado.detalle || "");
       // El detalle va en la respuesta a propósito: un cron que falla en silencio
       // es justamente lo que tuvo roto el reporte del día 10 durante meses.
-      return res.status(200).json({ ok: true, omitido: true, motivo: candado.motivo, detalle: candado.detalle });
+      // Se informa el host (no la clave) para poder distinguir "cache viejo" de
+      // "está apuntando a otro proyecto de Supabase" sin adivinar.
+      return res.status(200).json({
+        ok: true,
+        omitido: true,
+        motivo: candado.motivo,
+        detalle: candado.detalle,
+        supabase_host: supabaseHost
+      });
     }
 
     const deudores = await sociosQueDeben();
@@ -657,7 +671,15 @@ app.post('/api/cron/reporte-morosos', async (req, res) => {
       console.log(`>> [reporte-morosos] No se envía: ${candado.motivo}`, candado.detalle || "");
       // El detalle va en la respuesta a propósito: un cron que falla en silencio
       // es justamente lo que tuvo roto el reporte del día 10 durante meses.
-      return res.status(200).json({ ok: true, omitido: true, motivo: candado.motivo, detalle: candado.detalle });
+      // Se informa el host (no la clave) para poder distinguir "cache viejo" de
+      // "está apuntando a otro proyecto de Supabase" sin adivinar.
+      return res.status(200).json({
+        ok: true,
+        omitido: true,
+        motivo: candado.motivo,
+        detalle: candado.detalle,
+        supabase_host: supabaseHost
+      });
     }
 
     const deudores = await sociosQueDeben();
