@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, AlertCircle, CheckCircle, Calendar, Plus, AlertTriangle } from 'lucide-react';
+import { X, AlertCircle, CheckCircle, Calendar, Plus, AlertTriangle, ChevronUp, ArrowLeftRight } from 'lucide-react';
+import { calcularDiferenciaPlan } from '../../lib/calculoDeuda';
 
 interface ClienteTurnosModalProps {
   isOpen: boolean;
@@ -28,6 +29,17 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
     mensaje: string;
     fechas: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>;
   } | null>(null);
+  const [conflictoPlan, setConflictoPlan] = useState<{
+    clienteId: string;
+    clienteNombre: string;
+    turnosFijosActuales: string[];
+    maxDias: number;
+    nuevoMaxDias: number;
+    planActualId?: string;
+  } | null>(null);
+  const [selectedNuevoPlanId, setSelectedNuevoPlanId] = useState<string>('');
+  const [imputarDiferenciaDeuda, setImputarDiferenciaDeuda] = useState<boolean>(true);
+  const [reemplazarTurnoId, setReemplazarTurnoId] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -65,6 +77,25 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
 
     const res = asignarClienteFijo(activeClient.id, selectedTurnoToAssign, { forzar });
 
+    // Si excede el plan, abrir el modal interactivo de decisión
+    if (!res.success && res.excedePlan) {
+      const diasNecesarios = (res.maxDias || 0) + 1;
+      const planSugerido = planes.find(p => p.id !== 'p-none' && p.dias_por_semana >= diasNecesarios) || planes.find(p => p.id !== 'p-none');
+      setSelectedNuevoPlanId(planSugerido?.id || '');
+      setImputarDiferenciaDeuda(true);
+      setConflictoPlan({
+        clienteId: activeClient.id,
+        clienteNombre: res.clienteNombre || `${activeClient.nombre} ${activeClient.apellido}`,
+        turnosFijosActuales: res.turnosFijosActuales || [],
+        maxDias: res.maxDias || 0,
+        nuevoMaxDias: diasNecesarios,
+        planActualId: activeClient.plan_id
+      });
+      setReemplazarTurnoId('');
+      return;
+    }
+    setConflictoPlan(null);
+
     // El turno tiene reservas puntuales de OTROS socios que quedarían sobre el cupo.
     // No se decide solo: se le muestra al admin y él elige.
     if (!res.success && res.requiereConfirmacion) {
@@ -83,6 +114,44 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
         setSelectedTurnoToAssign('');
         setTimeout(() => setTurnosModalSuccess(''), 2000);
       }
+    } else {
+      setTurnosModalError(res.message);
+    }
+  };
+
+  const handleConfirmarAmpliarPlan = () => {
+    if (!conflictoPlan || !selectedNuevoPlanId || !selectedTurnoToAssign) return;
+    const res = asignarClienteFijo(conflictoPlan.clienteId, selectedTurnoToAssign, {
+      nuevoPlanId: selectedNuevoPlanId,
+      imputarDiferenciaDeuda
+    });
+    setConflictoPlan(null);
+    if (res.success) {
+      if (res.putInWaitlist) {
+        setTurnosModalWaitlist(res.message);
+      } else {
+        setTurnosModalSuccess(res.message);
+      }
+      setSelectedTurnoToAssign('');
+      setTimeout(() => { setTurnosModalSuccess(''); setTurnosModalWaitlist(''); }, 3500);
+    } else {
+      setTurnosModalError(res.message);
+    }
+  };
+
+  const handleReemplazarTurno = () => {
+    if (!conflictoPlan || !reemplazarTurnoId || !selectedTurnoToAssign) return;
+    const res = asignarClienteFijo(conflictoPlan.clienteId, selectedTurnoToAssign, { reemplazarTurnoId });
+    setConflictoPlan(null);
+    setReemplazarTurnoId('');
+    if (res.success) {
+      if (res.putInWaitlist) {
+        setTurnosModalWaitlist(res.message);
+      } else {
+        setTurnosModalSuccess(`Turno reemplazado y asignado exitosamente.`);
+      }
+      setSelectedTurnoToAssign('');
+      setTimeout(() => { setTurnosModalSuccess(''); setTurnosModalWaitlist(''); }, 3000);
     } else {
       setTurnosModalError(res.message);
     }
@@ -260,6 +329,172 @@ export const ClienteTurnosModal: React.FC<ClienteTurnosModalProps> = ({
 
         </div>
       </div>
+
+      {/* MODAL DIÁLOGO DE CONFLICTO DE PLAN */}
+      {conflictoPlan && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs animate-fade-in" id="cliente-conflicto-plan-modal">
+          <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92vh] flex flex-col">
+            <div className="bg-zinc-950 text-white p-5 flex items-start justify-between border-b border-zinc-800">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white tracking-tight">Límite de Cupos Semanales Alcanzado</h4>
+                  <p className="text-xs text-zinc-400 mt-0.5">Socio: <strong className="text-lime-400">{conflictoPlan.clienteNombre}</strong></p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConflictoPlan(null)}
+                className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg transition-colors cursor-pointer border-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-amber-900 text-xs leading-relaxed">
+                <p>
+                  <strong>{conflictoPlan.clienteNombre}</strong> tiene actualmente contratado el <strong>{planes.find(p => p.id === conflictoPlan.planActualId)?.nombre || 'Plan de ' + conflictoPlan.maxDias + ' días'}</strong> ({conflictoPlan.maxDias} días por semana) y ya los tiene cubiertos.
+                </p>
+                <p className="mt-1 text-amber-800">
+                  Al asignarle este nuevo turno, pasará a tener <strong>{conflictoPlan.nuevoMaxDias} turnos por semana</strong>.
+                </p>
+              </div>
+
+              {(() => {
+                const planActual = planes.find(p => p.id === conflictoPlan.planActualId);
+                const planNuevo = planes.find(p => p.id === selectedNuevoPlanId);
+                const precioActual = planActual ? Number(planActual.precio) : 0;
+                const precioNuevo = planNuevo ? Number(planNuevo.precio) : 0;
+                const diferencia = Math.max(0, precioNuevo - precioActual);
+
+                return (
+                  <div className="border border-violet-200 bg-violet-50/60 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-1.5 text-violet-950 font-bold text-xs">
+                      <ChevronUp className="w-4 h-4 text-violet-600" />
+                      <span>Opción 1: Ampliar a Plan de {conflictoPlan.nuevoMaxDias} días o más (Recomendado)</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-zinc-700 block">Seleccionar nuevo plan:</label>
+                      <select
+                        value={selectedNuevoPlanId}
+                        onChange={e => setSelectedNuevoPlanId(e.target.value)}
+                        className="w-full bg-white border border-violet-300 rounded-lg p-2 text-xs font-semibold text-zinc-900 focus:ring-2 focus:ring-violet-500 outline-none"
+                      >
+                        {planes.filter(p => p.id !== 'p-none').map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} ({p.dias_por_semana} días/sem) — ${p.precio.toLocaleString('es-AR')}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-3 border border-violet-200 space-y-2 text-xs">
+                      <div className="flex justify-between items-center text-zinc-600">
+                        <span>Plan actual ({planActual?.nombre || 'Actual'}):</span>
+                        <span className="font-semibold">${precioActual.toLocaleString('es-AR')}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-zinc-600">
+                        <span>Nuevo plan ({planNuevo?.nombre || 'Nuevo'}):</span>
+                        <span className="font-semibold text-zinc-900">${precioNuevo.toLocaleString('es-AR')}</span>
+                      </div>
+                      <div className="border-t border-zinc-100 pt-2 flex justify-between items-center font-bold text-violet-900">
+                        <span>Diferencia a imputar como deuda:</span>
+                        <span className="text-sm font-black text-violet-700">
+                          {diferencia > 0 ? `+$${diferencia.toLocaleString('es-AR')}` : '$0'}
+                        </span>
+                      </div>
+
+                      {diferencia > 0 && (
+                        <label className="flex items-center gap-2 pt-1 cursor-pointer select-none text-[11px] text-zinc-700 font-medium">
+                          <input
+                            type="checkbox"
+                            checked={imputarDiferenciaDeuda}
+                            onChange={e => setImputarDiferenciaDeuda(e.target.checked)}
+                            className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
+                          />
+                          <span>Imputar automáticamente los <strong>${diferencia.toLocaleString('es-AR')}</strong> como deuda en su cuenta</span>
+                        </label>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleConfirmarAmpliarPlan}
+                      className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer border-none"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>
+                        Confirmar Ampliación a {planNuevo?.nombre || 'Nuevo Plan'} {imputarDiferenciaDeuda && diferencia > 0 ? `(+$${diferencia.toLocaleString('es-AR')})` : ''} y Asignar
+                      </span>
+                    </button>
+                  </div>
+                );
+              })()}
+
+              <div className="border border-zinc-200 bg-zinc-50 rounded-xl p-4 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-zinc-800 font-bold text-xs">
+                  <ArrowLeftRight className="w-4 h-4 text-zinc-600" />
+                  <span>Opción 2: Reemplazar un turno existente (Mantener {conflictoPlan.maxDias} días)</span>
+                </div>
+                <p className="text-zinc-500 text-[11px]">
+                  Elegí cuál de sus turnos actuales quitar para reemplazarlo por el nuevo:
+                </p>
+
+                <div className="space-y-1.5">
+                  {conflictoPlan.turnosFijosActuales.map(tId => {
+                    const t = turnos.find(x => x.id === tId);
+                    const label = t ? `${t.dia} — ${t.hora} hs` : tId;
+                    return (
+                      <label
+                        key={tId}
+                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                          reemplazarTurnoId === tId
+                            ? 'bg-zinc-900 text-white border-zinc-900 font-bold'
+                            : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-100'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="reemplazar-turno-modal-cliente"
+                          value={tId}
+                          checked={reemplazarTurnoId === tId}
+                          onChange={() => setReemplazarTurnoId(tId)}
+                          className="accent-lime-400"
+                        />
+                        <span className="text-xs">{label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!reemplazarTurnoId}
+                  onClick={handleReemplazarTurno}
+                  className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all cursor-pointer border-none flex items-center justify-center gap-1.5"
+                >
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                  <span>Reemplazar Turno Seleccionado y Asignar</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-zinc-100 p-4 border-t border-zinc-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setConflictoPlan(null)}
+                className="px-4 py-2 bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancelar y volver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

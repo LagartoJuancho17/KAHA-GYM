@@ -16,7 +16,7 @@ import { calcularOcupacion, conflictosAlAgregarFijo, reservasPropiasDuplicadas }
 import { clavePrioridad, esperaDelTurno, proximoEnEntrar, ordenarEsperaSemanal } from './lib/listaEspera';
 import { hoyArgentina, fechasFuturasDelTurno } from './lib/fechas';
 import { iniciarReposo } from './lib/reposo';
-import { calcularDeudaYEstadoCliente } from './lib/calculoDeuda';
+import { calcularDeudaYEstadoCliente, calcularDiferenciaPlan, precioPlanSocio } from './lib/calculoDeuda';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -84,8 +84,7 @@ interface GymContextType {
   // Planes Methods
   updatePrecioPlan: (planId: string, nuevoPrecio: number, userEmail: string) => void;
 
-  // Turnos Methods
-  asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>; yaEnEspera?: boolean; puestoEnEspera?: number; totalEnEspera?: number; excedePlan?: boolean; turnosFijosActuales?: string[]; maxDias?: number; clienteNombre?: string };
+  asignarClienteFijo: (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string; nuevoPlanId?: string; imputarDiferenciaDeuda?: boolean }) => { success: boolean; message: string; putInWaitlist?: boolean; requiereConfirmacion?: boolean; conflictos?: Array<{ fecha: string; ocupacionActual: number; ocupacionConElFijo: number; cupo: number }>; yaEnEspera?: boolean; puestoEnEspera?: number; totalEnEspera?: number; excedePlan?: boolean; turnosFijosActuales?: string[]; maxDias?: number; clienteNombre?: string; planActualId?: string; diasRequeridos?: number; diferenciaDeuda?: number };
   removerAsignacionFija: (clienteId: string, turnoId: string) => void;
   darDeBajaTurnosFijosSocio: (clienteId: string, motivo?: string, userEmail?: string) => { success: boolean; message: string };
   darDeBajaTurnosFijosMultiple: (clienteIds: string[], motivo?: string, userEmail?: string) => { success: boolean; procesados: number };
@@ -1511,9 +1510,28 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let extraLog = extraLogParam || '';
     const clientePrev = clientes.find(c => c.id === id);
     if (updates.plan_id && clientePrev && clientePrev.plan_id !== updates.plan_id) {
-      const pAnterior = planes.find(p => p.id === clientePrev.plan_id)?.nombre || '';
-      const pNuevo = planes.find(p => p.id === updates.plan_id)?.nombre || '';
-      extraLog = `Cambió plan de [${pAnterior}] a [${pNuevo}]`;
+      const pAnterior = planes.find(p => p.id === clientePrev.plan_id);
+      const pNuevo = planes.find(p => p.id === updates.plan_id);
+      const nombreAnt = pAnterior?.nombre || 'Sin Plan';
+      const nombreNue = pNuevo?.nombre || 'Sin Plan';
+
+      // Calcular diferencia de costo entre planes y aplicar a la deuda si no se especificó deuda explícitamente
+      const diffPlan = calcularDiferenciaPlan(
+        clientePrev,
+        updates.plan_id,
+        planes,
+        updates.precio_personalizado !== undefined ? (updates.precio_personalizado ? Number(updates.precio_personalizado) : null) : undefined
+      );
+
+      if (updates.deuda_acumulada === undefined && diffPlan.diferencia > 0) {
+        const baseDeuda = Number(clientePrev.deuda_acumulada || 0);
+        updates.deuda_acumulada = Math.round(baseDeuda + diffPlan.diferencia);
+        if (updates.deuda_acumulada > 0 && (!updates.estado || updates.estado === 'ACTIVO')) {
+          updates.estado = 'CON_DEUDA';
+        }
+      }
+
+      extraLog = `Cambió plan de [${nombreAnt}] a [${nombreNue}]${diffPlan.diferencia > 0 ? ` (Diferencia +$${diffPlan.diferencia.toLocaleString('es-AR')} imputada a deuda)` : ''}`;
       
       // Si cambia de plan y tenía turnos asignados fijos, comprobar límite de turnos si excede días por semana
       const planNuevo = planes.find(p => p.id === updates.plan_id);
@@ -2374,7 +2392,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // TURNOS
-  const asignarClienteFijo = (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string }) => {
+  const asignarClienteFijo = (clienteId: string, turnoId: string, opciones?: { forzar?: boolean; reemplazarTurnoId?: string; nuevoPlanId?: string; imputarDiferenciaDeuda?: boolean }) => {
     const cliente = clientes.find(c => c.id === clienteId);
     const turno = turnos.find(t => t.id === turnoId);
 
@@ -2389,17 +2407,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Límite estricto de acuerdo al plan seleccionado para el socio.
     // Si viene reemplazarTurnoId se salta esta validación: el admin decidió hacer swap.
+    // Si viene nuevoPlanId se evalúa el límite contra el nuevo plan seleccionado.
     const plan = planes.find(p => p.id === cliente.plan_id);
+    const nuevoPlan = opciones?.nuevoPlanId ? planes.find(p => p.id === opciones.nuevoPlanId) : null;
     const diasUnicos = new Set(cliente.turnos_fijos.map(tId => tId.split('-')[0]));
-    const maxDias = cliente.dias_personalizados ?? (plan ? plan.dias_por_semana : 2);
+    const maxDias = nuevoPlan
+      ? nuevoPlan.dias_por_semana
+      : (cliente.dias_personalizados ?? (plan ? plan.dias_por_semana : 2));
     const esMismoDia = turno.dia && diasUnicos.has(turno.dia);
-    if (!esMismoDia && diasUnicos.size >= maxDias && !opciones?.reemplazarTurnoId) {
+    if (!esMismoDia && diasUnicos.size >= maxDias && !opciones?.reemplazarTurnoId && !opciones?.nuevoPlanId) {
       return {
         success: false,
         excedePlan: true,
         turnosFijosActuales: [...cliente.turnos_fijos],
         maxDias,
         clienteNombre: `${cliente.nombre} ${cliente.apellido}`,
+        planActualId: cliente.plan_id,
+        diasRequeridos: diasUnicos.size + 1,
         message: `Límite alcanzado: El plan del socio (${plan?.nombre || 'Sin Plan'}) permite como máximo ${maxDias} días distintos por semana.`
       };
     }
@@ -2459,12 +2483,6 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveState(clientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
 
       if (supabase) {
-        // resolveTurnoUuid (async, con fallback por dia/hora si falta db_uuid en el
-        // state), no getUuidFromTurnoId (sincrónico): éste devolvía '' cuando el
-        // turno local no traía db_uuid, y ese '' se mandaba como turno_id — insert
-        // rechazado por Postgres, solo un console.error, sin aviso ni reintento.
-        // El state local igual decía "en espera", así que al recargar (la lista
-        // sale sólo de la base) el socio desaparecía sin ningún rastro del error.
         resolveTurnoUuid(turnoId).then((turnoUuid) => {
           if (!turnoUuid) {
             console.warn(`No se pudo resolver el UUID del turno ${turnoId}; espera no persistida en Supabase.`);
@@ -2485,7 +2503,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true, message: 'El horario está completo. El cliente ha sido registrado en la lista de espera.', putInWaitlist: true };
     }
 
-    // Asignación limpia exitosa — quitar de lista de espera si ya estaba anotado ahí
+    // Asignación limpia exitosa — calcular diferencia de plan si se está ampliando
+    const diffPlan = nuevoPlan ? calcularDiferenciaPlan(cliente, nuevoPlan.id, planes) : { precioAnterior: 0, precioNuevo: 0, diferencia: 0 };
+    const debeImputarDeuda = Boolean(nuevoPlan && opciones?.imputarDiferenciaDeuda !== false && diffPlan.diferencia > 0);
+
     // El socio pasa a ser fijo de este turno: sus reservas SUELTAS futuras del MISMO
     // turno ya no tienen sentido y lo duplicarían (contaría como fijo y como reserva).
     // Es el flujo normal del gimnasio: prueba clases sueltas y después se hace fijo.
@@ -2498,9 +2519,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const turnosFijosBase = opciones?.reemplazarTurnoId
           ? c.turnos_fijos.filter(tId => tId !== opciones.reemplazarTurnoId)
           : c.turnos_fijos;
+
+        let nuevaDeuda = Number(c.deuda_acumulada || 0);
+        let nuevoEstado = c.estado;
+        if (debeImputarDeuda) {
+          nuevaDeuda = Math.round(nuevaDeuda + diffPlan.diferencia);
+          if (nuevaDeuda > 0 && (nuevoEstado === 'ACTIVO' || !nuevoEstado)) {
+            nuevoEstado = 'CON_DEUDA';
+          }
+        }
+
         return {
           ...c,
           tipo: 'FIJO' as TipoCliente,
+          plan_id: nuevoPlan ? nuevoPlan.id : c.plan_id,
+          dias_personalizados: nuevoPlan ? null : c.dias_personalizados,
+          deuda_acumulada: nuevaDeuda,
+          estado: nuevoEstado,
           turnos_fijos: [...turnosFijosBase, turnoId],
           turno_variable: c.turno_variable === turnoId ? undefined : c.turno_variable,
           reservas_individuales: (c.reservas_individuales || []).filter(
@@ -2548,6 +2583,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     saveState(updatedClientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+    // Persistir en Supabase actualización de plan / deuda si hubo ampliación de plan
+    if (supabase && nuevoPlan) {
+      const targetCli = updatedClientes.find(c => c.id === clienteId);
+      if (targetCli) {
+        supabase.from('clientes')
+          .update({
+            plan_id: nuevoPlan.id,
+            dias_personalizados: null,
+            deuda_acumulada: targetCli.deuda_acumulada,
+            estado: targetCli.estado
+          })
+          .eq('id', clienteId)
+          .then(({ error }) => {
+            if (error) console.error("Error al actualizar plan y deuda del socio en Supabase:", error);
+          });
+      }
+    }
 
     // Persistir la limpieza de las reservas duplicadas del propio socio.
     if (supabase && fechasDuplicadas.length > 0) {
@@ -2600,9 +2653,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    if (nuevoPlan) {
+      addAuditLog('CAMBIO_PLAN_SOCIO', {
+        cliente: `${cliente.nombre} ${cliente.apellido}`,
+        planAnterior: plan?.nombre || 'Sin Plan',
+        planNuevo: nuevoPlan.nombre,
+        diferenciaImputada: debeImputarDeuda ? diffPlan.diferencia : 0,
+        deudaTotal: updatedClientes.find(c => c.id === clienteId)?.deuda_acumulada || 0,
+        motivo: `Ampliación a ${nuevoPlan.dias_por_semana} días por asignación de turno fijo ${turnoId}`
+      });
+    }
+
     addAuditLog('TURNO_ASIGNACION_FIJA', { cliente: `${cliente.nombre} ${cliente.apellido}`, turno: turnoId });
-    addToast('add', 'Asignación directa de horario completada.');
-    return { success: true, message: 'Asignación directa de horario completada exitosamente.' };
+    const msgFinal = nuevoPlan
+      ? `Asignación exitosa. Se actualizó el plan a ${nuevoPlan.nombre}${debeImputarDeuda ? ` y se sumó una deuda de $${diffPlan.diferencia.toLocaleString('es-AR')}` : ''}.`
+      : 'Asignación directa de horario completada exitosamente.';
+
+    addToast('add', nuevoPlan ? `Plan ampliado a ${nuevoPlan.nombre} y turno asignado.` : 'Asignación directa de horario completada.');
+    return { success: true, message: msgFinal, diferenciaDeuda: debeImputarDeuda ? diffPlan.diferencia : 0 };
   };
 
   // Aviso por email al socio de una baja de clase (vía /api/notify-baja -> Resend).

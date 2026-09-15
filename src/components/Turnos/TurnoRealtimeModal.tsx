@@ -173,7 +173,9 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
     const res = await crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
     if (res.success) {
-      removerListaEsperaReserva(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
+      if (!res.putInWaitlist) {
+        removerListaEsperaReserva(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
+      }
       setRealtimeSuccess(`✅ ¡Confirmado! ${res.message}`);
       setRealtimeCandidateClient('');
       setGuestName('');
@@ -512,9 +514,11 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                               setRealtimeSuccess(`✅ ¡${wl.nombre} promovido a cupo fijo exitosamente!`);
                             } else {
                               const res = await crearReservaIndividual(wl.clienteId, selectedSlot.id, selectedSlot.date);
-                              if (res.success) {
+                              if (res.success && !res.putInWaitlist) {
                                 removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
                                 setRealtimeSuccess(`✅ ¡${wl.nombre} asignado a la clase exitosamente!`);
+                              } else if (res.success && res.putInWaitlist) {
+                                setRealtimeError('El turno sigue completo. El alumno permanece en lista de espera.');
                               } else {
                                 setRealtimeError(res.message);
                               }

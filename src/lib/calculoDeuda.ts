@@ -17,6 +17,28 @@ export function precioPlanSocio(
   return plan ? Number(plan.precio) : 0;
 }
 
+/**
+ * Calcula la diferencia de costo entre el plan actual de un socio y un nuevo plan.
+ * Devuelve un número >= 0 (o 0 si el nuevo plan es igual o más económico).
+ */
+export function calcularDiferenciaPlan(
+  cliente: Pick<Cliente, 'plan_id' | 'precio_personalizado'>,
+  nuevoPlanId: string,
+  planes: Pick<Plan, 'id' | 'precio'>[],
+  nuevoPrecioPersonalizado?: number | null
+): { precioAnterior: number; precioNuevo: number; diferencia: number } {
+  const precioAnterior = precioPlanSocio(cliente, planes);
+  let precioNuevo = 0;
+  if (nuevoPrecioPersonalizado != null && !isNaN(Number(nuevoPrecioPersonalizado))) {
+    precioNuevo = Number(nuevoPrecioPersonalizado);
+  } else {
+    const pNuevo = planes.find(p => p.id === nuevoPlanId);
+    precioNuevo = pNuevo ? Number(pNuevo.precio) : 0;
+  }
+  const diferencia = Math.max(0, precioNuevo - precioAnterior);
+  return { precioAnterior, precioNuevo, diferencia };
+}
+
 export interface ResultadoCalculoDeuda {
   deuda_acumulada: number;
   estado: EstadoCliente;

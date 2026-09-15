@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { TipoCliente } from '../../types';
 import { X, AlertCircle, Check, ChevronRight, Calendar, Plus, Wallet, CheckCircle, ArrowRight, AlertTriangle } from 'lucide-react';
+import { calcularDiferenciaPlan } from '../../lib/calculoDeuda';
 
 interface ClienteFormModalProps {
   isOpen: boolean;
@@ -296,10 +297,48 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
 
             <div className="space-y-1">
               <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Plan Base Contratado</label>
-              <select value={isCustomPlan ? 'PERSONALIZADO' : clienteForm.plan_id} onChange={(e) => { const val = e.target.value; if (val === 'PERSONALIZADO') setIsCustomPlan(true); else { setIsCustomPlan(false); setClienteForm(prev => ({ ...prev, plan_id: val, precio_personalizado: '', dias_personalizados: '', nota_plan_personalizado: '' })); } }} className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer font-medium" id="form-plan">
+              <select
+                value={isCustomPlan ? 'PERSONALIZADO' : clienteForm.plan_id}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'PERSONALIZADO') {
+                    setIsCustomPlan(true);
+                  } else {
+                    setIsCustomPlan(false);
+                    let nuevaDeuda = clienteForm.deuda_acumulada;
+                    const clienteOriginal = editingClienteId ? clientes.find(c => c.id === editingClienteId) : null;
+                    if (clienteOriginal) {
+                      const diff = calcularDiferenciaPlan(clienteOriginal, val, planes);
+                      nuevaDeuda = Math.round(Number(clienteOriginal.deuda_acumulada || 0) + diff.diferencia);
+                    }
+                    setClienteForm(prev => ({
+                      ...prev,
+                      plan_id: val,
+                      deuda_acumulada: nuevaDeuda,
+                      precio_personalizado: '',
+                      dias_personalizados: '',
+                      nota_plan_personalizado: ''
+                    }));
+                  }
+                }}
+                className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white cursor-pointer font-medium"
+                id="form-plan"
+              >
                 {planes.map(p => <option key={p.id} value={p.id}>{p.nombre} — (${p.precio.toLocaleString('es-AR')})</option>)}
                 <option value="PERSONALIZADO">✦ Plan Personalizado / Especial</option>
               </select>
+
+              {(() => {
+                const clienteOriginal = editingClienteId ? clientes.find(c => c.id === editingClienteId) : null;
+                if (!clienteOriginal || clienteForm.plan_id === clienteOriginal.plan_id) return null;
+                const diff = calcularDiferenciaPlan(clienteOriginal, clienteForm.plan_id, planes);
+                if (diff.diferencia <= 0) return null;
+                return (
+                  <div className="bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px] text-amber-900 mt-1">
+                    💡 <strong>Diferencia de plan detectada: +${diff.diferencia.toLocaleString('es-AR')}</strong>. Se ajustó automáticamente la deuda acumulada.
+                  </div>
+                );
+              })()}
             </div>
 
             {isCustomPlan && (

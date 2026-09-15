@@ -1,8 +1,9 @@
 // src/components/Clientes/ClientePlanAssignModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { X, Check, CreditCard, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
+import { calcularDiferenciaPlan } from '../../lib/calculoDeuda';
 
 interface ClientePlanAssignModalProps {
   isOpen: boolean;
@@ -262,6 +263,30 @@ export const ClientePlanAssignModal: React.FC<ClientePlanAssignModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Card Informativo de Diferencia de Deuda si el nuevo plan cuesta más */}
+          {(() => {
+            const diffInfo = calcularDiferenciaPlan(
+              activeClient,
+              selectedPlanId,
+              planes,
+              isCustomPlan && precioPersonalizado ? Number(precioPersonalizado) : null
+            );
+            if (diffInfo.diferencia <= 0) return null;
+            const deudaActual = Number(activeClient.deuda_acumulada || 0);
+            const nuevaDeuda = deudaActual + diffInfo.diferencia;
+            return (
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl space-y-1 text-[11px] text-amber-900">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Diferencia de costo de plan: +${diffInfo.diferencia.toLocaleString('es-AR')}</span>
+                </div>
+                <p className="text-amber-800/90 leading-tight">
+                  Al guardar, se sumará automáticamente la diferencia a la deuda del socio (${deudaActual.toLocaleString('es-AR')} ➔ <strong>${nuevaDeuda.toLocaleString('es-AR')}</strong>).
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Action buttons */}
           <div className="flex gap-3 pt-2">

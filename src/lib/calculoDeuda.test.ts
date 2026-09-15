@@ -1,7 +1,7 @@
 // src/lib/calculoDeuda.test.ts
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calcularDeudaYEstadoCliente, formatearDeudaVisual, precioPlanSocio } from './calculoDeuda';
+import { calcularDeudaYEstadoCliente, formatearDeudaVisual, precioPlanSocio, calcularDiferenciaPlan } from './calculoDeuda';
 import { Cliente, Plan } from '../types';
 
 const mockPlanes: Plan[] = [
@@ -126,3 +126,31 @@ test('socio con exención SUSPENDIDO (pausado) no es imputado como moroso y mant
   assert.equal(res.estado, 'ACTIVO');
   assert.equal(res.esBecado, false);
 });
+
+test('calcularDiferenciaPlan calcula la diferencia positiva entre planes', () => {
+  const socio2d = { plan_id: 'p-2d', precio_personalizado: null };
+  const diff = calcularDiferenciaPlan(socio2d, 'p-3d', mockPlanes);
+  assert.equal(diff.precioAnterior, 35000);
+  assert.equal(diff.precioNuevo, 45000);
+  assert.equal(diff.diferencia, 10000);
+});
+
+test('calcularDiferenciaPlan si el nuevo plan es igual o más económico devuelve diferencia 0', () => {
+  const socio3d = { plan_id: 'p-3d', precio_personalizado: null };
+  const diff = calcularDiferenciaPlan(socio3d, 'p-2d', mockPlanes);
+  assert.equal(diff.precioAnterior, 45000);
+  assert.equal(diff.precioNuevo, 35000);
+  assert.equal(diff.diferencia, 0);
+
+  const mismoPlan = calcularDiferenciaPlan(socio3d, 'p-3d', mockPlanes);
+  assert.equal(mismoPlan.diferencia, 0);
+});
+
+test('calcularDiferenciaPlan respeta precios personalizados del socio y del nuevo plan', () => {
+  const socioPersonalizado = { plan_id: 'p-2d', precio_personalizado: 30000 };
+  const diff = calcularDiferenciaPlan(socioPersonalizado, 'p-3d', mockPlanes, 50000);
+  assert.equal(diff.precioAnterior, 30000);
+  assert.equal(diff.precioNuevo, 50000);
+  assert.equal(diff.diferencia, 20000);
+});
+
