@@ -152,7 +152,14 @@ export function calcularBalanceMes({
   // 1. Filtrar pagos del mes
   const pagosMes = (pagos || []).filter(p => p.mes_correspondiente === mes);
   const totalIngresos = pagosMes.reduce((s, p) => s + (p.monto || 0), 0);
-  const pagosCount = pagosMes.length;
+  // Una cuota, no una fila. Desde que un cobro se puede partir en varios medios
+  // (mitad efectivo, mitad transferencia) la misma cuota son DOS filas de pago,
+  // y contar filas inflaba el numero de cuotas y partia al medio el ticket
+  // promedio, que ademas alimenta el punto de equilibrio y el texto del WhatsApp.
+  // Una cuota es un par (socio, mes): asi se cuenta igual antes y despues.
+  const pagosCount = new Set(
+    pagosMes.map(p => `${p.cliente_id}::${p.mes_correspondiente}`)
+  ).size;
   const ticketPromedio = pagosCount > 0 ? Math.round(totalIngresos / pagosCount) : 0;
 
   // Ingresos por destino

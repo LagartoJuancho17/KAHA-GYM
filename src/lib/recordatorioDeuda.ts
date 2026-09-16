@@ -64,6 +64,7 @@ export interface SocioCheckDeudaParams {
   pagos?: Array<{ mes_correspondiente: string; cliente_id: string }>;
   socioId?: string;
   fechaReferencia?: Date;
+  reposo?: { desde: string; hasta: string } | null;
 }
 
 /**
@@ -75,6 +76,7 @@ export interface SocioCheckDeudaParams {
  */
 export const socioEstaDebiendo = (params: SocioCheckDeudaParams): boolean => {
   const {
+    reposo,
     deuda_acumulada = 0,
     estado,
     ultimo_mes_pagado,
@@ -83,6 +85,13 @@ export const socioEstaDebiendo = (params: SocioCheckDeudaParams): boolean => {
     socioId,
     fechaReferencia = new Date()
   } = params;
+
+  // Un socio en reposo tiene la cuenta congelada a proposito: no se le reclama.
+  // Va PRIMERO y en el nucleo, no en cada pantalla, porque si no cada pantalla
+  // que llame a esta funcion se olvida de filtrarlo. Paso exactamente eso: el
+  // panel del socio le mostraba "tu turno fijo queda disponible" a alguien en
+  // reposo, contradiciendo el cartel que le promete lo contrario.
+  if (reposo?.desde) return false;
 
   // Si tiene exención de cobro activa y no tiene deuda previa registrada, no debe
   if (exencion_cobro && exencion_cobro !== 'NINGUNA' && deuda_acumulada <= 0) {

@@ -224,3 +224,30 @@ test('tolera listas vacías', () => {
   assert.deepEqual(asignarPartesACobros([], []), []);
   assert.deepEqual(asignarPartesACobros(null as any, null as any), []);
 });
+
+test('REGRESION: repartir sin que cierre falla fuerte, no calladamente', () => {
+  // Antes devolvía filas por el monto equivocado y el descuadre entraba a la
+  // base sin aviso. El formulario valida antes, pero eso es una promesa del
+  // llamador: con plata el módulo se defiende solo.
+  const cobros = [{ cliente_id: 'ana', mes_correspondiente: '2026-09', monto: 65000 }];
+
+  assert.throws(
+    () => asignarPartesACobros(cobros, [parte({ monto: 52500 })]),
+    /no cierra/i,
+    'faltando plata'
+  );
+  assert.throws(
+    () => asignarPartesACobros(cobros, [parte({ monto: 80000 })]),
+    /no cierra/i,
+    'sobrando plata'
+  );
+});
+
+test('el caso que cierra sigue funcionando igual', () => {
+  const cobros = [{ cliente_id: 'ana', mes_correspondiente: '2026-09', monto: 65000 }];
+  const filas = asignarPartesACobros(cobros, [
+    parte({ id: 'a', medio: 'EFECTIVO', destino: 'EFECTIVO', monto: 32500 }),
+    parte({ id: 'b', monto: 32500 })
+  ]);
+  assert.equal(filas.reduce((a, f) => a + f.monto, 0), 65000);
+});

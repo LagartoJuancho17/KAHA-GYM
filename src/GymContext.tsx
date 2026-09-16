@@ -4834,8 +4834,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .maybeSingle();
 
           if (dbClient) {
+            // La ficha ya vino en dbClient. NO volver a buscar en `clientes`: es el
+            // array capturado en el closure de este render, y loadSupabaseData
+            // actualiza el estado de forma asincronica, asi que seguiria dando
+            // undefined. Releerlo hacia fallar el login de un socio recien creado
+            // ("no se encontro la cuenta" con la cuenta existiendo) y anulaba el
+            // chequeo anti-duplicados del registro, que terminaba creando otra ficha.
             await loadSupabaseData();
-            socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+            socioExistente = dbClient as any;
           }
         } catch (err) {
           console.error("Error al buscar socio en Supabase en login con clave:", err);
@@ -4891,8 +4897,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .maybeSingle();
 
         if (dbClient) {
+          // La ficha ya vino en dbClient. NO volver a buscar en `clientes`: es el
+          // array capturado en el closure de este render, y loadSupabaseData
+          // actualiza el estado de forma asincronica, asi que seguiria dando
+          // undefined. Releerlo hacia fallar el login de un socio recien creado
+          // ("no se encontro la cuenta" con la cuenta existiendo) y anulaba el
+          // chequeo anti-duplicados del registro, que terminaba creando otra ficha.
           await loadSupabaseData();
-          socioExistente = clientes.find(c => c.activo && c.email.toLowerCase().trim() === cleanMail);
+          socioExistente = dbClient as any;
         }
       } catch (err) {
         console.error("Error al comprobar duplicado en registro:", err);

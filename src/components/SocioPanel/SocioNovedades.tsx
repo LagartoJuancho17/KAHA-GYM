@@ -29,6 +29,7 @@ export const SocioNovedades: React.FC = () => {
 
     // Validación estricta: SOLAMENTE a los socios que están debiendo
     const debiendo = socioEstaDebiendo({
+      reposo: socio.reposo,
       deuda_acumulada: socio.deuda_acumulada,
       estado: socio.estado,
       ultimo_mes_pagado: socio.ultimo_mes_pagado,

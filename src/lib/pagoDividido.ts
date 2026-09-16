@@ -125,6 +125,19 @@ export function asignarPartesACobros(
   cobros: CobroBeneficiario[],
   partes: ParteDePago[]
 ): FilaDePago[] {
+  // Guarda dura: si los medios no cubren exactamente lo que se cobra, esto
+  // devolvia filas por el monto equivocado sin chistar y el descuadre entraba a
+  // la base. Hoy el formulario llama antes a validarPartes, pero eso es una
+  // promesa del llamador, no del modulo. Con plata se falla fuerte, no callado.
+  const totalCobros = (cobros || []).reduce((a, c) => a + (Number(c.monto) || 0), 0);
+  const totalPartes = (partes || []).reduce((a, p) => a + (Number(p.monto) || 0), 0);
+  if (Math.abs(totalCobros - totalPartes) > TOLERANCIA_CENTAVOS) {
+    throw new Error(
+      `Los medios de pago suman ${totalPartes} y lo cobrado es ${totalCobros}. ` +
+      `No se reparte un pago que no cierra.`
+    );
+  }
+
   const filas: FilaDePago[] = [];
   const pendientes = (partes || []).map(p => ({ ...p, restante: Number(p.monto) || 0 }));
   let i = 0;

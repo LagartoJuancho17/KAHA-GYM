@@ -87,6 +87,7 @@ export const SocioPanel: React.FC = () => {
   const isDebiendo = useMemo(() => {
     if (!socio) return false;
     return socioEstaDebiendo({
+      reposo: socio.reposo,
       deuda_acumulada: socio.deuda_acumulada,
       estado: socio.estado,
       ultimo_mes_pagado: socio.ultimo_mes_pagado,

@@ -212,3 +212,59 @@ test('Formateo WhatsApp de Balance: Genera texto con formato esperado', () => {
   assert.match(texto, /Juanchi debe transferir \$100\.000 a Rulo/);
   assert.match(texto, /GANANCIA NETA REAL/);
 });
+
+test('REGRESION: una cuota partida en dos medios cuenta como UNA cuota, no dos', () => {
+  // Desde que se puede cobrar mitad efectivo y mitad transferencia, esa cuota
+  // son dos filas de pago. Contar filas inflaba las cuotas del mes y partía al
+  // medio el ticket promedio, que alimenta el punto de equilibrio y el WhatsApp.
+  const pagoBase = {
+    cliente_nombre_completo: 'Probador Uno',
+    fecha_pago: '2026-09-16',
+    mes_correspondiente: '2026-09',
+    registrado_por: 'admin@kaha.com',
+    creado_at: '2026-09-16T12:00:00.000Z'
+  };
+
+  const partida: any[] = [
+    { ...pagoBase, id: 'p1', cliente_id: 'socio-a', monto: 32500, medio_pago: 'EFECTIVO', destino_transferencia: 'EFECTIVO' },
+    { ...pagoBase, id: 'p2', cliente_id: 'socio-a', monto: 32500, medio_pago: 'TRANSFERENCIA', destino_transferencia: 'RULO' }
+  ];
+
+  const balance = calcularBalanceMes({
+    mes: '2026-09',
+    pagos: partida as Pago[],
+    gastos: [],
+    clientes: [],
+    planes: [],
+    profesores: [],
+    turnos: [],
+    novedadesProfesores: []
+  });
+
+  assert.equal(balance.totalIngresos, 65000, 'la plata total no cambia');
+  assert.equal(balance.pagosCount, 1, 'es UNA cuota, aunque sean dos filas');
+  assert.equal(balance.ticketPromedio, 65000, 'el ticket es la cuota entera');
+});
+
+test('dos socios distintos en el mismo mes siguen contando como dos cuotas', () => {
+  const pagoBase = {
+    cliente_nombre_completo: 'x',
+    fecha_pago: '2026-09-16',
+    mes_correspondiente: '2026-09',
+    registrado_por: 'admin@kaha.com',
+    creado_at: '2026-09-16T12:00:00.000Z',
+    medio_pago: 'TRANSFERENCIA' as const,
+    destino_transferencia: 'RULO'
+  };
+  const pagos: any[] = [
+    { ...pagoBase, id: 'a', cliente_id: 'socio-a', monto: 65000 },
+    { ...pagoBase, id: 'b', cliente_id: 'socio-b', monto: 65000 }
+  ];
+
+  const balance = calcularBalanceMes({
+    mes: '2026-09', pagos: pagos as Pago[], gastos: [], clientes: [], planes: [],
+    profesores: [], turnos: [], novedadesProfesores: []
+  });
+  assert.equal(balance.pagosCount, 2);
+  assert.equal(balance.ticketPromedio, 65000);
+});

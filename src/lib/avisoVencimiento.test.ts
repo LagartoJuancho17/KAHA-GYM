@@ -9,6 +9,7 @@ import {
   MENSAJE_RECORDATORIO_DEUDA,
   generarAvisoVencimiento,
   destinatariosAvisoDeuda,
+  socioEstaDebiendo,
   SocioNotificable
 } from './recordatorioDeuda.js';
 
@@ -104,5 +105,24 @@ describe('A quién le llega el aviso', () => {
     assert.deepStrictEqual(destinatariosAvisoDeuda([], pagos, dia5), []);
     assert.deepStrictEqual(destinatariosAvisoDeuda(null as any, pagos, dia5), []);
     assert.deepStrictEqual(destinatariosAvisoDeuda([null as any], pagos, dia5), []);
+  });
+});
+
+describe('Reposo y aviso de deuda (bugs encontrados en el testeo del 16/09)', () => {
+  it('REGRESION: socioEstaDebiendo por sí sola respeta el reposo', () => {
+    // Antes devolvía true y el panel del socio le mostraba "tu turno fijo queda
+    // disponible" a alguien con la cuenta congelada, justo lo contrario de lo
+    // que le promete el cartel de reposo. El filtro estaba sólo en el envío
+    // masivo, así que cada pantalla que llamara a esta función se lo perdía.
+    const enReposo = {
+      deuda_acumulada: 65000,
+      estado: 'MOROSO',
+      reposo: { desde: '2026-08-01', hasta: '2027-02-01' },
+      fechaReferencia: new Date('2026-09-16T12:00:00Z')
+    };
+    assert.strictEqual(socioEstaDebiendo(enReposo), false);
+
+    const { reposo, ...sinReposo } = enReposo;
+    assert.strictEqual(socioEstaDebiendo(sinReposo), true, 'el control sí debe');
   });
 });

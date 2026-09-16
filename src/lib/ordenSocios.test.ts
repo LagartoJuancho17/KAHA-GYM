@@ -147,3 +147,18 @@ test('alternarOrden elige el sentido más útil al cambiar de campo', () => {
     { campo: 'INGRESO', direccion: 'desc' }
   );
 });
+
+test('REGRESION: dos fichas sin fecha de ingreso no rompen el orden estable', () => {
+  // ingresoDe devuelve -Infinity para una ficha sin creado_at, y
+  // (-Infinity) - (-Infinity) da NaN. Un NaN nunca es distinto de 0, así que el
+  // desempate no llegaba a aplicarse y el orden dependía del array de entrada.
+  const a = socio({ id: 'b', apellido: 'Benitez', creado_at: '' });
+  const b = socio({ id: 'a', apellido: 'Acosta', creado_at: '' });
+  const c = socio({ id: 'c', apellido: 'Castro', creado_at: '' });
+
+  const r1 = ordenarSocios([a, b, c], { campo: 'INGRESO', direccion: 'desc' });
+  const r2 = ordenarSocios([c, a, b], { campo: 'INGRESO', direccion: 'desc' });
+
+  assert.deepEqual(r1.map(x => x.apellido), r2.map(x => x.apellido));
+  assert.deepEqual(r1.map(x => x.apellido), ['Acosta', 'Benitez', 'Castro']);
+});

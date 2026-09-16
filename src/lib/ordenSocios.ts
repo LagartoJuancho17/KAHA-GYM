@@ -41,7 +41,10 @@ const desempate = (a: Cliente, b: Cliente) =>
   (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 const comparadores: Record<CampoOrdenSocios, (a: Cliente, b: Cliente) => number> = {
-  INGRESO: (a, b) => ingresoDe(a) - ingresoDe(b),
+  // Restar da NaN cuando las dos fichas no tienen fecha (-Infinity - -Infinity).
+  // Un NaN nunca es != 0, asi que el desempate estable no se aplicaba y el orden
+  // quedaba a merced del array de entrada.
+  INGRESO: (a, b) => { const x = ingresoDe(a), y = ingresoDe(b); return x === y ? 0 : x < y ? -1 : 1; },
   APELLIDO: (a, b) => comparadorTexto(a.apellido, b.apellido) || comparadorTexto(a.nombre, b.nombre),
   NOMBRE: (a, b) => comparadorTexto(a.nombre, b.nombre) || comparadorTexto(a.apellido, b.apellido),
   DEUDA: (a, b) => deudaDe(a) - deudaDe(b)
