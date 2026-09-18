@@ -29,6 +29,12 @@
         "value": "text-zinc-400 hover:text-rose-600 bg-transparent",
         "createdAt": "2026-09-14T18:05:59.442Z",
         "reason": "boton de borrar: el gris va sobre fondo transparente y en hover cambian texto Y fondo juntos (rose-600 sobre rose-50), nunca hay gris sobre color. Mismo patron ya sancionado en SocioReservas.tsx"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "text-zinc-400 hover:text-red-600 bg-transparent",
+        "createdAt": "2026-09-16T12:22:19.705Z",
+        "reason": "boton de borrar: el gris va sobre fondo TRANSPARENTE y en hover cambian texto y fondo juntos (red-600 sobre red-50), nunca hay gris sobre color. Verificado leyendo la linea. Misma variante que la ya sancionada con rose-600"
       }
     ]
   }

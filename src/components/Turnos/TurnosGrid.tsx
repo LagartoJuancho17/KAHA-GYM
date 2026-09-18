@@ -15,11 +15,12 @@ import { SociosPrioritariosModal } from './SociosPrioritariosModal';
 import { SearchableSelect } from '../Common/SearchableSelect';
 import { History, Crown } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
+import { esperaDelTurno } from '../../lib/listaEspera';
 
 export const TurnosGrid: React.FC = () => {
   const { 
-    turnos, clientes, recuperos, agregarRecupero,
-    actualizarEstadoRecupero, checkInFlexible, 
+    turnos, clientes, recuperos, waitlistReservas, sociosPrioritarios,
+    agregarRecupero, actualizarEstadoRecupero, checkInFlexible, 
     crearReservaIndividual, registrarVacaciones,
     suspenderClaseFija, programarRecuperoPendiente
   } = useGym();
@@ -236,14 +237,15 @@ export const TurnosGrid: React.FC = () => {
 
   const getCellRealtimeData = (turnoId: string, fecha: string) => {
     const turno = turnos.find(t => t.id === turnoId);
-    if (!turno) return { fijos: [], fijosActivos: [], suspendidos: [], variables: [], recuperos: [], total: 0, cupo: 0, profesor: '' };
+    if (!turno) return { fijos: [], fijosActivos: [], suspendidos: [], variables: [], recuperos: [], waitlist: [], total: 0, cupo: 0, profesor: '' };
 
     const fijos = (turno.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
     const suspendidos = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha));
     const fijosActivos = fijos.filter(c => !suspendidos.some(s => s.id === c.id));
     const fijoIds = new Set(turno.asignados_ids || []);
     const vars = clientes.filter(c => c.activo && !fijoIds.has(c.id) && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));
-    const recs = recuperos.filter(r => r.estado === 'PENDIENTE' && r.turno_recupero_id === turno.id && r.fecha_recupero === fecha);
+    const recs = recuperos.filter(r => (r.estado === 'PENDIENTE' || r.estado === 'COMPLETADO') && r.turno_recupero_id === turno.id && r.fecha_recupero === fecha);
+    const waitlist = esperaDelTurno(waitlistReservas, turno.id, fecha, sociosPrioritarios, { clientes, turnos });
 
     return {
       turno,
@@ -252,6 +254,7 @@ export const TurnosGrid: React.FC = () => {
       fijosActivos,
       variables: vars,
       recuperos: recs,
+      waitlist,
       total: fijosActivos.length + vars.length + recs.length,
       cupo: turno.cupo_maximo,
       profesor: turno.profesor || ''
@@ -589,7 +592,7 @@ export const TurnosGrid: React.FC = () => {
                             className={`p-2.5 border-r border-zinc-200 cursor-pointer transition-all border-2 ${blockColorClass} ${
                               isSelected ? 'ring-2 ring-black border-transparent relative z-10 shadow-lg' : ''
                             }`}
-                            title={`Hacer clic para gestionar tiempo real: ${idTurno} (${fechaStr})`}
+                            title={`Hacer clic para gestionar tiempo real: ${idTurno} (${fechaStr})${rtData.waitlist.length > 0 ? ` - ${rtData.waitlist.length} en lista de espera` : ''}`}
                           >
                             <div className="flex flex-col items-center justify-center gap-0.5">
                               <span className="font-bold text-xs font-mono">{rtData.total} ocupados</span>
@@ -603,6 +606,11 @@ export const TurnosGrid: React.FC = () => {
                                 )}
                                 {rtData.recuperos.length > 0 && (
                                   <span className="text-[7.5px] px-1 bg-amber-100 text-amber-800 rounded-sm font-bold" title={`${rtData.recuperos.length} recuperos`}>R:{rtData.recuperos.length}</span>
+                                )}
+                                {rtData.waitlist.length > 0 && (
+                                  <span className="text-[7.5px] px-1 bg-zinc-900 text-lime-400 rounded-sm font-bold font-sans" title={`${rtData.waitlist.length} en lista de espera`}>
+                                    W: {rtData.waitlist.length}
+                                  </span>
                                 )}
                               </div>
 
