@@ -134,7 +134,7 @@ export function calcularDeudaYEstadoCliente(
   if (deudaRestante > 0) {
     return {
       deuda_acumulada: deudaRestante,
-      estado: diaDelMes > 5 ? 'MOROSO' : 'CON_DEUDA',
+      estado: 'CON_DEUDA',
       esBecado: false,
       pagoEsteMes: true
     };

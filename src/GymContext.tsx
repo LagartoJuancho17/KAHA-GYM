@@ -1891,9 +1891,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const altaCliente = (id: string) => {
+    const hoyArg = hoyArgentina();
+    const mesActual = hoyArg.slice(0, 7);
+
     const updatedClientes = clientes.map(c => {
       if (c.id === id) {
-        return { ...c, activo: true, estado: 'ACTIVO' as EstadoCliente };
+        const nuevoUltimoMes = (!c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual) ? mesActual : c.ultimo_mes_pagado;
+        return {
+          ...c,
+          activo: true,
+          estado: 'ACTIVO' as EstadoCliente,
+          deuda_acumulada: 0,
+          ultimo_mes_pagado: nuevoUltimoMes
+        };
       }
       return c;
     });
@@ -1901,14 +1911,20 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveState(updatedClientes);
 
     if (supabase) {
-      supabase.from('clientes').update({ activo: true, estado: 'ACTIVO' }).eq('id', id).then(({ error }) => {
+      const c = updatedClientes.find(cl => cl.id === id);
+      supabase.from('clientes').update({
+        activo: true,
+        estado: 'ACTIVO',
+        deuda_acumulada: 0,
+        ultimo_mes_pagado: c?.ultimo_mes_pagado || mesActual
+      }).eq('id', id).then(({ error }) => {
         if (error) console.error("Error al dar de alta en Supabase:", error);
       });
     }
 
     const c = clientes.find(cl => cl.id === id);
     addAuditLog('CLIENTE_ALTA', { id, nombre: c ? `${c.nombre} ${c.apellido}` : '' });
-    addToast('add', 'Socio dado de alta exitosamente.');
+    addToast('add', 'Socio dado de alta y regularizado exitosamente.');
   };
 
   const bajaClasesSocio = (
@@ -4130,6 +4146,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return {
           ...c,
+          activo: nuevaDeuda === 0 ? true : c.activo,
           deuda_acumulada: nuevaDeuda,
           ultimo_mes_pagado: ultimoMes,
           estado: nuevoEstado as EstadoCliente
@@ -4176,6 +4193,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const targetClient = updatedClientes.find(c => c.id === pagoData.cliente_id);
       if (targetClient) {
         supabase.from('clientes').update({
+          activo: targetClient.activo,
           deuda_acumulada: targetClient.deuda_acumulada,
           ultimo_mes_pagado: targetClient.ultimo_mes_pagado,
           estado: targetClient.estado
@@ -4310,6 +4328,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           return {
             ...c,
+            activo: nuevaDeuda === 0 ? true : c.activo,
             deuda_acumulada: nuevaDeuda,
             ultimo_mes_pagado: ultimoMes,
             estado: nuevoEstado as EstadoCliente
@@ -4361,6 +4380,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const clientActualizado = currentClientes.find(c => c.id === cId);
         if (clientActualizado) {
           supabase.from('clientes').update({
+            activo: clientActualizado.activo,
             deuda_acumulada: clientActualizado.deuda_acumulada,
             ultimo_mes_pagado: clientActualizado.ultimo_mes_pagado,
             estado: clientActualizado.estado
@@ -4584,12 +4604,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const tieneExencion = cli.exencion_cobro && cli.exencion_cobro !== 'NINGUNA';
 
       // 1. Cargar deuda y cambiar estado a MOROSO si venció el plazo
-      if (!pagoEsteMes && esFechaLimitePasada) {
+      if (pagoEsteMes) {
+        if (deudaActualizada <= 0) {
+          nuevoEstado = 'ACTIVO';
+        } else {
+          nuevoEstado = 'CON_DEUDA';
+        }
+      } else if (esFechaLimitePasada) {
         nuevoEstado = 'MOROSO';
         if (deudaActualizada < precioPlan) {
           deudaActualizada = precioPlan; // cargar la cuota este mes
         }
-      } else if (!pagoEsteMes && !esFechaLimitePasada && nuevoEstado === 'ACTIVO') {
+      } else if (!esFechaLimitePasada && nuevoEstado === 'ACTIVO') {
         nuevoEstado = 'ACTIVO'; // Aún en periodo de gracia
       }
 

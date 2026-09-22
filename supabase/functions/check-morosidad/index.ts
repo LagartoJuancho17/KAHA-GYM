@@ -78,14 +78,20 @@ Deno.serve(async (req) => {
       // Chequear si ya pagó este mes
       const pagoEsteMes = cliente.ultimo_mes_pagado === deMesFormato;
 
-      if (!pagoEsteMes && esFechaLimitePasada) {
+      if (pagoEsteMes) {
+        if (deudaActualizada <= 0) {
+          nuevoEstado = "ACTIVO";
+        } else {
+          nuevoEstado = "CON_DEUDA";
+        }
+      } else if (esFechaLimitePasada) {
         // No pagó el mes corriente y ya expiró el plazo de gracia (día 5)
         nuevoEstado = "MOROSO";
         // Si no se le ha cargado la deuda de este mes todavía
         if (deudaActualizada < planPrecio) {
           deudaActualizada = planPrecio; // cargamos el precio del plan como deuda base
         }
-      } else if (!pagoEsteMes && !esFechaLimitePasada && nuevoEstado === "ACTIVO") {
+      } else if (!esFechaLimitePasada && nuevoEstado === "ACTIVO") {
         // Estamos antes del 5 del mes, aún tiene tiempo de pagar pero se le cataloga activo/pendiente
         nuevoEstado = "ACTIVO";
       }
