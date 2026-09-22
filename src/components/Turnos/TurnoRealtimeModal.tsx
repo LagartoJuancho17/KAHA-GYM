@@ -5,6 +5,7 @@ import { Cliente } from '../../types';
 import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { esperaDelTurno, esPrioritario } from '../../lib/listaEspera';
+import { estaSuspendido } from '../../lib/ocupacion';
 
 interface TurnoRealtimeModalProps {
   selectedSlot: { id: string; date: string };
@@ -47,7 +48,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     if (!turno) return { fijos: [], fijosActivos: [], suspendidos: [], variables: [], recuperos: [], total: 0, cupo: 0, profesor: '' };
 
     const fijos = (turno.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
-    const suspendidos = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha));
+    const suspendidos = fijos.filter(c => estaSuspendido(c, turno.id, fecha));
     const fijosActivos = fijos.filter(c => !suspendidos.some(s => s.id === c.id));
     const fijoIds = new Set((turno.asignados_ids || []));
     const vars = clientes.filter(c => c.activo && !fijoIds.has(c.id) && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));

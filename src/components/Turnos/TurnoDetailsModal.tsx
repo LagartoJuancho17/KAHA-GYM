@@ -5,6 +5,7 @@ import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle, Histor
 import { SearchableSelect } from '../Common/SearchableSelect';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { ordenarEsperaSemanal, esPrioritario } from '../../lib/listaEspera';
+import { estaPausado } from '../../lib/pausa';
 
 interface TurnoDetailsModalProps {
   turnoId: string;
@@ -425,7 +426,14 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                   if (!cl) return null;
                   return (
                     <div key={cl.id} className="flex justify-between items-center p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
-                      <span className="font-semibold text-zinc-900">{cl.apellido}, {cl.nombre}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-zinc-900">{cl.apellido}, {cl.nombre}</span>
+                        {estaPausado(cl) && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-200" title="Socio en pausa: liberado de la Turnera este mes, conserva su lugar en la Matriz">
+                            En Pausa
+                          </span>
+                        )}
+                      </div>
                       <button
                         onClick={() => {
                           if (window.confirm(`¿Está seguro que desea eliminar a este cliente de sus turnos FIJOS?`)) {

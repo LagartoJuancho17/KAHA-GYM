@@ -17,6 +17,7 @@ import { clavePrioridad, esperaDelTurno, proximoEnEntrar, ordenarEsperaSemanal }
 import { hoyArgentina, fechasFuturasDelTurno } from './lib/fechas';
 import { iniciarReposo } from './lib/reposo';
 import { calcularDeudaYEstadoCliente, calcularDiferenciaPlan, precioPlanSocio } from './lib/calculoDeuda';
+import { generarNotaPausa, removerNotaPausa } from './lib/pausa';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -77,7 +78,9 @@ interface GymContextType {
   perdonarDeudaSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
   revertirPerdonDeuda: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
   prorrogarDeudaSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
-  pausarSocio: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
+  pausarSocio: (clienteId: string, userEmail?: string, mesPausa?: string) => { success: boolean; message: string };
+  retomarSocioPausado: (clienteId: string, userEmail?: string) => { success: boolean; message: string };
+  postergarPausaSocio: (clienteId: string, userEmail?: string, nuevoMes?: string) => { success: boolean; message: string };
   bajaClasesSocio: (clienteId: string, clases: { turno_id: string; fecha: string }[], opciones?: { esBajaTemporal?: boolean; exencionCobro?: 'SUSPENDIDO' | 'POSTERGADO' | 'NINGUNA' }) => { success: boolean; message: string };
   importarClientesCSV: (clientesImportados: Array<{ nombre: string; apellido: string; email: string; telefono: string; tipo: TipoCliente; plan_nombre: string }>) => { procesados: number; insertados: number; errores: string[] };
 
@@ -115,10 +118,11 @@ interface GymContextType {
       hash_transaccion?: string;
       destino_transferencia?: 'JUANCHI' | 'RULO' | 'EFECTIVO';
       registrado_por?: string;
+      fecha_pago?: string;
     }>,
     userEmail: string
   ) => { success: boolean; message: string; generatedPagos: Pago[] };
-  actualizarPago: (pagoId: string, updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia'>>, userEmail?: string) => { success: boolean; message: string };
+  actualizarPago: (pagoId: string, updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia' | 'fecha_pago'>>, userEmail?: string) => { success: boolean; message: string };
   actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
   eliminarPago: (pagoId: string) => void;
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
@@ -2257,19 +2261,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: `Prórroga de 1 semana otorgada a ${cli.nombre} ${cli.apellido}.` };
   };
 
-  const pausarSocio = (clienteId: string, userEmail?: string) => {
+  const pausarSocio = (clienteId: string, userEmail?: string, mesPausa?: string) => {
     const cli = clientes.find(c => c.id === clienteId);
     if (!cli) return { success: false, message: 'Socio no encontrado' };
 
+    const mes = mesPausa || hoyArgentina().slice(0, 7);
+    const nuevaNota = generarNotaPausa(mes, cli.nota_plan_personalizado);
+
     updateCliente(clienteId, {
       exencion_cobro: 'SUSPENDIDO',
-      estado: 'ACTIVO'
-    }, 'Membresía pausada (suspensión momentánea de cobro)');
+      estado: 'ACTIVO',
+      nota_plan_personalizado: nuevaNota
+    }, `Membresía pausada para el mes ${mes} (cupos liberados en Turnera, lugar reservado en Matriz)`);
 
     if (supabase) {
       supabase.from('clientes').update({
         exencion_cobro: 'SUSPENDIDO',
-        estado: 'ACTIVO'
+        estado: 'ACTIVO',
+        nota_plan_personalizado: nuevaNota
       }).eq('id', clienteId).then(({ error }) => {
         if (error) console.error("Error al persistir pausa de socio en Supabase:", error);
       });
@@ -2278,11 +2287,78 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('SOCIO_PAUSADO', {
       cliente_id: clienteId,
       cliente_nombre: `${cli.nombre} ${cli.apellido}`,
+      mes_pausa: mes,
       fecha: new Date().toISOString()
     }, userEmail);
 
-    addToast('success', `Se pausó la membresía de ${cli.nombre} ${cli.apellido}. Cobro suspendido.`);
+    addToast('success', `Se pausó la membresía de ${cli.nombre} ${cli.apellido} para ${mes}. Turnera liberada y Matriz conservada.`);
     return { success: true, message: `Socio pausado: ${cli.nombre} ${cli.apellido}.` };
+  };
+
+  const retomarSocioPausado = (clienteId: string, userEmail?: string) => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return { success: false, message: 'Socio no encontrado' };
+
+    const limpiaNota = removerNotaPausa(cli.nota_plan_personalizado);
+
+    updateCliente(clienteId, {
+      exencion_cobro: 'NINGUNA',
+      estado: 'ACTIVO',
+      nota_plan_personalizado: limpiaNota
+    }, 'Socio retoma actividad: fin de pausa, reactivado en Turnera');
+
+    if (supabase) {
+      supabase.from('clientes').update({
+        exencion_cobro: 'NINGUNA',
+        estado: 'ACTIVO',
+        nota_plan_personalizado: limpiaNota
+      }).eq('id', clienteId).then(({ error }) => {
+        if (error) console.error("Error al persistir reactivación de socio en Supabase:", error);
+      });
+    }
+
+    addAuditLog('SOCIO_PAUSA_RETOMADA', {
+      cliente_id: clienteId,
+      cliente_nombre: `${cli.nombre} ${cli.apellido}`,
+      fecha: new Date().toISOString()
+    }, userEmail);
+
+    addToast('success', `${cli.nombre} ${cli.apellido} retomó sus clases. Vuelve a figurar en la Turnera.`);
+    return { success: true, message: `Socio ${cli.nombre} ${cli.apellido} retomó exitosamente.` };
+  };
+
+  const postergarPausaSocio = (clienteId: string, userEmail?: string, nuevoMes?: string) => {
+    const cli = clientes.find(c => c.id === clienteId);
+    if (!cli) return { success: false, message: 'Socio no encontrado' };
+
+    const mes = nuevoMes || hoyArgentina().slice(0, 7);
+    const nuevaNota = generarNotaPausa(mes, cli.nota_plan_personalizado);
+
+    updateCliente(clienteId, {
+      exencion_cobro: 'SUSPENDIDO',
+      estado: 'ACTIVO',
+      nota_plan_personalizado: nuevaNota
+    }, `Pausa postergada al mes ${mes}`);
+
+    if (supabase) {
+      supabase.from('clientes').update({
+        exencion_cobro: 'SUSPENDIDO',
+        estado: 'ACTIVO',
+        nota_plan_personalizado: nuevaNota
+      }).eq('id', clienteId).then(({ error }) => {
+        if (error) console.error("Error al persistir prórroga de pausa en Supabase:", error);
+      });
+    }
+
+    addAuditLog('SOCIO_PAUSA_POSTERGADA', {
+      cliente_id: clienteId,
+      cliente_nombre: `${cli.nombre} ${cli.apellido}`,
+      mes_postergado: mes,
+      fecha: new Date().toISOString()
+    }, userEmail);
+
+    addToast('success', `Se postergó la pausa de ${cli.nombre} ${cli.apellido} para el mes ${mes}.`);
+    return { success: true, message: `Pausa postergada a ${mes}.` };
   };
 
   // IMPORTACIÓN MASIVA CSV CLIENTES
@@ -4251,6 +4327,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       hash_transaccion?: string;
       destino_transferencia?: 'JUANCHI' | 'RULO' | 'EFECTIVO';
       registrado_por?: string;
+      fecha_pago?: string;
     }>,
     userEmail: string = 'operator@gimnasio.com.ar'
   ): { success: boolean; message: string; generatedPagos: Pago[] } => {
@@ -4306,7 +4383,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         hash_transaccion: itemHash,
         destino_transferencia: pagoItem.destino_transferencia || 'RULO',
         registrado_por: userEmail,
-        fecha_pago: now,
+        fecha_pago: pagoItem.fecha_pago || now,
         creado_at: now
       };
 
@@ -4419,7 +4496,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ACTUALIZAR PAGO EXISTENTE (MONTO, CLIENTE, MES, MEDIO, DESTINO, ETC)
   const actualizarPago = (
     pagoId: string,
-    updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia'>>,
+    updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia' | 'fecha_pago'>>,
     userEmail: string = 'admin@gimnasio.com.ar'
   ) => {
     const prevPago = pagos.find(p => p.id === pagoId);
@@ -4447,6 +4524,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (updates.mes_correspondiente !== undefined) payload.mes_correspondiente = updates.mes_correspondiente;
       if (updates.hash_transaccion !== undefined) payload.hash_transaccion = updates.hash_transaccion;
       if (updates.destino_transferencia !== undefined) payload.destino_transferencia = updates.destino_transferencia;
+      if (updates.fecha_pago !== undefined) payload.fecha_pago = updates.fecha_pago;
 
       supabase.from('pagos').update(payload).eq('id', pagoId).then(({ error }) => {
         if (error) {
@@ -5299,7 +5377,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
       sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
-      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, ponerEnReposo, sacarDeReposo, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, bajaClasesSocio, importarClientesCSV,
+      addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, ponerEnReposo, sacarDeReposo, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, retomarSocioPausado, postergarPausaSocio, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
       asignarClienteFijo, removerAsignacionFija, darDeBajaTurnosFijosSocio, darDeBajaTurnosFijosMultiple, notificarBajaClase, notificarAltaWaitlist, asignarTurnoVariable, checkInFlexible, agregarRecupero, actualizarEstadoRecupero, programarRecuperoPendiente, modificarPrecioOCupoTurno,
       asignarProfesorTurno, registrarVacaciones,

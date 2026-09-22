@@ -18,10 +18,12 @@
 // Un turno está LLENO cuando ocupación >= cupo_maximo (>=, no >).
 
 import { Cliente, Turno, RecuperoTurno } from '../types';
+import { estaPausadoEnFecha } from './pausa';
 
-/** Un fijo cuenta salvo que haya suspendido esa clase ese día. */
+/** Un fijo cuenta salvo que haya suspendido esa clase ese día o esté en pausa ese mes. */
 export function estaSuspendido(cliente: Cliente | undefined, turnoId: string, fecha: string): boolean {
   if (!cliente) return false;
+  if (estaPausadoEnFecha(cliente, fecha)) return true;
   return (cliente.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha);
 }
 

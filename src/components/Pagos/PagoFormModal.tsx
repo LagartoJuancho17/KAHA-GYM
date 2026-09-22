@@ -34,6 +34,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     hash_transaccion: '',
     destino_transferencia: 'RULO' as 'JUANCHI' | 'RULO' | 'EFECTIVO'
   });
+  const [fechaPago, setFechaPago] = useState(() => new Date().toISOString().slice(0, 10));
   
   const [esPagoMultiple, setEsPagoMultiple] = useState(false);
   const [beneficiarios, setBeneficiarios] = useState<BeneficiarioItem[]>([]);
@@ -291,6 +292,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
       ).map(f => ({
         ...f,
         hash_transaccion: pagoForm.hash_transaccion.trim() || undefined,
+        fecha_pago: fechaPago ? `${fechaPago}T12:00:00.000Z` : undefined,
         registrado_por: 'operator@gimnasio.com.ar'
       }));
     } else {
@@ -301,6 +303,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
         mes_correspondiente: b.mes_correspondiente,
         hash_transaccion: pagoForm.hash_transaccion.trim() || undefined,
         destino_transferencia: pagoForm.destino_transferencia,
+        fecha_pago: fechaPago ? `${fechaPago}T12:00:00.000Z` : undefined,
         registrado_por: 'operator@gimnasio.com.ar'
       }));
     }
@@ -848,13 +851,13 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
               </div>
 
               <div className="space-y-1">
-                <label className="text-zinc-500 font-bold block text-[10px] uppercase">Ref / ID Transacción</label>
+                <label className="text-zinc-500 font-bold block text-[10px] uppercase">Fecha de Cobro</label>
                 <input 
-                  type="text" 
-                  placeholder="ej: MP-90382211 (opcional)" 
-                  value={pagoForm.hash_transaccion} 
-                  onChange={e => setPagoForm(prev => ({ ...prev, hash_transaccion: e.target.value }))} 
-                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden font-medium" 
+                  type="date" 
+                  value={fechaPago} 
+                  onChange={e => setFechaPago(e.target.value)} 
+                  className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-sans outline-hidden font-medium bg-white text-zinc-800" 
+                  id="input-fecha-cobro"
                 />
               </div>
             </div>

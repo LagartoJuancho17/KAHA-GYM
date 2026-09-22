@@ -25,6 +25,7 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
   const [medioPago, setMedioPago] = useState<MedioPago>('TRANSFERENCIA');
   const [destinoTransferencia, setDestinoTransferencia] = useState<'JUANCHI' | 'RULO' | 'EFECTIVO'>('RULO');
   const [hashTransaccion, setHashTransaccion] = useState('');
+  const [fechaPago, setFechaPago] = useState('');
 
   const [searchText, setSearchText] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -44,6 +45,7 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
       const dest = pago.destino_transferencia as 'JUANCHI' | 'RULO' | 'EFECTIVO';
       setDestinoTransferencia(dest || 'RULO');
       setHashTransaccion(pago.hash_transaccion || '');
+      setFechaPago(pago.fecha_pago ? pago.fecha_pago.slice(0, 10) : new Date().toISOString().slice(0, 10));
 
       const cl = clientes.find(c => c.id === pago.cliente_id);
       if (cl) {
@@ -124,7 +126,8 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
       mes_correspondiente: mesCorrespondiente,
       medio_pago: medioPago,
       destino_transferencia: destinoTransferencia,
-      hash_transaccion: hashTransaccion.trim()
+      hash_transaccion: hashTransaccion.trim(),
+      fecha_pago: fechaPago ? `${fechaPago}T12:00:00.000Z` : pago.fecha_pago
     });
 
     if (res.success) {
@@ -315,15 +318,14 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
 
             <div className="space-y-1">
               <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">
-                Ref / ID Transacción
+                Fecha de Cobro
               </label>
               <input
-                type="text"
-                placeholder="ej: MP-90382211"
-                value={hashTransaccion}
-                onChange={e => setHashTransaccion(e.target.value)}
-                className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-mono outline-hidden focus:border-black font-medium"
-                id="edit-pago-hash"
+                type="date"
+                value={fechaPago}
+                onChange={e => setFechaPago(e.target.value)}
+                className="w-full border border-zinc-200 rounded-lg p-2 text-xs font-sans outline-hidden focus:border-black font-medium bg-white text-zinc-800"
+                id="edit-pago-fecha"
               />
             </div>
           </div>

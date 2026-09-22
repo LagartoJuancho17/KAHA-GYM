@@ -39,7 +39,25 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
     return new Date().toISOString().slice(0, 7);
   });
 
-  const [incluirEfectivo, setIncluirEfectivo] = useState(false);
+  const [incluirEfectivo, setIncluirEfectivo] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('gym_balance_incluir_efectivo');
+      if (saved !== null) return saved === 'true';
+    } catch {
+      // ignore
+    }
+    return true;
+  });
+
+  const handleToggleIncluirEfectivo = (checked: boolean) => {
+    setIncluirEfectivo(checked);
+    try {
+      localStorage.setItem('gym_balance_incluir_efectivo', String(checked));
+    } catch {
+      // ignore
+    }
+  };
+
   const [porcentajeJuanchi, setPorcentajeJuanchi] = useState<number>(50);
   const [copiado, setCopiado] = useState(false);
 
@@ -409,7 +427,7 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
               <input
                 type="checkbox"
                 checked={incluirEfectivo}
-                onChange={e => setIncluirEfectivo(e.target.checked)}
+                onChange={e => handleToggleIncluirEfectivo(e.target.checked)}
                 className="rounded text-indigo-500 focus:ring-indigo-400 cursor-pointer"
               />
               <span className="text-[11px] font-medium">Repartir Efectivo de Caja</span>

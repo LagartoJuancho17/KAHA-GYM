@@ -16,6 +16,7 @@ import { SearchableSelect } from '../Common/SearchableSelect';
 import { History, Crown } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 import { esperaDelTurno } from '../../lib/listaEspera';
+import { estaSuspendido } from '../../lib/ocupacion';
 
 export const TurnosGrid: React.FC = () => {
   const { 
@@ -240,7 +241,7 @@ export const TurnosGrid: React.FC = () => {
     if (!turno) return { fijos: [], fijosActivos: [], suspendidos: [], variables: [], recuperos: [], waitlist: [], total: 0, cupo: 0, profesor: '' };
 
     const fijos = (turno.asignados_ids || []).map(id => clientes.find(c => c.id === id)).filter(Boolean) as Cliente[];
-    const suspendidos = fijos.filter(c => (c.clases_suspendidas || []).some(s => s.turno_id === turno.id && s.fecha === fecha));
+    const suspendidos = fijos.filter(c => estaSuspendido(c, turno.id, fecha));
     const fijosActivos = fijos.filter(c => !suspendidos.some(s => s.id === c.id));
     const fijoIds = new Set(turno.asignados_ids || []);
     const vars = clientes.filter(c => c.activo && !fijoIds.has(c.id) && (c.reservas_individuales || []).some(r => r.turno_id === turno.id && r.fecha === fecha));

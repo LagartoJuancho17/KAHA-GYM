@@ -5,14 +5,16 @@ import {
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
   TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2,
-  Eye, EyeOff, Mail, Send, UserMinus
+  Eye, EyeOff, Mail, Send, UserMinus, PauseCircle
 } from 'lucide-react';
 import { Gasto, PagoEnRevision, OrigenGasto } from '../types';
 import { EmailInicioMesModal } from './Notifications/EmailInicioMesModal';
 import { AdminBajasReviewModal } from './Morosos/AdminBajasReviewModal';
+import { AdminPausadosReviewModal } from './Morosos/AdminPausadosReviewModal';
 import { EmailReporteMorososAdminModal } from './Notifications/EmailReporteMorososAdminModal';
 import { hoyArgentina } from '../lib/fechas';
 import { estaEmailInicioMesEnviado } from '../lib/emailInicioMes';
+import { pausadosPendientesDeRevision } from '../lib/pausa';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -73,6 +75,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Modal de Revisión de Bajas Día 10+
   const [showBajasModal, setShowBajasModal] = useState(false);
   const [showEmailReporteModal, setShowEmailReporteModal] = useState(false);
+  // Modal de Revisión de Socios Pausados
+  const [showPausadosModal, setShowPausadosModal] = useState(false);
 
   const handleToggleBalance = () => {
     setMostrarBalance(prev => !prev);
@@ -98,13 +102,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ? Math.round((morososCount / totalActivosCount) * 100) 
     : 0;
 
-  // Candidatos a baja de turno fijo (Día 10 en adelante): socios activos con turnos fijos asignados y sin pagar este mes (excluye becados/exentos)
+  // Candidatos a baja de turno fijo (Día 10 en adelante): socios activos con turnos fijos asignados y sin pagar este mes (excluye becados/exentos/suspendidos)
   const candidatosBajaFijos = clientesActivosFicha.filter(c => {
     if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
     const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual;
-    const estaExento = c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO';
+    const estaExento = c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO' || c.exencion_cobro === 'SUSPENDIDO';
     return noPago && !estaExento;
   });
+
+  // Socios que finalizaron su mes de pausa y deben ser revisados (retomar, postergar o dar de baja)
+  const pausadosPorRevisar = pausadosPendientesDeRevision(clientes, mesActual);
 
   // Ingresos reales de este mes
   const pagosDeEsteMes = pagos.filter(p => p.mes_correspondiente === mesActual);
@@ -324,6 +331,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
               Bajas Día 10 ({candidatosBajaFijos.length})
             </button>
           )}
+
+          {pausadosPorRevisar.length > 0 && (
+            <button
+              onClick={() => setShowPausadosModal(true)}
+              className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+              id="quick-pausados-review-btn"
+              title="Revisar socios que completaron su mes de pausa"
+            >
+              <PauseCircle className="w-3.5 h-3.5" />
+              Revisar Pausados ({pausadosPorRevisar.length})
+            </button>
+          )}
         </div>
       </div>
 
@@ -357,6 +376,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
             >
               <UserMinus className="w-3.5 h-3.5" />
               <span>Revisar Bajas</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BANNER REVISIÓN DE SOCIOS PAUSADOS (MES SIGUIENTE) */}
+      {pausadosPorRevisar.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in mb-2" id="pausados-review-reminder-banner">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <PauseCircle className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-950">
+                ⚠️ Revisión de Socios en Pausa: {pausadosPorRevisar.length} socio(s) finalizaron su mes de pausa
+              </p>
+              <p className="text-[11px] text-amber-800/80 mt-0.5">
+                Definí si retoman sus clases este mes, se posterga la pausa un mes más, o se les da de baja liberando el cupo de la Matriz.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowPausadosModal(true)}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all border-none"
+              id="btn-revisar-pausados-banner"
+            >
+              <PauseCircle className="w-3.5 h-3.5" />
+              <span>Revisar Pausados</span>
             </button>
           </div>
         </div>
@@ -1292,6 +1340,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <EmailReporteMorososAdminModal
         isOpen={showEmailReporteModal}
         onClose={() => setShowEmailReporteModal(false)}
+      />
+
+      {/* MODAL REVISIÓN DE SOCIOS EN PAUSA */}
+      <AdminPausadosReviewModal
+        isOpen={showPausadosModal}
+        onClose={() => setShowPausadosModal(false)}
       />
     </div>
   );

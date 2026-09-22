@@ -150,15 +150,14 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                 <th className="p-4">Abono</th>
                 <th className="p-4">Medio / Destino</th>
                 <th className="p-4">Mes Cubierto</th>
-                <th className="p-4">Ref. / ID</th>
-                <th className="p-4">Registrado por</th>
+                <th className="p-4">Fecha de Cobro</th>
                 <th className="p-4 text-center">Recibo</th>
                 <th className="p-4 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 text-zinc-700 font-medium">
               {pagosFiltrados.length === 0 ? (
-                <tr><td colSpan={8} className="p-8 text-center text-zinc-400 italic">Sin registros de cobros coincidentes este mes.</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-zinc-400 italic">Sin registros de cobros coincidentes este mes.</td></tr>
               ) : (
                 pagosFiltrados.map(p => {
                   const cl = clientes.find(c => c.id === p.cliente_id);
@@ -195,10 +194,13 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                       </td>
                       <td className="p-4 font-mono font-bold text-zinc-600">{p.mes_correspondiente}</td>
                       <td className="p-4">
-                        <div className="font-mono text-zinc-500 text-[10px] select-all">{p.hash_transaccion || 'Ref-' + p.id.slice(-5)}</div>
-                        <div className="text-[9px] text-zinc-400">{new Date(p.fecha_pago).toLocaleString('es-AR')}</div>
+                        <div className="font-medium text-zinc-900 text-xs">
+                          {new Date(p.fecha_pago).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </div>
+                        <div className="text-[10px] text-zinc-400 font-mono">
+                          {new Date(p.fecha_pago).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                        </div>
                       </td>
-                      <td className="p-4 font-mono text-zinc-400 text-[10px]">{p.registrado_por}</td>
                       <td className="p-4 text-center">
                         <button onClick={() => onOpenReceipt(p)} className="px-2.5 py-1 text-[10.5px] border border-emerald-200 rounded bg-emerald-50 text-emerald-800 flex items-center gap-1.5 hover:bg-emerald-100 font-bold justify-center mx-auto cursor-pointer transition-colors border-none">
                           <svg className="w-3.5 h-3.5 fill-current text-emerald-600" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.66.986 3.284 1.48 4.909 1.481 5.482 0 9.94-4.461 9.943-9.94.002-2.654-1.029-5.15-2.901-7.025C16.726 1.795 14.237.772 11.583.772c-5.485 0-9.94 4.46-9.943 9.94-.001 1.904.5 3.76 1.45 5.421L2.09 21.65l5.557-1.496zm12.355-6.883c-.302-.15-1.787-.882-2.062-.982-.275-.1-.475-.15-.674.15-.2.3-.775.982-.95 1.182-.175.2-.35.225-.65.075-.3-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.784-1.275-2.083.175-.3.275-.475.375-.674.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.925-2.225-.244-.589-.493-.51-.674-.519-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5 0 1.475 1.075 2.9 1.225 3.1.15.2 2.11 3.22 5.11 4.52.714.31 1.272.496 1.706.634.717.228 1.37.195 1.887.118.575-.085 1.788-.73 2.038-1.43.25-.7.25-1.3.175-1.43-.075-.125-.275-.2-.575-.35z"/></svg>

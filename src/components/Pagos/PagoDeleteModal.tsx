@@ -113,7 +113,9 @@ export const PagoDeleteModal: React.FC<PagoDeleteModalProps> = ({
             <span className="text-zinc-500 font-mono text-[10px] block">
               ${pago.monto.toLocaleString('es-AR')} · {pago.mes_correspondiente} · {pago.medio_pago}
             </span>
-            <span className="text-zinc-400 font-mono text-[9px] block">Ref: {pago.hash_transaccion || pago.id.slice(-8)}</span>
+            <span className="text-zinc-500 font-sans text-[10.5px] block">
+              Fecha de cobro: {new Date(pago.fecha_pago).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(pago.fecha_pago).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+            </span>
           </div>
 
           <div className="text-xs text-zinc-600 bg-red-50/40 p-3 rounded-lg border border-red-100/50 font-sans">
