@@ -365,9 +365,11 @@ export const TurnosGrid: React.FC = () => {
                         const idTurno = `${dia}-${hora}`;
                         const slotTurno = turnos.find(t => t.id === idTurno);
 
-                        // Horarios que no se dictan ese día: 15:00 solo Ma/Ju/Vi
+                        // Horarios que no se dictan ese día: 15:00 solo Ma/Ju/Vi, 11:30 solo L/M/V, 12:00 no Miércoles
                         const noSeDicta =
-                          (hora === '15:00' && dia !== 'MARTES' && dia !== 'JUEVES' && dia !== 'VIERNES');
+                          (hora === '15:00' && dia !== 'MARTES' && dia !== 'JUEVES' && dia !== 'VIERNES') ||
+                          (hora === '11:30' && dia !== 'LUNES' && dia !== 'MIERCOLES' && dia !== 'VIERNES') ||
+                          (hora === '12:00' && dia === 'MIERCOLES');
                         if (noSeDicta) {
                           return (
                             <td key={dia} className="p-2 border-r border-zinc-200 bg-zinc-50/20 text-zinc-400 italic font-medium text-[10px] text-center">
@@ -553,9 +555,11 @@ export const TurnosGrid: React.FC = () => {
                         const idTurno = `${dia}-${hora}`;
                         const fechaStr = weekDates[dia];
 
-                        // Horarios que no se dictan ese día: 15:00 solo Ma/Ju/Vi
+                        // Horarios que no se dictan ese día: 15:00 solo Ma/Ju/Vi, 11:30 solo L/M/V, 12:00 no Miércoles
                         const noSeDicta =
-                          (hora === '15:00' && dia !== 'MARTES' && dia !== 'JUEVES' && dia !== 'VIERNES');
+                          (hora === '15:00' && dia !== 'MARTES' && dia !== 'JUEVES' && dia !== 'VIERNES') ||
+                          (hora === '11:30' && dia !== 'LUNES' && dia !== 'MIERCOLES' && dia !== 'VIERNES') ||
+                          (hora === '12:00' && dia === 'MIERCOLES');
                         if (noSeDicta) {
                           return (
                             <td key={dia} className="p-2 border-r border-zinc-200 bg-zinc-50/20 text-zinc-400 italic font-medium text-[10px] text-center">
