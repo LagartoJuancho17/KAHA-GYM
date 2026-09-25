@@ -57,7 +57,6 @@ Un sistema comercial full-stack llave en mano desarrollado para la administraci√
 | **08:30** | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Libre |
 | **09:30** | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Libre |
 | **10:30** | Cupo 5 | Cupo 5 | Cupo 5 | Cupo 5 | Cupo 5 | Libre |
-| **11:00** | Cupo 3 | Cupo 3 | Cupo 3 | Cupo 3 | Cupo 3 | Libre |
 | **12:00** | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Libre |
 | **15:00** | No Disp | Cupo 7 | No Disp | Cupo 7 | Cupo 7 | Libre |
 | **16:00** | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Cupo 7 | Libre |

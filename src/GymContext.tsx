@@ -414,10 +414,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Nota sobre logs de auditoría en Supabase:', logsErr);
       }
 
-      // Migración: los turnos de 11:00 de Lunes/Miércoles/Viernes/Jueves ya no existen (solo Martes 11:00).
+      // Migración: los turnos de 11:00 ya no existen en ningún día (Lunes, Martes, Miércoles, Jueves, Viernes).
       // generarTurnosIniciales dejó de crearlos, pero pueden quedar filas viejas
       // en la tabla `turnos` de Supabase. Las filtramos al cargar y las limpiamos de la base.
-      const TURNOS_OBSOLETOS = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00', 'JUEVES-11:00'];
+      const TURNOS_OBSOLETOS = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00', 'JUEVES-11:00', 'MARTES-11:00'];
       const localIdDeTurno = (t: any) => `${t.dia}-${t.hora.substring(0, 5)}`;
       const turnosObsoletos = dbTurnos.filter(t => TURNOS_OBSOLETOS.includes(localIdDeTurno(t)));
       if (turnosObsoletos.length > 0) {
@@ -425,13 +425,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Limpieza best-effort en Supabase (hijos primero por FK). Si falla por
         // permisos, el filtro en memoria igual los oculta de inmediato.
         supabase.from('asignaciones_turnos').delete().in('turno_id', uuidsObsoletos).then(({ error }) => {
-          if (error) console.error('Error al limpiar asignaciones de turnos obsoletos (11 LMV):', error);
+          if (error) console.error('Error al limpiar asignaciones de turnos obsoletos (11hs):', error);
         });
         supabase.from('lista_espera_turnos').delete().in('turno_id', uuidsObsoletos).then(({ error }) => {
-          if (error) console.error('Error al limpiar lista de espera de turnos obsoletos (11 LMV):', error);
+          if (error) console.error('Error al limpiar lista de espera de turnos obsoletos (11hs):', error);
         });
         supabase.from('turnos').delete().in('id', uuidsObsoletos).then(({ error }) => {
-          if (error) console.error('Error al eliminar turnos obsoletos (11 LMV) en Supabase:', error);
+          if (error) console.error('Error al eliminar turnos obsoletos (11hs) en Supabase:', error);
         });
         // Filtrado en memoria: no aparecen aunque la limpieza en la base falle.
         dbTurnos = dbTurnos.filter(t => !TURNOS_OBSOLETOS.includes(localIdDeTurno(t)));
@@ -888,23 +888,30 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const mesActual = hoyArg.slice(0, 7);
       const diaHoy = Number(hoyArg.slice(8, 10));
 
+      const turnosObsoletosGlobal = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00', 'JUEVES-11:00', 'MARTES-11:00'];
+      let huboLimpiezaEnClientes = false;
       const clientesSincronizados = rawLoadedClientes.map(c => {
         const res = calcularDeudaYEstadoCliente(c, planesActivos, mesActual, diaHoy);
         const ultimoMes = (res.esBecado || c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO') &&
           (!c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual)
             ? mesActual
             : c.ultimo_mes_pagado;
+        const turnosFijosLimpios = (c.turnos_fijos || []).filter(tId => !turnosObsoletosGlobal.includes(tId));
+        if (turnosFijosLimpios.length !== (c.turnos_fijos || []).length) {
+          huboLimpiezaEnClientes = true;
+        }
         return {
           ...c,
           deuda_acumulada: res.deuda_acumulada,
           estado: res.estado,
           deuda_perdonada: res.deuda_perdonada ?? c.deuda_perdonada,
-          ultimo_mes_pagado: ultimoMes
+          ultimo_mes_pagado: ultimoMes,
+          turnos_fijos: turnosFijosLimpios
         };
       });
 
       setClientes(clientesSincronizados);
-      if (!localClientes) {
+      if (!localClientes || huboLimpiezaEnClientes) {
         localStorage.setItem('gym_clientes', JSON.stringify(clientesSincronizados));
       }
 
@@ -916,8 +923,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (localTurnos) {
         let parsedTurnos: Turno[] = JSON.parse(localTurnos);
-        // Migración: eliminar turno 11:00 de Lunes, Miércoles, Viernes y Jueves
-        const turnosA_Eliminar = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00', 'JUEVES-11:00'];
+        // Migración: eliminar turno 11:00 de todos los días (Lunes, Miércoles, Viernes, Jueves y Martes)
+        const turnosA_Eliminar = ['LUNES-11:00', 'MIERCOLES-11:00', 'VIERNES-11:00', 'JUEVES-11:00', 'MARTES-11:00'];
         const turnosFiltrados = parsedTurnos.filter(t => !turnosA_Eliminar.includes(t.id));
         if (turnosFiltrados.length !== parsedTurnos.length) {
           localStorage.setItem('gym_turnos', JSON.stringify(turnosFiltrados));
