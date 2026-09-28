@@ -119,6 +119,15 @@ export function calcularDeudaYEstadoCliente(
   if (!pagoEsteMes) {
     // Si la deuda acumulada guardada era 0, desde el día 1 se imputa la cuota del mes
     const deudaBase = Math.max(Number(cliente.deuda_acumulada || 0), cuotaMes);
+    // Si la cuota del plan es $0 (ej: invitados, prueba, plan 'Aún no sabe') y no tiene deuda previa, no debe pasar a mora
+    if (deudaBase <= 0) {
+      return {
+        deuda_acumulada: 0,
+        estado: 'ACTIVO',
+        esBecado: false,
+        pagoEsteMes: false
+      };
+    }
     // Del día 1 al 5 está en plazo de pago -> CON_DEUDA; día 6+ -> MOROSO
     const nuevoEstado: EstadoCliente = diaDelMes > 5 ? 'MOROSO' : 'CON_DEUDA';
     return {

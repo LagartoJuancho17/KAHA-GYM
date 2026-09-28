@@ -44,11 +44,14 @@ export const MorososControl: React.FC = () => {
 
   const esExento = (c: Cliente) => c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO';
 
-  const morososList = useMemo(() => clientesActivos.filter(c => c.estado === 'MOROSO' && !esExento(c)), [clientesActivos]);
-  const morososCount = morososList.length;
-
   const deudoresTotalesList = useMemo(() => clientesActivos.filter(c => c.deuda_acumulada > 0 && !esExento(c)), [clientesActivos]);
   const deudoresCount = deudoresTotalesList.length;
+
+  const morososList = useMemo(() => deudoresTotalesList.filter(c => c.estado === 'MOROSO'), [deudoresTotalesList]);
+  const morososCount = morososList.length;
+
+  const atrasosGraciaList = useMemo(() => deudoresTotalesList.filter(c => c.estado === 'CON_DEUDA'), [deudoresTotalesList]);
+  const atrasosGraciaCount = atrasosGraciaList.length;
 
   // Candidatos a baja de turno fijo (Día 10+)
   const candidatosBajaFijos = useMemo(() => {
@@ -292,6 +295,7 @@ export const MorososControl: React.FC = () => {
       <MorososList
         deudoresCount={deudoresCount}
         morososCount={morososCount}
+        atrasosGraciaCount={atrasosGraciaCount}
         listadoDeudoresMora={listadoDeudoresMora}
         filtroMora={filtroMora}
         setFiltroMora={setFiltroMora}

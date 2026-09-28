@@ -10,6 +10,7 @@ import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 interface MorososListProps {
   deudoresCount: number;
   morososCount: number;
+  atrasosGraciaCount?: number;
   listadoDeudoresMora: any[];
   filtroMora: 'TODOS' | 'MOROSO' | 'CON_DEUDA';
   setFiltroMora: (val: 'TODOS' | 'MOROSO' | 'CON_DEUDA') => void;
@@ -21,6 +22,7 @@ interface MorososListProps {
 export const MorososList: React.FC<MorososListProps> = ({
   deudoresCount,
   morososCount,
+  atrasosGraciaCount,
   listadoDeudoresMora,
   filtroMora,
   setFiltroMora,
@@ -55,7 +57,7 @@ export const MorososList: React.FC<MorososListProps> = ({
             onClick={() => setFiltroMora('CON_DEUDA')}
             className={`px-3 py-1 rounded-md transition-all border-none bg-transparent cursor-pointer ${filtroMora === 'CON_DEUDA' ? 'bg-zinc-900 text-white font-bold' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
-            Atrasos de Gracia
+            Atrasos de Gracia {atrasosGraciaCount != null ? `(${atrasosGraciaCount})` : ''}
           </button>
         </div>
       </div>

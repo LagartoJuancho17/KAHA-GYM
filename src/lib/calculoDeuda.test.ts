@@ -127,6 +127,20 @@ test('socio con exención SUSPENDIDO (pausado) no es imputado como moroso y mant
   assert.equal(res.esBecado, false);
 });
 
+test('socio sin plan contratado o plan $0 (ej: invitados, aún no sabe) con deuda $0 NO pasa a MOROSO aunque pase el día 5', () => {
+  const planesConPlanCero = [...mockPlanes, { id: 'p-cero', precio: 0 }];
+  const res = calcularDeudaYEstadoCliente(
+    { ...mockBaseCliente, plan_id: 'p-cero', deuda_acumulada: 0, ultimo_mes_pagado: '2026-08' },
+    planesConPlanCero,
+    '2026-09',
+    28 // Pasado el día 5
+  );
+
+  assert.equal(res.deuda_acumulada, 0);
+  assert.equal(res.estado, 'ACTIVO');
+  assert.equal(res.pagoEsteMes, false);
+});
+
 test('calcularDiferenciaPlan calcula la diferencia positiva entre planes', () => {
   const socio2d = { plan_id: 'p-2d', precio_personalizado: null };
   const diff = calcularDiferenciaPlan(socio2d, 'p-3d', mockPlanes);
