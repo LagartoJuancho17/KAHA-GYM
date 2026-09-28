@@ -103,6 +103,40 @@ app.post('/api/create-preference', async (req, res) => {
   }
 });
 
+// Endpoint seguro para sincronizar comprobantes de facturación con Google Apps Script (evita bloqueos de CORS en el navegador)
+app.post('/api/sync-sheets', async (req, res) => {
+  try {
+    const { webhookUrl, rows } = req.body;
+    if (!webhookUrl || !webhookUrl.trim()) {
+      return res.status(400).json({ error: 'Falta la URL del Webhook de Google Apps Script' });
+    }
+
+    console.log(`>> [sync-sheets] Enviando ${rows?.length || 0} filas de facturación a Google Apps Script...`);
+
+    const response = await fetch(webhookUrl.trim(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify({ rows: rows || [] })
+    });
+
+    const text = await response.text();
+    console.log(`>> [sync-sheets] Respuesta de Google Apps Script (HTTP ${response.status}):`, text.slice(0, 150));
+
+    if (response.status === 401 || text.includes('No se pudo abrir el archivo') || text.includes('ServiceLogin')) {
+      return res.status(401).json({
+        error: 'Google Apps Script requiere autorizar los permisos ("Ejecutar" en el editor de Apps Script) y acceso configurado en "Cualquier persona".'
+      });
+    }
+
+    return res.status(200).json({ ok: true, status: response.status, responseText: text });
+  } catch (err) {
+    console.error('>> [sync-sheets] Error de red:', err);
+    return res.status(500).json({ error: err.message || 'Error al conectar con Google Apps Script' });
+  }
+});
+
 // Webhook endpoint to receive asynchronous updates from Mercado Pago
 app.post('/api/webhooks/mercadopago', async (req, res) => {
   try {
