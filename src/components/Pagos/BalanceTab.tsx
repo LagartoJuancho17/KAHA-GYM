@@ -4,13 +4,14 @@ import { useGym } from '../../GymContext';
 import { 
   DollarSign, TrendingUp, TrendingDown, Scale, ArrowRight, 
   Share2, Check, Eye, EyeOff, Calendar, AlertCircle, 
-  Users, Wallet, PieChart, ShieldCheck, HelpCircle, Sparkles
+  Users, Wallet, PieChart, ShieldCheck, HelpCircle, Sparkles, FileSpreadsheet
 } from 'lucide-react';
 import { 
   calcularBalanceMes, 
   generarMensajeWhatsAppBalance,
   generarInformeAnalisisIA 
 } from '../../lib/balanceFinanciero';
+import { FacturacionRuloModal } from './FacturacionRuloModal';
 
 interface BalanceTabProps {
   mostrarBalance: boolean;
@@ -65,6 +66,7 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
   const [porcentajeJuanchi, setPorcentajeJuanchi] = useState<number>(50);
   const [copiado, setCopiado] = useState(false);
   const [copiadoIA, setCopiadoIA] = useState(false);
+  const [modalFacturacionOpen, setModalFacturacionOpen] = useState(false);
 
   // Nombre legible del mes seleccionado
   const nombreMesSeleccionado = useMemo(() => {
@@ -218,6 +220,16 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
           >
             {copiadoIA ? <Check className="w-4 h-4 text-white" /> : <Sparkles className="w-4 h-4 text-indigo-600" />}
             <span>{copiadoIA ? '¡Copiado para IA!' : 'Copiar Resumen para IA'}</span>
+          </button>
+
+          {/* BOTÓN FACTURACIÓN RULO (AFIP / GOOGLE SHEETS) */}
+          <button
+            onClick={() => setModalFacturacionOpen(true)}
+            className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 hover:border-amber-400"
+            title="Abrir panel de facturación AFIP para transferencias a Rulo y sincronizar con Google Sheets"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-700" />
+            <span>Facturación Rulo (AFIP)</span>
           </button>
         </div>
       </div>
@@ -409,6 +421,14 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
                 <strong className="text-rose-700 font-mono">-{fmt(balance.cajaRulo.egresos)}</strong>
               </div>
             </div>
+
+            <button
+              onClick={() => setModalFacturacionOpen(true)}
+              className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold shadow-xs transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>⚡ Facturación AFIP / Sheets</span>
+            </button>
           </div>
 
           {/* CAJA EFECTIVO */}
@@ -608,6 +628,17 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
           </div>
         </div>
       </div>
+
+      {/* MODAL DE FACTURACIÓN AFIP (RULO) Y GOOGLE SHEETS */}
+      <FacturacionRuloModal
+        isOpen={modalFacturacionOpen}
+        onClose={() => setModalFacturacionOpen(false)}
+        mes={mesSeleccionado}
+        nombreMes={nombreMesSeleccionado}
+        pagos={pagos}
+        clientes={clientes}
+        planes={planes}
+      />
     </div>
   );
 };
