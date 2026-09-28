@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useGym } from '../../GymContext';
 import { MedioPago } from '../../types';
-import { X, Trash2, Search, Users, Check, Plus, Calendar } from 'lucide-react';
+import { X, Trash2, Search, Users, Check, Plus, Calendar, Building2, UserCheck } from 'lucide-react';
 import {
   sincronizarMedioYDestino,
   validarPartes,
@@ -25,7 +25,18 @@ interface BeneficiarioItem {
 }
 
 export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess }) => {
-  const { clientes, planes, registrarPagosMultiples } = useGym();
+  const { clientes, planes, registrarPagosMultiples, pagadoresExternos, registrarPagadorExterno } = useGym();
+
+  // Tipo de pagador: Socio registrado vs Pagador Externo (alquiler, masajista, servicio)
+  const [tipoPagador, setTipoPagador] = useState<'SOCIO' | 'EXTERNO'>('SOCIO');
+  const [pagadorExternoSeleccionadoId, setPagadorExternoSeleccionadoId] = useState<string>('');
+  const [conceptoExterno, setConceptoExterno] = useState<string>('Alquiler de espacio / consultorio');
+  
+  // Formulario rápido para nuevo pagador externo
+  const [showNuevoPagadorForm, setShowNuevoPagadorForm] = useState(false);
+  const [nuevoPagadorNombre, setNuevoPagadorNombre] = useState('');
+  const [nuevoPagadorConcepto, setNuevoPagadorConcepto] = useState('Alquiler del local');
+  const [nuevoPagadorTelefono, setNuevoPagadorTelefono] = useState('');
 
   const [pagoForm, setPagoForm] = useState({
     cliente_id: '',
@@ -256,6 +267,50 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     setFormErr('');
   };
 
+  const handleCrearNuevoPagador = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoPagadorNombre.trim()) {
+      setFormErr('Por favor ingresá un nombre o razón social para el pagador.');
+      return;
+    }
+    const creado = registrarPagadorExterno({
+      nombre: nuevoPagadorNombre.trim(),
+      concepto: nuevoPagadorConcepto.trim() || undefined,
+      telefono: nuevoPagadorTelefono.trim() || undefined
+    });
+    setPagadorExternoSeleccionadoId(creado.id);
+    setConceptoExterno(creado.concepto || 'Alquiler del local');
+    setPagoForm(prev => ({ ...prev, cliente_id: creado.id }));
+    setSearchPagadorText(creado.nombre);
+    setBeneficiarios([{
+      id: genId(),
+      cliente_id: creado.id,
+      monto: '50000',
+      mes_correspondiente: pagoForm.mes_correspondiente
+    }]);
+    setNuevoPagadorNombre('');
+    setNuevoPagadorConcepto('Alquiler del local');
+    setNuevoPagadorTelefono('');
+    setShowNuevoPagadorForm(false);
+    setFormErr('');
+  };
+
+  const handleSelectPagadorExterno = (id: string) => {
+    setPagadorExternoSeleccionadoId(id);
+    const p = pagadoresExternos.find(x => x.id === id);
+    if (!p) return;
+    setPagoForm(prev => ({ ...prev, cliente_id: id }));
+    setSearchPagadorText(p.nombre);
+    setConceptoExterno(p.concepto || 'Alquiler del local');
+    const prevMonto = beneficiarios[0]?.monto || '50000';
+    setBeneficiarios([{
+      id: genId(),
+      cliente_id: id,
+      monto: prevMonto,
+      mes_correspondiente: pagoForm.mes_correspondiente
+    }]);
+  };
+
   const handleManualPagoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormErr('');
@@ -263,12 +318,18 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
     if (!pagoForm.cliente_id) { setFormErr('Por favor seleccione quién abona la transacción.'); return; }
     if (beneficiarios.length === 0) { setFormErr('Debe ingresar al menos un cobro o cuota para registrar.'); return; }
 
+    const isExt = tipoPagador === 'EXTERNO';
+    const extPayer = isExt ? pagadoresExternos.find(x => x.id === pagoForm.cliente_id) : null;
+    const extNombre = extPayer ? extPayer.nombre : (searchPagadorText || 'Pagador Externo');
+    const extConcepto = isExt ? (conceptoExterno.trim() || extPayer?.concepto || 'Alquiler del local') : undefined;
+
     for (let i = 0; i < beneficiarios.length; i++) {
       const b = beneficiarios[i];
       const parsedMonto = parseFloat(b.monto);
       if (isNaN(parsedMonto) || parsedMonto <= 0) {
         const c = clientes.find(x => x.id === b.cliente_id);
-        setFormErr(`El monto para ${c ? c.nombre + ' ' + c.apellido : 'el socio'} debe ser mayor a 0 pesos.`);
+        const titularNombre = isExt ? extNombre : (c ? `${c.nombre} ${c.apellido}` : 'el socio');
+        setFormErr(`El monto para ${titularNombre} debe ser mayor a 0 pesos.`);
         return;
       }
       if (!b.mes_correspondiente) { setFormErr('Todos los pagos deben tener un mes asignado.'); return; }
@@ -293,7 +354,10 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
         ...f,
         hash_transaccion: pagoForm.hash_transaccion.trim() || undefined,
         fecha_pago: fechaPago ? `${fechaPago}T12:00:00.000Z` : undefined,
-        registrado_por: 'operator@gimnasio.com.ar'
+        registrado_por: 'operator@gimnasio.com.ar',
+        es_externo: isExt,
+        concepto: extConcepto,
+        cliente_nombre_completo: isExt ? extNombre : undefined
       }));
     } else {
       payloadList = beneficiarios.map(b => ({
@@ -304,7 +368,10 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
         hash_transaccion: pagoForm.hash_transaccion.trim() || undefined,
         destino_transferencia: pagoForm.destino_transferencia,
         fecha_pago: fechaPago ? `${fechaPago}T12:00:00.000Z` : undefined,
-        registrado_por: 'operator@gimnasio.com.ar'
+        registrado_por: 'operator@gimnasio.com.ar',
+        es_externo: isExt,
+        concepto: extConcepto,
+        cliente_nombre_completo: isExt ? extNombre : undefined
       }));
     }
 
@@ -318,29 +385,40 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
 
     // Comprobantes para enviar por WhatsApp
     const generatedReceipts: any[] = [];
-    beneficiarios.forEach(b => {
-      const clObj = clientes.find(c => c.id === b.cliente_id);
-      if (clObj) {
-        const nombre = clObj.nombre;
-        const parsedMonto = parseFloat(b.monto);
-        let textMsg = '';
-        if (clObj.tipo === 'FIJO' && clObj.turnos_fijos.length > 0) {
-          const turnosStr = clObj.turnos_fijos.map(tfId => {
-            const parts = tfId.split('-');
-            return `${parts[0]} ${parts[1] || '00:00'}hs`;
-          }).join(', ');
-          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA BOX. ¡Muchas gracias por tu compromiso! Tus turnos fijos son ${turnosStr}. Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
-        } else {
-          textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA BOX. ¡Muchas gracias por tu compromiso! Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
+    if (isExt) {
+      const parsedMonto = totalACobrar;
+      const textMsg = `Hola ${extNombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente a ${extConcepto || 'alquiler'} (${pagoForm.mes_correspondiente}). ¡Muchas gracias! KAHA GYM`;
+      generatedReceipts.push({
+        cliente_nombre: `${extNombre} (${pagoForm.mes_correspondiente})`,
+        messageText: textMsg,
+        telefono: extPayer?.telefono || '',
+        copiado: false
+      });
+    } else {
+      beneficiarios.forEach(b => {
+        const clObj = clientes.find(c => c.id === b.cliente_id);
+        if (clObj) {
+          const nombre = clObj.nombre;
+          const parsedMonto = parseFloat(b.monto);
+          let textMsg = '';
+          if (clObj.tipo === 'FIJO' && clObj.turnos_fijos.length > 0) {
+            const turnosStr = clObj.turnos_fijos.map(tfId => {
+              const parts = tfId.split('-');
+              return `${parts[0]} ${parts[1] || '00:00'}hs`;
+            }).join(', ');
+            textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA BOX. ¡Muchas gracias por tu compromiso! Tus turnos fijos son ${turnosStr}. Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
+          } else {
+            textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${parsedMonto.toLocaleString('es-AR')} correspondiente al mes de ${b.mes_correspondiente} para la actividad física en KAHA BOX. ¡Muchas gracias por tu compromiso! Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
+          }
+          generatedReceipts.push({
+            cliente_nombre: `${clObj.apellido}, ${clObj.nombre} (${b.mes_correspondiente})`,
+            messageText: textMsg,
+            telefono: clObj.telefono || '5491123456789',
+            copiado: false
+          });
         }
-        generatedReceipts.push({
-          cliente_nombre: `${clObj.apellido}, ${clObj.nombre} (${b.mes_correspondiente})`,
-          messageText: textMsg,
-          telefono: clObj.telefono || '5491123456789',
-          copiado: false
-        });
-      }
-    });
+      });
+    }
 
     setFormSuccess(res.message);
     setPagoForm({
@@ -392,189 +470,369 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
             {formErr && <div className="bg-red-50 text-red-700 p-2.5 rounded-lg font-medium border border-red-200 text-xs">{formErr}</div>}
             {formSuccess && <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg font-semibold border border-emerald-200 text-xs">{formSuccess}</div>}
             
-            {/* BUSCADOR DE QUIÉN ABONA */}
-            <div className="space-y-1 relative" ref={pagadorRef}>
-              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Quién Abona (Pagador)</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Escribí para buscar por nombre o apellido..."
-                  value={searchPagadorText}
-                  onFocus={() => setIsPagadorDropdownOpen(true)}
-                  onChange={(e) => {
-                    setSearchPagadorText(e.target.value);
-                    setIsPagadorDropdownOpen(true);
-                  }}
-                  className="w-full pl-9 pr-8 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-medium"
-                  id="pago-cliente-search-input"
-                />
-                {pagoForm.cliente_id && (
-                  <button
-                    type="button"
-                    onClick={() => {
+            {/* SELECTOR DE TIPO DE PAGADOR: SOCIO vs EXTERNO */}
+            <div className="space-y-1.5">
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase">Tipo de Ingreso / Pagador</label>
+              <div className="grid grid-cols-2 gap-2 bg-zinc-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tipoPagador !== 'SOCIO') {
+                      setTipoPagador('SOCIO');
                       setPagoForm(prev => ({ ...prev, cliente_id: '' }));
                       setSearchPagadorText('');
                       setBeneficiarios([]);
-                      setIsPagadorDropdownOpen(true);
-                    }}
-                    className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-100 cursor-pointer border-none bg-transparent"
-                    title="Limpiar selección"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Dropdown popup para Pagador */}
-              {isPagadorDropdownOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto divide-y divide-zinc-100">
-                  {pagadorOptions.length === 0 ? (
-                    <div className="p-3 text-center text-zinc-400 italic text-xs">No se encontraron socios que coincidan</div>
-                  ) : (
-                    pagadorOptions.map(c => {
-                      const pl = planes.find(p => p.id === c.plan_id);
-                      const isSelected = c.id === pagoForm.cliente_id;
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            handleClientSelect(c.id);
-                            setIsPagadorDropdownOpen(false);
-                          }}
-                          className={`w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors cursor-pointer text-xs ${
-                            isSelected ? 'bg-zinc-100 font-bold' : ''
-                          }`}
-                        >
-                          <div>
-                            <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
-                            <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
-                          </div>
-                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                            c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                              : c.deuda_acumulada > 0
-                              ? 'bg-red-50 text-red-600 border border-red-200'
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          }`}>
-                            {c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO'
-                              ? 'Becado ($0)'
-                              : c.deuda_acumulada > 0
-                              ? `Deuda: $${c.deuda_acumulada.toLocaleString('es-AR')}`
-                              : 'Al día'}
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ATAJO RÁPIDO PARA SUMAR OTRA CUOTA / MES PARA EL MISMO SOCIO */}
-            {pagoForm.cliente_id && pagadorSeleccionado && (
-              <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => handleAddBeneficiary(pagoForm.cliente_id)}
-                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                  title="Permite cargar 2, 3 o 4 meses juntos para este mismo socio"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Sumar otro mes para {pagadorSeleccionado.nombre}</span>
-                </button>
-              </div>
-            )}
-
-            {/* OPCIÓN: PAGO MÚLTIPLE O DIFERENTE BENEFICIARIO */}
-            <div className="pt-1">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-zinc-700 font-bold">
-                <input
-                  type="checkbox"
-                  checked={esPagoMultiple}
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setEsPagoMultiple(val);
-                    if (!val && pagoForm.cliente_id) {
-                      const cl = clientes.find(c => c.id === pagoForm.cliente_id);
-                      const plan = planes.find(p => p.id === cl?.plan_id);
-                      const planPrecio = cl?.precio_personalizado ?? (plan ? plan.precio : 0);
-                      setBeneficiarios([{
-                        id: genId(),
-                        cliente_id: pagoForm.cliente_id,
-                        monto: planPrecio.toString(),
-                        mes_correspondiente: pagoForm.mes_correspondiente
-                      }]);
                     }
                   }}
-                  className="w-4 h-4 accent-black rounded border-zinc-300 cursor-pointer"
-                  id="chk-pago-multiple"
-                />
-                <span className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-zinc-500" />
-                  Pagar por otros socios o grupo (ej: familiar, amigos, múltiples personas)
-                </span>
-              </label>
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border-none flex items-center justify-center gap-1.5 ${
+                    tipoPagador === 'SOCIO'
+                      ? 'bg-white text-zinc-900 shadow-xs'
+                      : 'bg-transparent text-zinc-500 hover:text-zinc-800'
+                  }`}
+                  id="tab-pagador-socio"
+                >
+                  <UserCheck className="w-3.5 h-3.5 text-zinc-700" />
+                  <span>Socio del Gimnasio</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tipoPagador !== 'EXTERNO') {
+                      setTipoPagador('EXTERNO');
+                      setEsPagoMultiple(false);
+                      const def = pagadoresExternos[0];
+                      if (def) {
+                        setPagadorExternoSeleccionadoId(def.id);
+                        setConceptoExterno(def.concepto || 'Alquiler del local');
+                        setPagoForm(prev => ({ ...prev, cliente_id: def.id }));
+                        setSearchPagadorText(def.nombre);
+                        setBeneficiarios([{
+                          id: genId(),
+                          cliente_id: def.id,
+                          monto: '50000',
+                          mes_correspondiente: pagoForm.mes_correspondiente
+                        }]);
+                      }
+                    }
+                  }}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border-none flex items-center justify-center gap-1.5 ${
+                    tipoPagador === 'EXTERNO'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-transparent text-zinc-500 hover:text-zinc-800'
+                  }`}
+                  id="tab-pagador-externo"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Pagador Externo / Alquiler</span>
+                </button>
+              </div>
             </div>
 
-            {/* BUSCADOR DE BENEFICIARIO ADICIONAL (SI SE MARCA EL CHECKBOX) */}
-            {esPagoMultiple && (
-              <div className="space-y-1 relative pt-1" ref={beneficiarioRef}>
-                <label className="text-zinc-500 font-bold block text-[10px] uppercase">Agregar Alumno Beneficiario</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Buscar y agregar otro alumno..."
-                    value={searchBeneficiarioText}
-                    onFocus={() => setIsBeneficiarioDropdownOpen(true)}
-                    onChange={(e) => {
-                      setSearchBeneficiarioText(e.target.value);
-                      setIsBeneficiarioDropdownOpen(true);
-                    }}
-                    className="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-medium"
-                    id="add-beneficiary-search-input"
-                  />
+            {tipoPagador === 'EXTERNO' ? (
+              /* SECCIÓN PAGADOR EXTERNO (ALQUILER, MASAJISTA, ETC) */
+              <div className="space-y-3 bg-blue-50/40 border border-blue-200/80 rounded-xl p-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-blue-700" />
+                    <span className="font-bold text-xs text-blue-950 uppercase tracking-tight">
+                      Pagador No Socio (Terceros)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowNuevoPagadorForm(!showNuevoPagadorForm)}
+                    className="text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-100/60 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                    id="btn-toggle-nuevo-pagador"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>{showNuevoPagadorForm ? 'Cerrar formulario' : '+ Nuevo Pagador'}</span>
+                  </button>
                 </div>
 
-                {isBeneficiarioDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto divide-y divide-zinc-100">
-                    {beneficiarioOptions.length === 0 ? (
-                      <div className="p-3 text-center text-zinc-400 italic text-xs">No hay socios que coincidan</div>
-                    ) : (
-                      beneficiarioOptions.map(c => {
-                        const pl = planes.find(p => p.id === c.plan_id);
-                        const cantAgregado = beneficiarios.filter(b => b.cliente_id === c.id).length;
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              handleAddBeneficiary(c.id);
-                              setSearchBeneficiarioText('');
-                              setIsBeneficiarioDropdownOpen(false);
-                            }}
-                            className="w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors text-xs cursor-pointer"
-                          >
-                            <div>
-                              <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
-                              <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
-                            </div>
-                            {cantAgregado > 0 ? (
-                              <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
-                                <Check className="w-3 h-3" /> {cantAgregado} {cantAgregado === 1 ? 'cuota' : 'cuotas'} (+ tocar para sumar otra)
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-zinc-400 font-semibold">+ Agregar</span>
-                            )}
-                          </button>
-                        );
-                      })
-                    )}
+                {showNuevoPagadorForm ? (
+                  <div className="bg-white border border-blue-300 rounded-xl p-3.5 space-y-3 shadow-sm animate-fade-in">
+                    <div className="font-bold text-zinc-900 text-xs flex items-center gap-1.5 text-blue-700">
+                      <Plus className="w-4 h-4" />
+                      <span>Registrar Nuevo Pagador Externo</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[9px] text-zinc-500 font-bold uppercase block mb-1">Nombre o Empresa *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ej: Lic. Masajes Juan Pérez"
+                          value={nuevoPagadorNombre}
+                          onChange={e => setNuevoPagadorNombre(e.target.value)}
+                          className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden focus:border-blue-500 font-medium"
+                          id="input-nuevo-pagador-nombre"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-zinc-500 font-bold uppercase block mb-1">Concepto habitual</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Alquiler del local / consultorio"
+                          value={nuevoPagadorConcepto}
+                          onChange={e => setNuevoPagadorConcepto(e.target.value)}
+                          className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden focus:border-blue-500 font-medium"
+                          id="input-nuevo-pagador-concepto"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-zinc-500 font-bold uppercase block mb-1">Teléfono WhatsApp (opcional)</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: 5491123456789"
+                        value={nuevoPagadorTelefono}
+                        onChange={e => setNuevoPagadorTelefono(e.target.value)}
+                        className="w-full border border-zinc-200 rounded-lg p-2 text-xs bg-white outline-hidden focus:border-blue-500 font-medium"
+                        id="input-nuevo-pagador-telefono"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowNuevoPagadorForm(false)}
+                        className="px-3 py-1.5 text-xs border border-zinc-200 rounded-lg bg-white text-zinc-600 hover:bg-zinc-50 cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCrearNuevoPagador}
+                        className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white cursor-pointer border-none shadow-xs"
+                        id="btn-guardar-nuevo-pagador"
+                      >
+                        Guardar Pagador
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="text-zinc-600 font-bold block text-[10px] uppercase mb-1">
+                        Seleccionar Pagador Registrado
+                      </label>
+                      <select
+                        value={pagadorExternoSeleccionadoId}
+                        onChange={e => handleSelectPagadorExterno(e.target.value)}
+                        className="w-full border border-blue-200 rounded-lg p-2 text-xs bg-white outline-hidden focus:border-blue-500 font-bold text-zinc-900"
+                        id="select-pagador-externo"
+                      >
+                        {pagadoresExternos.map(pe => (
+                          <option key={pe.id} value={pe.id}>
+                            {pe.nombre} {pe.concepto ? `— (${pe.concepto})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-zinc-600 font-bold block text-[10px] uppercase mb-1">
+                        Concepto o Motivo del Cobro
+                      </label>
+                      <input
+                        type="text"
+                        value={conceptoExterno}
+                        onChange={e => setConceptoExterno(e.target.value)}
+                        placeholder="Ej: Alquiler del local, Servicio de masajes, etc."
+                        className="w-full border border-blue-200 rounded-lg p-2 text-xs bg-white outline-hidden focus:border-blue-500 font-medium"
+                        id="input-concepto-externo"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
+            ) : (
+              /* SECCIÓN SOCIO DEL GIMNASIO */
+              <>
+                {/* BUSCADOR DE QUIÉN ABONA */}
+                <div className="space-y-1 relative" ref={pagadorRef}>
+                  <label className="text-zinc-500 font-bold block text-[10px] uppercase">Quién Abona (Socio)</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Escribí para buscar por nombre o apellido..."
+                      value={searchPagadorText}
+                      onFocus={() => setIsPagadorDropdownOpen(true)}
+                      onChange={(e) => {
+                        setSearchPagadorText(e.target.value);
+                        setIsPagadorDropdownOpen(true);
+                      }}
+                      className="w-full pl-9 pr-8 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-medium"
+                      id="pago-cliente-search-input"
+                    />
+                    {pagoForm.cliente_id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPagoForm(prev => ({ ...prev, cliente_id: '' }));
+                          setSearchPagadorText('');
+                          setBeneficiarios([]);
+                          setIsPagadorDropdownOpen(true);
+                        }}
+                        className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-100 cursor-pointer border-none bg-transparent"
+                        title="Limpiar selección"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown popup para Pagador */}
+                  {isPagadorDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto divide-y divide-zinc-100">
+                      {pagadorOptions.length === 0 ? (
+                        <div className="p-3 text-center text-zinc-400 italic text-xs">No se encontraron socios que coincidan</div>
+                      ) : (
+                        pagadorOptions.map(c => {
+                          const pl = planes.find(p => p.id === c.plan_id);
+                          const isSelected = c.id === pagoForm.cliente_id;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                handleClientSelect(c.id);
+                                setIsPagadorDropdownOpen(false);
+                              }}
+                              className={`w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors cursor-pointer text-xs ${
+                                isSelected ? 'bg-zinc-100 font-bold' : ''
+                              }`}
+                            >
+                              <div>
+                                <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
+                                <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
+                              </div>
+                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                                c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : c.deuda_acumulada > 0
+                                  ? 'bg-red-50 text-red-600 border border-red-200'
+                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              }`}>
+                                {c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO'
+                                  ? 'Becado ($0)'
+                                  : c.deuda_acumulada > 0
+                                  ? `Deuda: $${c.deuda_acumulada.toLocaleString('es-AR')}`
+                                  : 'Al día'}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ATAJO RÁPIDO PARA SUMAR OTRA CUOTA / MES PARA EL MISMO SOCIO */}
+                {pagoForm.cliente_id && pagadorSeleccionado && (
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleAddBeneficiary(pagoForm.cliente_id)}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                      title="Permite cargar 2, 3 o 4 meses juntos para este mismo socio"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Sumar otro mes para {pagadorSeleccionado.nombre}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* OPCIÓN: PAGO MÚLTIPLE O DIFERENTE BENEFICIARIO */}
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-zinc-700 font-bold">
+                    <input
+                      type="checkbox"
+                      checked={esPagoMultiple}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setEsPagoMultiple(val);
+                        if (!val && pagoForm.cliente_id) {
+                          const cl = clientes.find(c => c.id === pagoForm.cliente_id);
+                          const plan = planes.find(p => p.id === cl?.plan_id);
+                          const planPrecio = cl?.precio_personalizado ?? (plan ? plan.precio : 0);
+                          setBeneficiarios([{
+                            id: genId(),
+                            cliente_id: pagoForm.cliente_id,
+                            monto: planPrecio.toString(),
+                            mes_correspondiente: pagoForm.mes_correspondiente
+                          }]);
+                        }
+                      }}
+                      className="w-4 h-4 accent-black rounded border-zinc-300 cursor-pointer"
+                      id="chk-pago-multiple"
+                    />
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-zinc-500" />
+                      Pagar por otros socios o grupo (ej: familiar, amigos, múltiples personas)
+                    </span>
+                  </label>
+                </div>
+
+                {/* BUSCADOR DE BENEFICIARIO ADICIONAL (SI SE MARCA EL CHECKBOX) */}
+                {esPagoMultiple && (
+                  <div className="space-y-1 relative pt-1" ref={beneficiarioRef}>
+                    <label className="text-zinc-500 font-bold block text-[10px] uppercase">Agregar Alumno Beneficiario</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Buscar y agregar otro alumno..."
+                        value={searchBeneficiarioText}
+                        onFocus={() => setIsBeneficiarioDropdownOpen(true)}
+                        onChange={(e) => {
+                          setSearchBeneficiarioText(e.target.value);
+                          setIsBeneficiarioDropdownOpen(true);
+                        }}
+                        className="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-medium"
+                        id="add-beneficiary-search-input"
+                      />
+                    </div>
+
+                    {isBeneficiarioDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto divide-y divide-zinc-100">
+                        {beneficiarioOptions.length === 0 ? (
+                          <div className="p-3 text-center text-zinc-400 italic text-xs">No hay socios que coincidan</div>
+                        ) : (
+                          beneficiarioOptions.map(c => {
+                            const pl = planes.find(p => p.id === c.plan_id);
+                            const cantAgregado = beneficiarios.filter(b => b.cliente_id === c.id).length;
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  handleAddBeneficiary(c.id);
+                                  setSearchBeneficiarioText('');
+                                  setIsBeneficiarioDropdownOpen(false);
+                                }}
+                                className="w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors text-xs cursor-pointer"
+                              >
+                                <div>
+                                  <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
+                                  <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
+                                </div>
+                                {cantAgregado > 0 ? (
+                                  <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                                    <Check className="w-3 h-3" /> {cantAgregado} {cantAgregado === 1 ? 'cuota' : 'cuotas'} (+ tocar para sumar otra)
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-zinc-400 font-semibold">+ Agregar</span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             {/* DETALLE DE COBROS Y BENEFICIARIOS */}
@@ -595,11 +853,17 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                   <div className="block sm:hidden space-y-2 max-h-56 overflow-y-auto pr-1">
                     {beneficiarios.map((b, idx) => {
                       const cl = clientes.find(c => c.id === b.cliente_id);
+                      const extPayer = !cl ? pagadoresExternos.find(pe => pe.id === b.cliente_id) : null;
+                      const nombreTitular = cl ? `${cl.apellido}, ${cl.nombre}` : (extPayer ? extPayer.nombre : (searchPagadorText || 'Pagador Externo'));
+
                       return (
                         <div key={b.id} className="bg-zinc-50 border border-zinc-200 rounded-xl p-3 space-y-2.5 shadow-2xs">
                           <div className="flex justify-between items-center">
-                            <span className="font-bold text-zinc-900 text-xs truncate max-w-[200px]">
-                              {idx + 1}. {cl ? `${cl.apellido}, ${cl.nombre}` : 'Desconocido'}
+                            <span className="font-bold text-zinc-900 text-xs truncate max-w-[200px] flex items-center gap-1.5">
+                              <span>{idx + 1}. {nombreTitular}</span>
+                              {(extPayer || tipoPagador === 'EXTERNO') && (
+                                <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold shrink-0">🏢 Externo</span>
+                              )}
                             </span>
                             <button
                               type="button"
@@ -646,7 +910,7 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-zinc-100 text-zinc-600 font-bold border-b border-zinc-200 text-[10px] uppercase">
-                          <th className="p-2">Socio</th>
+                          <th className="p-2">{tipoPagador === 'EXTERNO' ? 'Pagador / Entidad' : 'Socio'}</th>
                           <th className="p-2 w-32">Mes</th>
                           <th className="p-2 w-28">Monto</th>
                           <th className="p-2 text-center w-10"></th>
@@ -655,10 +919,18 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
                       <tbody className="divide-y divide-zinc-200">
                         {beneficiarios.map((b, idx) => {
                           const cl = clientes.find(c => c.id === b.cliente_id);
+                          const extPayer = !cl ? pagadoresExternos.find(pe => pe.id === b.cliente_id) : null;
+                          const nombreTitular = cl ? `${cl.apellido}, ${cl.nombre}` : (extPayer ? extPayer.nombre : (searchPagadorText || 'Pagador Externo'));
+
                           return (
                             <tr key={b.id}>
                               <td className="p-2 font-semibold text-zinc-900 truncate max-w-[160px]">
-                                {cl ? `${cl.apellido}, ${cl.nombre}` : 'Desconocido'}
+                                <div className="flex items-center gap-1.5">
+                                  <span>{nombreTitular}</span>
+                                  {(extPayer || tipoPagador === 'EXTERNO') && (
+                                    <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold shrink-0">🏢 Externo</span>
+                                  )}
+                                </div>
                               </td>
                               <td className="p-2">
                                 <input 

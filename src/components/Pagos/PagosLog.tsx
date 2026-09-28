@@ -149,8 +149,9 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       if (buscarCliente.trim()) {
         const query = buscarCliente.toLowerCase();
         const cl = clientes.find(c => c.id === p.cliente_id);
-        const nameText = cl ? `${cl.nombre} ${cl.apellido}`.toLowerCase() : p.cliente_nombre_completo.toLowerCase();
-        if (!nameText.includes(query)) return false;
+        const nameText = cl ? `${cl.nombre} ${cl.apellido}`.toLowerCase() : (p.cliente_nombre_completo || '').toLowerCase();
+        const conceptoText = (p.concepto || '').toLowerCase();
+        if (!nameText.includes(query) && !conceptoText.includes(query)) return false;
       }
       return true;
     });
@@ -158,9 +159,11 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
   const handleOpenReceipt = (p: Pago) => {
     const cl = clientes.find(c => c.id === p.cliente_id);
-    const nombre = cl ? cl.nombre : p.cliente_nombre_completo;
+    const nombre = cl ? cl.nombre : (p.cliente_nombre_completo || 'Pagador');
     let textMsg = '';
-    if (cl && cl.tipo === 'FIJO' && cl.turnos_fijos.length > 0) {
+    if (p.es_externo || (p.cliente_id && p.cliente_id.startsWith('ext-')) || !cl) {
+      textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente a ${p.concepto || 'alquiler / servicio'} (${p.mes_correspondiente}). ¡Muchas gracias! KAHA GYM`;
+    } else if (cl && cl.tipo === 'FIJO' && cl.turnos_fijos.length > 0) {
       const turnosStr = cl.turnos_fijos.map(tfId => { const parts = tfId.split('-'); return `${parts[0]} ${parts[1] || '00:00'}hs`; }).join(', ');
       textMsg = `Hola ${nombre}! Confirmamos la recepción de tu pago de $${p.monto.toLocaleString('es-AR')} correspondiente al mes de ${p.mes_correspondiente} para la actividad física en KAHA BOX. Tus turnos fijos son ${turnosStr}. Recordá darte de baja del turno cuando sepas que no vas a venir, así podemos liberar el lugar.`;
     } else {

@@ -1,7 +1,7 @@
 // src/initialMockData.ts
 // Datos semilla iniciales para simular Supabase mediante localStorage (Argentina timezone)
 
-import { Cliente, Plan, Turno, Pago, AuditLog, HistorialPrecioPlan, RecuperoTurno, Novedad } from './types';
+import { Cliente, Plan, Turno, Pago, AuditLog, HistorialPrecioPlan, RecuperoTurno, Novedad, PagadorExterno } from './types';
 
 export const INITIAL_PLANES: Plan[] = [
   { id: 'p-none', nombre: 'Aún no sabe', dias_por_semana: 5, precio: 0.00, creado_at: '2026-01-10T10:00:00Z' },
@@ -537,6 +537,17 @@ export const INITIAL_NOVEDADES: Novedad[] = [
     categoria: 'INFORMACION',
     creado_por: 'operator@gimnasio.com.ar',
     destacado: true
+  }
+];
+
+export const INITIAL_PAGADORES_EXTERNOS: PagadorExterno[] = [
+  {
+    id: 'ext-masajista',
+    nombre: 'Masajista (Alquiler del local)',
+    concepto: 'Alquiler de espacio / consultorio',
+    telefono: '',
+    email: '',
+    creado_at: '2026-01-01T12:00:00Z'
   }
 ];
 

@@ -26,6 +26,8 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
   const [destinoTransferencia, setDestinoTransferencia] = useState<'JUANCHI' | 'RULO' | 'EFECTIVO'>('RULO');
   const [hashTransaccion, setHashTransaccion] = useState('');
   const [fechaPago, setFechaPago] = useState('');
+  const [concepto, setConcepto] = useState('');
+  const [isExternal, setIsExternal] = useState(false);
 
   const [searchText, setSearchText] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -48,6 +50,10 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
       setFechaPago(pago.fecha_pago ? pago.fecha_pago.slice(0, 10) : new Date().toISOString().slice(0, 10));
 
       const cl = clientes.find(c => c.id === pago.cliente_id);
+      const ext = Boolean(pago.es_externo || (pago.cliente_id && pago.cliente_id.startsWith('ext-')) || !cl);
+      setIsExternal(ext);
+      setConcepto(pago.concepto || '');
+
       if (cl) {
         setSearchText(`${cl.apellido}, ${cl.nombre}`);
       } else {
@@ -102,8 +108,13 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!clienteId) {
+    if (!clienteId && !isExternal) {
       setErrorMsg('Seleccioná el socio correspondiente.');
+      return;
+    }
+
+    if (isExternal && !searchText.trim()) {
+      setErrorMsg('Ingresá el nombre del pagador.');
       return;
     }
 
@@ -122,6 +133,9 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
 
     const res = actualizarPago(pago.id, {
       cliente_id: clienteId,
+      cliente_nombre_completo: isExternal ? searchText.trim() : undefined,
+      es_externo: isExternal,
+      concepto: isExternal ? concepto.trim() : undefined,
       monto: parsedMonto,
       mes_correspondiente: mesCorrespondiente,
       medio_pago: medioPago,
@@ -183,79 +197,121 @@ export const PagoEditModal: React.FC<PagoEditModalProps> = ({
             </div>
           )}
 
-          {/* 1. BUSCADOR DE SOCIO */}
-          <div className="space-y-1 relative" ref={dropdownRef}>
-            <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">
-              Socio / Titular del Abono *
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Buscar por nombre o apellido..."
-                value={searchText}
-                onFocus={() => setIsDropdownOpen(true)}
-                onChange={(e) => {
-                  setSearchText(e.target.value);
-                  setIsDropdownOpen(true);
-                }}
-                className="w-full pl-9 pr-8 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-semibold text-zinc-900"
-                id="edit-pago-cliente-search"
-              />
-              {clienteId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setClienteId('');
-                    setSearchText('');
+          {/* 1. PAGADOR O SOCIO */}
+          {isExternal ? (
+            <div className="space-y-3 bg-amber-50/50 p-3 rounded-xl border border-amber-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  Pagador Externo / Alquiler
+                </span>
+                <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-semibold">
+                  No computa como alumno
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-zinc-600 font-bold block text-[10px] uppercase tracking-wider">
+                  Nombre del Pagador *
+                </label>
+                <input
+                  type="text"
+                  placeholder="ej: Masajista (Alquiler del local)"
+                  value={searchText}
+                  onChange={e => setSearchText(e.target.value)}
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-semibold text-zinc-900"
+                  id="edit-pago-pagador-externo"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-zinc-600 font-bold block text-[10px] uppercase tracking-wider">
+                  Concepto / Detalle
+                </label>
+                <input
+                  type="text"
+                  placeholder="ej: Alquiler espacio, sesiones, convenio..."
+                  value={concepto}
+                  onChange={e => setConcepto(e.target.value)}
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black text-zinc-800"
+                  id="edit-pago-concepto"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1 relative" ref={dropdownRef}>
+              <label className="text-zinc-500 font-bold block text-[10px] uppercase tracking-wider">
+                Socio / Titular del Abono *
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o apellido..."
+                  value={searchText}
+                  onFocus={() => setIsDropdownOpen(true)}
+                  onChange={(e) => {
+                    setSearchText(e.target.value);
                     setIsDropdownOpen(true);
                   }}
-                  className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-100 cursor-pointer border-none bg-transparent"
-                  title="Limpiar selección"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Dropdown popup */}
-            {isDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto divide-y divide-zinc-100">
-                {clientOptions.length === 0 ? (
-                  <div className="p-3 text-center text-zinc-400 italic text-xs">No se encontraron socios activos</div>
-                ) : (
-                  clientOptions.map(c => {
-                    const pl = planes.find(p => p.id === c.plan_id);
-                    const isSelected = c.id === clienteId;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          setClienteId(c.id);
-                          setSearchText(`${c.apellido}, ${c.nombre}`);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors cursor-pointer text-xs ${
-                          isSelected ? 'bg-zinc-100 font-bold' : ''
-                        }`}
-                      >
-                        <div>
-                          <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
-                          <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
-                        </div>
-                        {isSelected && (
-                          <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5" /> Seleccionado
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })
+                  className="w-full pl-9 pr-8 py-2 border border-zinc-200 rounded-lg text-xs bg-white outline-hidden focus:border-black font-semibold text-zinc-900"
+                  id="edit-pago-cliente-search"
+                />
+                {clienteId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClienteId('');
+                      setSearchText('');
+                      setIsDropdownOpen(true);
+                    }}
+                    className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-100 cursor-pointer border-none bg-transparent"
+                    title="Limpiar selección"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
-            )}
-          </div>
+
+              {/* Dropdown popup */}
+              {isDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto divide-y divide-zinc-100">
+                  {clientOptions.length === 0 ? (
+                    <div className="p-3 text-center text-zinc-400 italic text-xs">No se encontraron socios activos</div>
+                  ) : (
+                    clientOptions.map(c => {
+                      const pl = planes.find(p => p.id === c.plan_id);
+                      const isSelected = c.id === clienteId;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setClienteId(c.id);
+                            setSearchText(`${c.apellido}, ${c.nombre}`);
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full text-left p-2.5 hover:bg-zinc-50 flex items-center justify-between transition-colors cursor-pointer text-xs ${
+                            isSelected ? 'bg-zinc-100 font-bold' : ''
+                          }`}
+                        >
+                          <div>
+                            <span className="font-bold text-zinc-900 block">{c.apellido}, {c.nombre}</span>
+                            <span className="text-[10px] text-zinc-400 font-mono">Plan: {pl ? pl.nombre : 'Sin plan'}</span>
+                          </div>
+                          {isSelected && (
+                            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5" /> Seleccionado
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 2. MONTO Y MES CUBIERTO */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

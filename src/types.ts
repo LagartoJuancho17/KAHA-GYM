@@ -87,6 +87,15 @@ export interface Turno {
   db_uuid?: string; // UUID real en la base de datos de Supabase
 }
 
+export interface PagadorExterno {
+  id: string;
+  nombre: string;
+  concepto?: string; // ej: "Alquiler consultorio", "Servicio masajes"
+  telefono?: string;
+  email?: string;
+  creado_at: string;
+}
+
 export interface Pago {
   id: string;
   cliente_id: string;
@@ -99,6 +108,8 @@ export interface Pago {
   destino_transferencia?: 'JUANCHI' | 'RULO' | string;
   registrado_por: string; // email del operador/admin
   creado_at: string;
+  es_externo?: boolean; // true si es un ingreso/pago de un pagador externo (no socio)
+  concepto?: string; // motivo/concepto opcional (ej: "Alquiler del local")
 }
 
 export interface PagoEnRevision {

@@ -268,3 +268,38 @@ test('dos socios distintos en el mismo mes siguen contando como dos cuotas', () 
   assert.equal(balance.pagosCount, 2);
   assert.equal(balance.ticketPromedio, 65000);
 });
+
+test('Pagos externos (alquiler masajista / terceros) ingresan al balance financiero correctamente', () => {
+  const pagos: Pago[] = [
+    {
+      id: 'ext-pago-1',
+      cliente_id: 'ext-masajista',
+      cliente_nombre_completo: 'Masajista (Alquiler del local)',
+      es_externo: true,
+      concepto: 'Alquiler consultorio septiembre',
+      monto: 50000,
+      mes_correspondiente: '2026-09',
+      fecha_pago: '2026-09-10',
+      medio_pago: 'TRANSFERENCIA',
+      destino_transferencia: 'JUANCHI',
+      registrado_por: 'admin@kaha.com'
+    }
+  ];
+
+  const balance = calcularBalanceMes({
+    mes: '2026-09',
+    pagos,
+    gastos: [],
+    clientes: [],
+    planes: [],
+    profesores: [],
+    turnos: [],
+    novedadesProfesores: []
+  });
+
+  assert.equal(balance.totalIngresos, 50000);
+  assert.equal(balance.cajaJuanchi.ingresos, 50000);
+  assert.equal(balance.cajaRulo.ingresos, 0);
+  assert.equal(balance.gananciaReal, 50000);
+});
+

@@ -4,11 +4,12 @@ import {
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, PagoEnRevision,
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
   ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, OrigenGasto, Profesor, NovedadProfesor, WaitlistReserva,
-  ToastMessage
+  ToastMessage, PagadorExterno
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
-  INITIAL_CLIENTES, INITIAL_PAGOS, INITIAL_AUDIT_LOGS, INITIAL_RECUPEROS, INITIAL_NOVEDADES, INITIAL_GASTOS
+  INITIAL_CLIENTES, INITIAL_PAGOS, INITIAL_AUDIT_LOGS, INITIAL_RECUPEROS, INITIAL_NOVEDADES, INITIAL_GASTOS,
+  INITIAL_PAGADORES_EXTERNOS
 } from './initialMockData';
 import { supabase } from './supabaseClient';
 import { mergeLogs, logsFaltantesEnDb, parsearLogsGuardados, normalizarIdsLegacy, nuevoLogId, MAX_LOGS } from './lib/auditLogs';
@@ -119,13 +120,21 @@ interface GymContextType {
       destino_transferencia?: 'JUANCHI' | 'RULO' | 'EFECTIVO';
       registrado_por?: string;
       fecha_pago?: string;
+      es_externo?: boolean;
+      concepto?: string;
+      cliente_nombre_completo?: string;
     }>,
     userEmail: string
   ) => { success: boolean; message: string; generatedPagos: Pago[] };
-  actualizarPago: (pagoId: string, updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia' | 'fecha_pago'>>, userEmail?: string) => { success: boolean; message: string };
+  actualizarPago: (pagoId: string, updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia' | 'fecha_pago' | 'concepto' | 'cliente_nombre_completo' | 'es_externo'>>, userEmail?: string) => { success: boolean; message: string };
   actualizarDestinoPago: (pagoId: string, destino: 'JUANCHI' | 'RULO' | 'EFECTIVO') => void;
   eliminarPago: (pagoId: string) => void;
   importarPagosCSV: (pagosImportados: Array<{ cliente_email: string; monto: number; fecha_pago: string; medio_pago: MedioPago; mes: string; hash: string }>, userEmail: string) => { procesados: number; insertados: number; duplicados: number; errores: string[] };
+
+  // Pagadores Externos (no socios: alquiler de espacio, masajistas, convenios)
+  pagadoresExternos: PagadorExterno[];
+  registrarPagadorExterno: (pagador: Omit<PagadorExterno, 'id' | 'creado_at'>) => PagadorExterno;
+  eliminarPagadorExterno: (id: string) => void;
 
   // Transferencias en Revision
   pagosEnRevision: PagoEnRevision[];
@@ -249,6 +258,57 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   });
+  const [pagadoresExternos, setPagadoresExternos] = useState<PagadorExterno[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_pagadores_externos');
+      return stored ? JSON.parse(stored) : INITIAL_PAGADORES_EXTERNOS;
+    } catch { return INITIAL_PAGADORES_EXTERNOS; }
+  });
+
+  const registrarPagadorExterno = (data: Omit<PagadorExterno, 'id' | 'creado_at'>): PagadorExterno => {
+    const id = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const nuevo: PagadorExterno = {
+      ...data,
+      id,
+      creado_at: new Date().toISOString()
+    };
+    const updated = [nuevo, ...pagadoresExternos];
+    setPagadoresExternos(updated);
+    localStorage.setItem('gym_pagadores_externos', JSON.stringify(updated));
+
+    if (supabase) {
+      supabase.from('pagadores_externos').insert({
+        id: nuevo.id,
+        nombre: nuevo.nombre,
+        concepto: nuevo.concepto || null,
+        telefono: nuevo.telefono || null,
+        email: nuevo.email || null,
+        creado_at: nuevo.creado_at
+      }).then(({ error }) => {
+        if (error) console.warn('[Supabase] pagadores_externos insert info:', error.message);
+      });
+    }
+
+    addToast('add', `Pagador "${nuevo.nombre}" guardado.`);
+    return nuevo;
+  };
+
+  const eliminarPagadorExterno = (id: string) => {
+    const target = pagadoresExternos.find(p => p.id === id);
+    const updated = pagadoresExternos.filter(p => p.id !== id);
+    setPagadoresExternos(updated);
+    localStorage.setItem('gym_pagadores_externos', JSON.stringify(updated));
+
+    if (supabase) {
+      supabase.from('pagadores_externos').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('[Supabase] pagadores_externos delete info:', error.message);
+      });
+    }
+
+    if (target) {
+      addToast('delete', `Pagador "${target.nombre}" eliminado.`);
+    }
+  };
   const [recuperos, setRecuperos] = useState<RecuperoTurno[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [novedades, setNovedades] = useState<Novedad[]>([]);
@@ -400,6 +460,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .order('creado_at', { ascending: false });
       if (pagosErr) throw pagosErr;
 
+      // 5.b Fetch Pagadores Externos (alquileres, masajistas, etc.)
+      let pagadoresExternosDb: any[] = [];
+      try {
+        const { data: peDb } = await supabase.from('pagadores_externos').select('*');
+        if (peDb && peDb.length > 0) {
+          pagadoresExternosDb = peDb;
+          setPagadoresExternos(peDb);
+          localStorage.setItem('gym_pagadores_externos', JSON.stringify(peDb));
+        }
+      } catch (err) {
+        // Ignorar si la tabla aún no se ha creado
+      }
+
       // 6. Fetch Recuperos
       const { data: recuperosDb, error: recsErr } = await supabase.from('recupero_turnos').select('*');
       if (recsErr) throw recsErr;
@@ -535,10 +608,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const mappedPagos: Pago[] = (pagosDb || []).map(p => {
         const c = clientList.find(cl => cl.id === p.cliente_id);
+        const pagadorExt = (pagadoresExternosDb.length > 0 ? pagadoresExternosDb : pagadoresExternos).find((pe: any) => pe.id === p.cliente_id);
+        const isExt = p.es_externo || (p.cliente_id ? p.cliente_id.startsWith('ext-') : true) || !c;
+        const nombreCompleto = c 
+          ? `${c.nombre} ${c.apellido}` 
+          : (p.cliente_nombre_completo || pagadorExt?.nombre || 'Pagador Externo');
+
         return {
           id: p.id,
-          cliente_id: p.cliente_id,
-          cliente_nombre_completo: c ? `${c.nombre} ${c.apellido}` : 'Socio Desconocido',
+          cliente_id: p.cliente_id || (pagadorExt ? pagadorExt.id : 'ext-general'),
+          cliente_nombre_completo: nombreCompleto,
           monto: Number(p.monto),
           medio_pago: p.medio_pago as MedioPago,
           mes_correspondiente: p.mes_correspondiente,
@@ -546,7 +625,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           destino_transferencia: p.destino_transferencia || undefined,
           registrado_por: p.registrado_por || 'admin@gimnasio.com.ar',
           fecha_pago: p.fecha_pago,
-          creado_at: p.creado_at
+          creado_at: p.creado_at,
+          es_externo: isExt,
+          concepto: p.concepto || pagadorExt?.concepto || undefined
         };
       });
 
@@ -866,6 +947,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const localGastos = localStorage.getItem('gym_gastos');
       const localProfesores = localStorage.getItem('gym_profesores');
       const localNovedadesProfesores = localStorage.getItem('gym_novedades_profesores');
+      const localPagadores = localStorage.getItem('gym_pagadores_externos');
+
+      if (localPagadores) {
+        try {
+          setPagadoresExternos(JSON.parse(localPagadores));
+        } catch {
+          setPagadoresExternos(INITIAL_PAGADORES_EXTERNOS);
+        }
+      } else {
+        setPagadoresExternos(INITIAL_PAGADORES_EXTERNOS);
+        localStorage.setItem('gym_pagadores_externos', JSON.stringify(INITIAL_PAGADORES_EXTERNOS));
+      }
 
       let planesActivos = INITIAL_PLANES;
       if (localPlanes) {
@@ -4173,13 +4266,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // CLIENT PAGOS OPERATIONS
   const registrarPago = (pagoData: Omit<Pago, 'id' | 'creado_at' | 'fecha_pago'>, userEmail: string) => {
-    const cli = clientes.find(c => c.id === pagoData.cliente_id);
-    if (!cli) return { success: false, message: 'Cliente no encontrado.' };
+    const isExterno = Boolean(pagoData.es_externo || (pagoData.cliente_id && pagoData.cliente_id.startsWith('ext-')));
+    const cli = isExterno ? null : clientes.find(c => c.id === pagoData.cliente_id);
+    if (!cli && !isExterno) return { success: false, message: 'Cliente no encontrado.' };
+
+    const pagadorExt = isExterno ? pagadoresExternos.find(pe => pe.id === pagoData.cliente_id) : null;
+    const nombreCompleto = isExterno
+      ? (pagoData.cliente_nombre_completo || pagadorExt?.nombre || 'Pagador Externo')
+      : `${cli!.nombre} ${cli!.apellido}`;
 
     let cleanHash = pagoData.hash_transaccion?.trim() || `TXN-${Date.now()}`;
     
     // Prevención de duplicados por hash:
-    // Solo bloqueamos si es exactamente el MISMO cliente, para el MISMO mes y con el MISMO hash
+    // Solo bloqueamos si es exactamente el MISMO cliente/pagador, para el MISMO mes y con el MISMO hash
     if (pagoData.hash_transaccion) {
       const cleanInputHash = pagoData.hash_transaccion.trim();
       const duplicadoMismoClienteYMes = pagos.some(
@@ -4188,7 +4287,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              p.mes_correspondiente === pagoData.mes_correspondiente
       );
       if (duplicadoMismoClienteYMes) {
-        return { success: false, message: 'Este pago ya se encuentra registrado para este socio y mes (Detección de duplicado).' };
+        return { success: false, message: 'Este pago ya se encuentra registrado para este pagador y mes (Detección de duplicado).' };
       }
     }
 
@@ -4208,201 +4307,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nuevoPago: Pago = {
       ...pagoData,
       id: pagoId,
+      cliente_nombre_completo: nombreCompleto,
+      es_externo: isExterno,
+      concepto: pagoData.concepto || pagadorExt?.concepto || undefined,
       fecha_pago: now,
       hash_transaccion: cleanHash,
       creado_at: now
     };
 
-    // Actualizar ficha del cliente (bajar deudas e indicar mes pagado)
-    const updatedClientes = clientes.map(c => {
-      if (c.id === pagoData.cliente_id) {
-        const nuevaDeuda = Math.max(0, c.deuda_acumulada - pagoData.monto);
-        let ultimoMes = c.ultimo_mes_pagado;
-        if (!ultimoMes || pagoData.mes_correspondiente > ultimoMes) {
-          ultimoMes = pagoData.mes_correspondiente;
-        }
-        let nuevoEstado = c.estado;
-        if (nuevaDeuda === 0) {
-          nuevoEstado = 'ACTIVO';
-        } else if (nuevoEstado === 'MOROSO' && nuevaDeuda > 0) {
-          nuevoEstado = 'CON_DEUDA';
-        }
-        return {
-          ...c,
-          activo: nuevaDeuda === 0 ? true : c.activo,
-          deuda_acumulada: nuevaDeuda,
-          ultimo_mes_pagado: ultimoMes,
-          estado: nuevoEstado as EstadoCliente
-        };
-      }
-      return c;
-    });
-
-    const updatedPagos = [nuevoPago, ...pagos];
-
-    saveState(updatedClientes, planes, historialPrecios, turnos, updatedPagos, recuperos, auditLogs);
-
-    if (supabase) {
-      // 1. Insertar pago en Supabase
-      // Nota: 'registrado_por' es FK a perfiles_usuario(id) UUID — se omite para evitar error de tipo
-      // ya que solo tenemos el email del operador, no su UUID de perfil.
-      const pagoInsertPayload: any = {
-        id: pagoId,
-        cliente_id: nuevoPago.cliente_id,
-        monto: nuevoPago.monto,
-        medio_pago: nuevoPago.medio_pago,
-        mes_correspondiente: nuevoPago.mes_correspondiente,
-        hash_transaccion: cleanHash,
-        destino_transferencia: nuevoPago.destino_transferencia || null,
-        fecha_pago: now,
-        creado_at: now
-      };
-
-      supabase.from('pagos').insert(pagoInsertPayload).then(({ error }) => {
-        if (error) {
-          console.error('[Supabase] Error al insertar pago:', error.message, error.details, error.hint);
-          // Si el error es por columna inexistente (42703), reintentar sin destino_transferencia
-          if (error.code === '42703' || error.message?.includes('destino_transferencia')) {
-            const safePayload = { ...pagoInsertPayload };
-            delete safePayload.destino_transferencia;
-            supabase.from('pagos').insert(safePayload);
-          }
-        } else {
-          console.log('[Supabase] Pago guardado correctamente:', pagoId);
-        }
-      });
-
-      // 2. Actualizar deuda y estado del cliente en Supabase
-      const targetClient = updatedClientes.find(c => c.id === pagoData.cliente_id);
-      if (targetClient) {
-        supabase.from('clientes').update({
-          activo: targetClient.activo,
-          deuda_acumulada: targetClient.deuda_acumulada,
-          ultimo_mes_pagado: targetClient.ultimo_mes_pagado,
-          estado: targetClient.estado
-        }).eq('id', pagoData.cliente_id).then(({ error }) => {
-          if (error) console.error('[Supabase] Error al actualizar deuda del cliente:', error.message);
-        });
-      }
-    }
-
-    addAuditLog('PAGO_REGISTRADO', { 
-      cliente: cli.nombre + ' ' + cli.apellido, 
-      monto: pagoData.monto, 
-      mes: pagoData.mes_correspondiente, 
-      medio: pagoData.medio_pago,
-      registrado_por: userEmail
-    }, userEmail);
-
-    addNotificacion(
-      'PAGO_REALIZADO',
-      'Pago Confirmado 💰',
-      `El socio ${cli.nombre} ${cli.apellido} abonó $${pagoData.monto.toLocaleString('es-AR')} ARS por el mes de ${pagoData.mes_correspondiente} (${pagoData.medio_pago === 'MERCADO_PAGO' ? 'Mercado Pago' : pagoData.medio_pago}).`
-    );
-
-    // ── Novedad privada de agradecimiento para el socio ──────────────────────
-    // Solo aparece en la cartelera del socio que pagó (gracias al campo socio_id)
-    // Si el socio ya tiene este mensaje de agradecimiento vigente, no duplicar ("que no aparezca nada porque ya pagó")
-    const yaTieneMensajeGracias = novedades.some(n => 
-      n.socio_id === cli.id && n.titulo.includes('Gracias por tu pago')
-    );
-
-    if (!yaTieneMensajeGracias) {
-      const GRACIAS_PAGO = `Ya lo registramos y tus turnos fijos se renovaron correctamente 🙌\n\nRecordá que, si algún día vas a ausentarte, podés avisarlo directamente desde la app. De esta manera liberamos ese lugar para que otra persona pueda aprovecharlo y facilitamos la organización de recuperaciones para todos.\n\nEntre todos hacemos que KAHA funcione cada vez mejor 🤝💚`;
-      addNovedad({
-        titulo: '💚 ¡Gracias por tu pago!',
-        contenido: GRACIAS_PAGO,
-        categoria: 'INFORMACION',
-        destacado: false,
-        creado_por: 'KAHA GYM',
-        socio_id: cli.id
-      });
-    }
-
-    addToast('add', 'Pago registrado exitosamente.');
-
-    return { success: true, message: 'Pago registrado exitosamente. Comprobante de cobertura generado.' };
-  };
-
-  // CLIENT PAGOS OPERATIONS - MULTIPLES (Lote / Batch / Cuotas múltiples)
-  const registrarPagosMultiples = (
-    pagosList: Array<{
-      cliente_id: string;
-      monto: number;
-      medio_pago: MedioPago;
-      mes_correspondiente: string;
-      hash_transaccion?: string;
-      destino_transferencia?: 'JUANCHI' | 'RULO' | 'EFECTIVO';
-      registrado_por?: string;
-      fecha_pago?: string;
-    }>,
-    userEmail: string = 'operator@gimnasio.com.ar'
-  ): { success: boolean; message: string; generatedPagos: Pago[] } => {
-    if (!pagosList || pagosList.length === 0) {
-      return { success: false, message: 'No hay pagos para registrar.', generatedPagos: [] };
-    }
-
-    // Validación preliminar de todos los ítems
-    for (const p of pagosList) {
-      const cli = clientes.find(c => c.id === p.cliente_id);
-      if (!cli) {
-        return { success: false, message: `Socio no encontrado para uno de los cobros.`, generatedPagos: [] };
-      }
-      if (isNaN(p.monto) || p.monto <= 0) {
-        return { success: false, message: `El monto para ${cli.nombre} ${cli.apellido} debe ser mayor a 0 pesos.`, generatedPagos: [] };
-      }
-      if (!p.mes_correspondiente) {
-        return { success: false, message: `Falta mes correspondiente para ${cli.nombre} ${cli.apellido}.`, generatedPagos: [] };
-      }
-    }
-
-    const now = new Date().toISOString();
-    const nuevosPagos: Pago[] = [];
-    const baseHash = (pagosList[0]?.hash_transaccion?.trim()) || `MP-${Date.now()}`;
-
-    // Copia de trabajo para acumular secuencialmente las reducciones de deuda y últimos meses
-    let currentClientes = [...clientes];
-
-    pagosList.forEach((pagoItem, idx) => {
-      const pagoId = typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `pay-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 9)}`;
-
-      // Asignar hash único a cada registro para evitar colisión de la restricción UNIQUE de Supabase
-      let itemHash = pagosList.length > 1
-        ? `${baseHash}#${idx + 1}`
-        : baseHash;
-
-      // Si colisiona con algún pago preexistente en la base
-      if (pagos.some(p => p.hash_transaccion === itemHash)) {
-        itemHash = `${itemHash}_${pagoId.slice(0, 4)}`;
-      }
-
-      const cli = currentClientes.find(c => c.id === pagoItem.cliente_id);
-
-      const nuevoPago: Pago = {
-        id: pagoId,
-        cliente_id: pagoItem.cliente_id,
-        cliente_nombre_completo: cli ? `${cli.nombre} ${cli.apellido}` : '',
-        monto: pagoItem.monto,
-        medio_pago: pagoItem.medio_pago,
-        mes_correspondiente: pagoItem.mes_correspondiente,
-        hash_transaccion: itemHash,
-        destino_transferencia: pagoItem.destino_transferencia || 'RULO',
-        registrado_por: userEmail,
-        fecha_pago: pagoItem.fecha_pago || now,
-        creado_at: now
-      };
-
-      nuevosPagos.push(nuevoPago);
-
-      // Reducción acumulativa de la deuda del cliente
-      currentClientes = currentClientes.map(c => {
-        if (c.id === pagoItem.cliente_id) {
-          const nuevaDeuda = Math.max(0, c.deuda_acumulada - pagoItem.monto);
+    // Actualizar ficha del cliente (solo si es un socio del gimnasio)
+    let updatedClientes = clientes;
+    if (cli) {
+      updatedClientes = clientes.map(c => {
+        if (c.id === pagoData.cliente_id) {
+          const nuevaDeuda = Math.max(0, c.deuda_acumulada - pagoData.monto);
           let ultimoMes = c.ultimo_mes_pagado;
-          if (!ultimoMes || pagoItem.mes_correspondiente > ultimoMes) {
-            ultimoMes = pagoItem.mes_correspondiente;
+          if (!ultimoMes || pagoData.mes_correspondiente > ultimoMes) {
+            ultimoMes = pagoData.mes_correspondiente;
           }
           let nuevoEstado = c.estado;
           if (nuevaDeuda === 0) {
@@ -4420,6 +4341,222 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return c;
       });
+    }
+
+    const updatedPagos = [nuevoPago, ...pagos];
+
+    saveState(updatedClientes, planes, historialPrecios, turnos, updatedPagos, recuperos, auditLogs);
+
+    if (supabase) {
+      // 1. Insertar pago en Supabase
+      const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const dbClienteId = (isExterno || !isUuid(nuevoPago.cliente_id)) ? null : nuevoPago.cliente_id;
+
+      const pagoInsertPayload: any = {
+        id: pagoId,
+        cliente_id: dbClienteId,
+        monto: nuevoPago.monto,
+        medio_pago: nuevoPago.medio_pago,
+        mes_correspondiente: nuevoPago.mes_correspondiente,
+        hash_transaccion: cleanHash,
+        destino_transferencia: nuevoPago.destino_transferencia || null,
+        fecha_pago: now,
+        creado_at: now
+      };
+      if (nuevoPago.es_externo) pagoInsertPayload.es_externo = true;
+      if (nuevoPago.concepto) pagoInsertPayload.concepto = nuevoPago.concepto;
+      if (nuevoPago.cliente_nombre_completo) pagoInsertPayload.cliente_nombre_completo = nuevoPago.cliente_nombre_completo;
+
+      supabase.from('pagos').insert(pagoInsertPayload).then(({ error }) => {
+        if (error) {
+          console.error('[Supabase] Error al insertar pago:', error.message, error.details, error.hint);
+          // Reintento seguro con payload estándar
+          const safePayload = {
+            id: pagoId,
+            cliente_id: dbClienteId,
+            monto: nuevoPago.monto,
+            medio_pago: nuevoPago.medio_pago,
+            mes_correspondiente: nuevoPago.mes_correspondiente,
+            hash_transaccion: cleanHash,
+            fecha_pago: now,
+            creado_at: now
+          };
+          supabase.from('pagos').insert(safePayload);
+        } else {
+          console.log('[Supabase] Pago guardado correctamente:', pagoId);
+        }
+      });
+
+      // 2. Actualizar deuda y estado del cliente en Supabase si es socio
+      if (cli) {
+        const targetClient = updatedClientes.find(c => c.id === pagoData.cliente_id);
+        if (targetClient) {
+          supabase.from('clientes').update({
+            activo: targetClient.activo,
+            deuda_acumulada: targetClient.deuda_acumulada,
+            ultimo_mes_pagado: targetClient.ultimo_mes_pagado,
+            estado: targetClient.estado
+          }).eq('id', pagoData.cliente_id).then(({ error }) => {
+            if (error) console.error('[Supabase] Error al actualizar deuda del cliente:', error.message);
+          });
+        }
+      }
+    }
+
+    addAuditLog('PAGO_REGISTRADO', { 
+      cliente: nombreCompleto + (isExterno ? ' [EXTERNO]' : ''), 
+      monto: pagoData.monto, 
+      mes: pagoData.mes_correspondiente, 
+      medio: pagoData.medio_pago,
+      registrado_por: userEmail
+    }, userEmail);
+
+    addNotificacion(
+      'PAGO_REALIZADO',
+      isExterno ? 'Ingreso Externo Confirmado 🏢' : 'Pago Confirmado 💰',
+      isExterno
+        ? `Se registró un cobro de $${pagoData.monto.toLocaleString('es-AR')} ARS a ${nombreCompleto} (${nuevoPago.concepto || 'Ingreso externo'}).`
+        : `El socio ${cli!.nombre} ${cli!.apellido} abonó $${pagoData.monto.toLocaleString('es-AR')} ARS por el mes de ${pagoData.mes_correspondiente} (${pagoData.medio_pago === 'MERCADO_PAGO' ? 'Mercado Pago' : pagoData.medio_pago}).`
+    );
+
+    // ── Novedad privada de agradecimiento solo para socios del gimnasio ───────────────
+    if (cli) {
+      const yaTieneMensajeGracias = novedades.some(n => 
+        n.socio_id === cli.id && n.titulo.includes('Gracias por tu pago')
+      );
+
+      if (!yaTieneMensajeGracias) {
+        const GRACIAS_PAGO = `Ya lo registramos y tus turnos fijos se renovaron correctamente 🙌\n\nRecordá que, si algún día vas a ausentarte, podés avisarlo directamente desde la app. De esta manera liberamos ese lugar para que otra persona pueda aprovecharlo y facilitamos la organización de recuperaciones para todos.\n\nEntre todos hacemos que KAHA funcione cada vez mejor 🤝💚`;
+        addNovedad({
+          titulo: '💚 ¡Gracias por tu pago!',
+          contenido: GRACIAS_PAGO,
+          categoria: 'INFORMACION',
+          destacado: false,
+          creado_por: 'KAHA GYM',
+          socio_id: cli.id
+        });
+      }
+    }
+
+    addToast('add', isExterno ? 'Ingreso externo registrado exitosamente.' : 'Pago registrado exitosamente.');
+
+    return { 
+      success: true, 
+      message: isExterno ? 'Ingreso externo registrado exitosamente.' : 'Pago registrado exitosamente. Comprobante de cobertura generado.' 
+    };
+  };
+
+  // CLIENT PAGOS OPERATIONS - MULTIPLES (Lote / Batch / Cuotas múltiples)
+  const registrarPagosMultiples = (
+    pagosList: Array<{
+      cliente_id: string;
+      monto: number;
+      medio_pago: MedioPago;
+      mes_correspondiente: string;
+      hash_transaccion?: string;
+      destino_transferencia?: 'JUANCHI' | 'RULO' | 'EFECTIVO';
+      registrado_por?: string;
+      fecha_pago?: string;
+      es_externo?: boolean;
+      concepto?: string;
+      cliente_nombre_completo?: string;
+    }>,
+    userEmail: string = 'operator@gimnasio.com.ar'
+  ): { success: boolean; message: string; generatedPagos: Pago[] } => {
+    if (!pagosList || pagosList.length === 0) {
+      return { success: false, message: 'No hay pagos para registrar.', generatedPagos: [] };
+    }
+
+    // Validación preliminar de todos los ítems
+    for (const p of pagosList) {
+      const isExt = Boolean(p.es_externo || (p.cliente_id && p.cliente_id.startsWith('ext-')));
+      const cli = isExt ? null : clientes.find(c => c.id === p.cliente_id);
+      const pagadorExt = isExt ? pagadoresExternos.find(pe => pe.id === p.cliente_id) : null;
+      if (!cli && !isExt) {
+        return { success: false, message: `Socio no encontrado para uno de los cobros.`, generatedPagos: [] };
+      }
+      const titular = isExt ? (p.cliente_nombre_completo || pagadorExt?.nombre || 'Pagador Externo') : `${cli!.nombre} ${cli!.apellido}`;
+      if (isNaN(p.monto) || p.monto <= 0) {
+        return { success: false, message: `El monto para ${titular} debe ser mayor a 0 pesos.`, generatedPagos: [] };
+      }
+      if (!p.mes_correspondiente) {
+        return { success: false, message: `Falta mes correspondiente para ${titular}.`, generatedPagos: [] };
+      }
+    }
+
+    const now = new Date().toISOString();
+    const nuevosPagos: Pago[] = [];
+    const baseHash = (pagosList[0]?.hash_transaccion?.trim()) || `MP-${Date.now()}`;
+
+    // Copia de trabajo para acumular secuencialmente las reducciones de deuda
+    let currentClientes = [...clientes];
+
+    pagosList.forEach((pagoItem, idx) => {
+      const pagoId = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `pay-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 9)}`;
+
+      // Asignar hash único a cada registro para evitar colisión de la restricción UNIQUE de Supabase
+      let itemHash = pagosList.length > 1
+        ? `${baseHash}#${idx + 1}`
+        : baseHash;
+
+      // Si colisiona con algún pago preexistente en la base
+      if (pagos.some(p => p.hash_transaccion === itemHash)) {
+        itemHash = `${itemHash}_${pagoId.slice(0, 4)}`;
+      }
+
+      const isExt = Boolean(pagoItem.es_externo || (pagoItem.cliente_id && pagoItem.cliente_id.startsWith('ext-')));
+      const cli = isExt ? null : currentClientes.find(c => c.id === pagoItem.cliente_id);
+      const pagadorExt = isExt ? pagadoresExternos.find(pe => pe.id === pagoItem.cliente_id) : null;
+      const nombreCompleto = isExt 
+        ? (pagoItem.cliente_nombre_completo || pagadorExt?.nombre || 'Pagador Externo')
+        : (cli ? `${cli.nombre} ${cli.apellido}` : '');
+
+      const nuevoPago: Pago = {
+        id: pagoId,
+        cliente_id: pagoItem.cliente_id,
+        cliente_nombre_completo: nombreCompleto,
+        monto: pagoItem.monto,
+        medio_pago: pagoItem.medio_pago,
+        mes_correspondiente: pagoItem.mes_correspondiente,
+        hash_transaccion: itemHash,
+        destino_transferencia: pagoItem.destino_transferencia || 'RULO',
+        registrado_por: userEmail,
+        fecha_pago: pagoItem.fecha_pago || now,
+        creado_at: now,
+        es_externo: isExt,
+        concepto: pagoItem.concepto || pagadorExt?.concepto || undefined
+      };
+
+      nuevosPagos.push(nuevoPago);
+
+      // Reducción acumulativa de la deuda del cliente (solo socios de KAHA)
+      if (cli) {
+        currentClientes = currentClientes.map(c => {
+          if (c.id === pagoItem.cliente_id) {
+            const nuevaDeuda = Math.max(0, c.deuda_acumulada - pagoItem.monto);
+            let ultimoMes = c.ultimo_mes_pagado;
+            if (!ultimoMes || pagoItem.mes_correspondiente > ultimoMes) {
+              ultimoMes = pagoItem.mes_correspondiente;
+            }
+            let nuevoEstado = c.estado;
+            if (nuevaDeuda === 0) {
+              nuevoEstado = 'ACTIVO';
+            } else if (nuevoEstado === 'MOROSO' && nuevaDeuda > 0) {
+              nuevoEstado = 'CON_DEUDA';
+            }
+            return {
+              ...c,
+              activo: nuevaDeuda === 0 ? true : c.activo,
+              deuda_acumulada: nuevaDeuda,
+              ultimo_mes_pagado: ultimoMes,
+              estado: nuevoEstado as EstadoCliente
+            };
+          }
+          return c;
+        });
+      }
     });
 
     const updatedPagos = [...nuevosPagos, ...pagos];
@@ -4429,9 +4566,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Sincronización con Supabase en lote
     if (supabase) {
+      const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       const payloads = nuevosPagos.map(np => ({
         id: np.id,
-        cliente_id: np.cliente_id,
+        cliente_id: (np.es_externo || !isUuid(np.cliente_id)) ? null : np.cliente_id,
         monto: np.monto,
         medio_pago: np.medio_pago,
         mes_correspondiente: np.mes_correspondiente,
@@ -4458,8 +4596,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
 
-      // Actualizar en Supabase los clientes afectados
-      const uniqueClientIds = Array.from(new Set(pagosList.map(p => p.cliente_id)));
+      // Actualizar en Supabase solo los socios reales
+      const isUuidCheck = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const uniqueClientIds = Array.from(new Set(pagosList.map(p => p.cliente_id))).filter(id => !id.startsWith('ext-') && isUuidCheck(id));
       uniqueClientIds.forEach(cId => {
         const clientActualizado = currentClientes.find(c => c.id === cId);
         if (clientActualizado) {
@@ -4503,44 +4642,63 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ACTUALIZAR PAGO EXISTENTE (MONTO, CLIENTE, MES, MEDIO, DESTINO, ETC)
   const actualizarPago = (
     pagoId: string,
-    updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia' | 'fecha_pago'>>,
+    updates: Partial<Pick<Pago, 'cliente_id' | 'monto' | 'medio_pago' | 'mes_correspondiente' | 'hash_transaccion' | 'destino_transferencia' | 'fecha_pago' | 'concepto' | 'cliente_nombre_completo' | 'es_externo'>>,
     userEmail: string = 'admin@gimnasio.com.ar'
   ) => {
     const prevPago = pagos.find(p => p.id === pagoId);
     if (!prevPago) return { success: false, message: 'Pago no encontrado.' };
 
-    let clienteNombre = prevPago.cliente_nombre_completo;
+    let clienteNombre = updates.cliente_nombre_completo || prevPago.cliente_nombre_completo;
+    let isExt = updates.es_externo ?? prevPago.es_externo;
+
     if (updates.cliente_id) {
-      const cli = clientes.find(c => c.id === updates.cliente_id);
-      if (cli) {
-        clienteNombre = `${cli.nombre} ${cli.apellido}`;
+      if (updates.cliente_id.startsWith('ext-')) {
+        isExt = true;
+        const pe = pagadoresExternos.find(x => x.id === updates.cliente_id);
+        if (pe) clienteNombre = pe.nombre;
+      } else {
+        const cli = clientes.find(c => c.id === updates.cliente_id);
+        if (cli) {
+          clienteNombre = `${cli.nombre} ${cli.apellido}`;
+          isExt = false;
+        }
       }
     }
 
     const updatedPagos = pagos.map(p =>
-      p.id === pagoId ? { ...p, ...updates, cliente_nombre_completo: clienteNombre } : p
+      p.id === pagoId ? { 
+        ...p, 
+        ...updates, 
+        cliente_nombre_completo: clienteNombre,
+        es_externo: isExt
+      } : p
     );
     setPagos(updatedPagos);
     localStorage.setItem('gym_pagos', JSON.stringify(updatedPagos));
 
     if (supabase) {
+      const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       const payload: any = {};
-      if (updates.cliente_id !== undefined) payload.cliente_id = updates.cliente_id;
+      if (updates.cliente_id !== undefined) payload.cliente_id = (!isExt && isUuid(updates.cliente_id)) ? updates.cliente_id : null;
       if (updates.monto !== undefined) payload.monto = updates.monto;
       if (updates.medio_pago !== undefined) payload.medio_pago = updates.medio_pago;
       if (updates.mes_correspondiente !== undefined) payload.mes_correspondiente = updates.mes_correspondiente;
       if (updates.hash_transaccion !== undefined) payload.hash_transaccion = updates.hash_transaccion;
       if (updates.destino_transferencia !== undefined) payload.destino_transferencia = updates.destino_transferencia;
       if (updates.fecha_pago !== undefined) payload.fecha_pago = updates.fecha_pago;
+      if (updates.concepto !== undefined) payload.concepto = updates.concepto;
+      if (clienteNombre !== undefined) payload.cliente_nombre_completo = clienteNombre;
+      if (isExt !== undefined) payload.es_externo = isExt;
 
       supabase.from('pagos').update(payload).eq('id', pagoId).then(({ error }) => {
         if (error) {
           console.error('[Supabase] Error al actualizar pago:', error.message);
-          if (error.code === '42703' || error.message?.includes('destino_transferencia')) {
-            const safe = { ...payload };
-            delete safe.destino_transferencia;
-            supabase.from('pagos').update(safe).eq('id', pagoId);
-          }
+          const safe = { ...payload };
+          delete safe.destino_transferencia;
+          delete safe.es_externo;
+          delete safe.concepto;
+          delete safe.cliente_nombre_completo;
+          supabase.from('pagos').update(safe).eq('id', pagoId);
         }
       });
     }
@@ -5390,6 +5548,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarProfesorTurno, registrarVacaciones,
       crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
       registrarPago, registrarPagosMultiples, actualizarPago, actualizarDestinoPago, eliminarPago, importarPagosCSV,
+      pagadoresExternos, registrarPagadorExterno, eliminarPagadorExterno,
       pagosEnRevision,
       solicitarPagoTransferencia,
       aprobarPagoTransferencia,

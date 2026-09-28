@@ -89,7 +89,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
           <input
             type="text"
-            placeholder="Buscar por nombre del alumno..."
+            placeholder="Buscar por nombre de alumno o pagador externo..."
             value={buscarCliente}
             onChange={e => setBuscarCliente(e.target.value)}
             className="pl-9 pr-4 py-2 w-full border border-zinc-200 rounded-lg text-xs font-sans outline-hidden focus:border-zinc-400 font-medium"
@@ -146,7 +146,7 @@ export const PagosTable: React.FC<PagosTableProps> = ({
           <table className="w-full text-left text-xs font-sans">
             <thead>
               <tr className="bg-zinc-50 text-zinc-500 font-semibold border-b border-zinc-200 uppercase tracking-wider text-[10px]">
-                <th className="p-4">Socio</th>
+                <th className="p-4">Socio / Pagador</th>
                 <th className="p-4">Abono</th>
                 <th className="p-4">Medio / Destino</th>
                 <th className="p-4">Mes Cubierto</th>
@@ -162,12 +162,30 @@ export const PagosTable: React.FC<PagosTableProps> = ({
                 pagosFiltrados.map(p => {
                   const cl = clientes.find(c => c.id === p.cliente_id);
                   const planSocio = cl ? planes.find(x => x.id === cl.plan_id) : null;
+                  const isExt = p.es_externo || (p.cliente_id && p.cliente_id.startsWith('ext-')) || !cl;
                   return (
                     <tr key={p.id} className="hover:bg-zinc-50/50">
-                      <td className="p-4 font-semibold text-zinc-950">{cl ? `${cl.apellido}, ${cl.nombre}` : p.cliente_nombre_completo}</td>
+                      <td className="p-4 font-semibold text-zinc-950">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{cl ? `${cl.apellido}, ${cl.nombre}` : (p.cliente_nombre_completo || 'Pagador Externo')}</span>
+                          {isExt && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                              🏢 Externo
+                            </span>
+                          )}
+                        </div>
+                        {p.concepto && (
+                          <div className="text-[10px] text-zinc-500 font-medium italic mt-0.5">
+                            {p.concepto}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-4">
                         <div className="font-mono font-bold text-emerald-600">${p.monto.toLocaleString('es-AR')}</div>
                         {planSocio && <div className="text-[10px] text-zinc-400">{planSocio.nombre}</div>}
+                        {!planSocio && isExt && (
+                          <div className="text-[10px] text-blue-600 font-medium">{p.concepto || 'Alquiler / Externo'}</div>
+                        )}
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-1.5 items-start">
