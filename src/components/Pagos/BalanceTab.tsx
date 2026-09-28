@@ -4,9 +4,13 @@ import { useGym } from '../../GymContext';
 import { 
   DollarSign, TrendingUp, TrendingDown, Scale, ArrowRight, 
   Share2, Check, Eye, EyeOff, Calendar, AlertCircle, 
-  Users, Wallet, PieChart, ShieldCheck, HelpCircle
+  Users, Wallet, PieChart, ShieldCheck, HelpCircle, Sparkles
 } from 'lucide-react';
-import { calcularBalanceMes, generarMensajeWhatsAppBalance } from '../../lib/balanceFinanciero';
+import { 
+  calcularBalanceMes, 
+  generarMensajeWhatsAppBalance,
+  generarInformeAnalisisIA 
+} from '../../lib/balanceFinanciero';
 
 interface BalanceTabProps {
   mostrarBalance: boolean;
@@ -60,6 +64,7 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
 
   const [porcentajeJuanchi, setPorcentajeJuanchi] = useState<number>(50);
   const [copiado, setCopiado] = useState(false);
+  const [copiadoIA, setCopiadoIA] = useState(false);
 
   // Nombre legible del mes seleccionado
   const nombreMesSeleccionado = useMemo(() => {
@@ -118,6 +123,27 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
     setTimeout(() => setCopiado(false), 2500);
   };
 
+  const handleCopiarIA = () => {
+    const pagosMes = (pagos || []).filter(p => p.mes_correspondiente === mesSeleccionado);
+    const gastosMes = (gastos || []).filter(g => (g.fecha || '').startsWith(mesSeleccionado));
+    const totalSociosActivos = (clientes || []).filter(c => c.activo).length;
+
+    const texto = generarInformeAnalisisIA({
+      balance,
+      nombreMes: nombreMesSeleccionado,
+      pagosMes,
+      gastosMes,
+      totalSociosActivos,
+      comparativaMesAnterior: balanceMesAnterior ? {
+        variacionGanancia,
+        variacionPorcentual
+      } : undefined
+    });
+    navigator.clipboard.writeText(texto);
+    setCopiadoIA(true);
+    setTimeout(() => setCopiadoIA(false), 2500);
+  };
+
   const fmt = (monto: number) => {
     if (!mostrarBalance) return '$ •••••••';
     return `$${Math.round(monto).toLocaleString('es-AR')}`;
@@ -164,19 +190,36 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
           </button>
         </div>
 
-        {/* BOTÓN COPIAR RESUMEN PARA WHATSAPP */}
-        <button
-          onClick={handleCopiarWhatsApp}
-          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border ${
-            copiado 
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-200' 
-              : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
-          }`}
-          title="Copia al portapapeles un resumen formateado para compartir con los socios en WhatsApp"
-        >
-          {copiado ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4 text-emerald-700" />}
-          <span>{copiado ? '¡Copiado para WhatsApp!' : 'Copiar Resumen para WhatsApp'}</span>
-        </button>
+        {/* BOTONES DE EXPORTACIÓN Y COPIADO */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* BOTÓN COPIAR RESUMEN PARA WHATSAPP */}
+          <button
+            onClick={handleCopiarWhatsApp}
+            className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border ${
+              copiado 
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-200' 
+                : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+            }`}
+            title="Copia al portapapeles un resumen formateado para compartir con los socios en WhatsApp"
+          >
+            {copiado ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4 text-emerald-700" />}
+            <span>{copiado ? '¡Copiado para WhatsApp!' : 'Copiar para WhatsApp'}</span>
+          </button>
+
+          {/* BOTÓN COPIAR PARA ANÁLISIS IA */}
+          <button
+            onClick={handleCopiarIA}
+            className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border ${
+              copiadoIA 
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200' 
+                : 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100 hover:border-indigo-400'
+            }`}
+            title="Copia al portapapeles un informe financiero y operativo exhaustivo listo para pegar en ChatGPT, Gemini o Claude"
+          >
+            {copiadoIA ? <Check className="w-4 h-4 text-white" /> : <Sparkles className="w-4 h-4 text-indigo-600" />}
+            <span>{copiadoIA ? '¡Copiado para IA!' : 'Copiar Resumen para IA'}</span>
+          </button>
+        </div>
       </div>
 
       {/* FILA 1: KPIs EJECUTIVOS DE GANANCIA Y RESULTADO DE LA EMPRESA */}

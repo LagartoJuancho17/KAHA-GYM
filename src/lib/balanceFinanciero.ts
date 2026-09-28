@@ -361,3 +361,130 @@ ${compensacionEmoji} *COMPENSACIÓN SOCIOS (50/50):*
 🎯 *Ganancia Proyectada al Cierre:* $${balance.gananciaProyectada.toLocaleString('es-AR')}
 📈 *Efectividad Cobranza:* ${balance.porcentajeCobrado}% cobrado`.trim();
 }
+
+export interface OpcionesInformeIA {
+  balance: BalanceMensual;
+  nombreMes: string;
+  pagosMes?: Pago[];
+  gastosMes?: Gasto[];
+  totalSociosActivos?: number;
+  comparativaMesAnterior?: {
+    variacionGanancia: number;
+    variacionPorcentual: number;
+  };
+}
+
+/** Genera un informe financiero y operativo exhaustivo optimizado como prompt para Inteligencia Artificial */
+export function generarInformeAnalisisIA({
+  balance,
+  nombreMes,
+  pagosMes = [],
+  gastosMes = [],
+  totalSociosActivos = 0,
+  comparativaMesAnterior
+}: OpcionesInformeIA): string {
+  // Desglose de ingresos entre alumnos y pagadores externos
+  const pagosExternos = pagosMes.filter(p => p.es_externo || (p.cliente_id && p.cliente_id.startsWith('ext-')));
+  const pagosAlumnos = pagosMes.filter(p => !p.es_externo && (!p.cliente_id || !p.cliente_id.startsWith('ext-')));
+
+  const montoExternos = pagosExternos.reduce((s, p) => s + (p.monto || 0), 0);
+  const montoAlumnos = pagosAlumnos.reduce((s, p) => s + (p.monto || 0), 0);
+
+  // Desglose por medio de pago
+  const montoTransferencia = pagosMes
+    .filter(p => p.medio_pago === 'TRANSFERENCIA')
+    .reduce((s, p) => s + (p.monto || 0), 0);
+  const montoEfectivo = pagosMes
+    .filter(p => p.medio_pago === 'EFECTIVO')
+    .reduce((s, p) => s + (p.monto || 0), 0);
+
+  // Detalle de pagadores externos
+  let detalleExternos = '';
+  if (pagosExternos.length > 0) {
+    detalleExternos = pagosExternos
+      .map(p => `  - ${p.cliente_nombre_completo || 'Tercero'}${p.concepto ? ` (${p.concepto})` : ''}: $${(p.monto || 0).toLocaleString('es-AR')}`)
+      .join('\n');
+  } else {
+    detalleExternos = '  - Sin ingresos externos registrados en el período.';
+  }
+
+  // Top gastos del mes
+  const topGastos = [...gastosMes]
+    .sort((a, b) => (b.monto || 0) - (a.monto || 0))
+    .slice(0, 7)
+    .map(g => `  - [${g.categoria || 'OTROS'}] ${g.concepto}: $${(g.monto || 0).toLocaleString('es-AR')}`)
+    .join('\n');
+
+  // Variación respecto al mes anterior
+  const textoComparativa = comparativaMesAnterior
+    ? `- **Variación vs Mes Anterior:** ${comparativaMesAnterior.variacionGanancia >= 0 ? '+' : ''}$${comparativaMesAnterior.variacionGanancia.toLocaleString('es-AR')} (${comparativaMesAnterior.variacionPorcentual >= 0 ? '+' : ''}${comparativaMesAnterior.variacionPorcentual}% en ganancia)`
+    : '- **Variación vs Mes Anterior:** Sin datos previos para comparar';
+
+  const superavitBreakEven = balance.pagosCount - balance.puntoEquilibrioSocios;
+
+  return `# 📊 INFORME FINANCIERO Y OPERATIVO — KAHA BOX
+**Período:** ${nombreMes} (${balance.mes})
+**Gimnasio / Box:** KAHA BOX (Entrenamiento Funcional, Argentina)
+
+---
+> 🤖 **INSTRUCCIÓN PARA LA IA:**
+> Actuá como un consultor financiero y estratega de negocios senior con amplia experiencia en gimnasios y boxes de entrenamiento funcional en Argentina.
+> Analizá minuciosamente las métricas reales provistas abajo y elaborá:
+> 1. **Diagnóstico Ejecutivo:** Salud de la caja, rentabilidad real y sostenibilidad del negocio.
+> 2. **Detección de Fugas e Ineficiencias:** Gastos desmedidos, riesgos de concentración o fallas en el flujo de cobranzas.
+> 3. **Análisis de Punto de Equilibrio y Precios:** ¿El ticket promedio ($${balance.ticketPromedio.toLocaleString('es-AR')}) cubre la estructura ante la inflación? ¿Es viable aumentar cuotas o sumar más alquileres a profesionales?
+> 4. **Plan Táctico en 3 Pasos:** Las 3 medidas prioritarias que los socios administradores (Juanchi y Rulo) deben ejecutar el próximo mes.
+
+---
+### 1. RESUMEN GENERAL Y RENTABILIDAD
+- **Ingresos Cobrados Totales:** $${balance.totalIngresos.toLocaleString('es-AR')}
+- **Egresos Totales Pagados:** $${balance.totalEgresos.toLocaleString('es-AR')}
+- **Ganancia Neta Real (Caja):** $${balance.gananciaReal.toLocaleString('es-AR')}
+- **Margen Neto Operativo:** ${balance.margenRealPorcentaje}%
+${textoComparativa}
+- **Ticket Promedio por Cuota:** $${balance.ticketPromedio.toLocaleString('es-AR')}
+- **Volumen de Cuotas Cobradas:** ${balance.pagosCount} cuotas
+
+---
+### 2. COMPOSICIÓN DE INGRESOS
+- **Cuotas de Alumnos del Gimnasio:** $${montoAlumnos.toLocaleString('es-AR')} (${pagosAlumnos.length} transacciones)
+- **Ingresos de Pagadores Externos / Alquileres:** $${montoExternos.toLocaleString('es-AR')} (${pagosExternos.length} transacciones)
+*Detalle de ingresos externos:*
+${detalleExternos}
+- **Vía de Cobro:**
+  - Transferencias: $${montoTransferencia.toLocaleString('es-AR')} (${balance.totalIngresos > 0 ? Math.round((montoTransferencia / balance.totalIngresos) * 100) : 0}%)
+  - Efectivo: $${montoEfectivo.toLocaleString('es-AR')} (${balance.totalIngresos > 0 ? Math.round((montoEfectivo / balance.totalIngresos) * 100) : 0}%)
+
+---
+### 3. ESTADO DE CAJAS Y CUENTAS BANCARIAS
+- **Cuenta Juanchi:** Cobró $${balance.cajaJuanchi.ingresos.toLocaleString('es-AR')} | Pagó $${balance.cajaJuanchi.egresos.toLocaleString('es-AR')} | Saldo Neto: $${balance.cajaJuanchi.saldoNeto.toLocaleString('es-AR')}
+- **Cuenta Rulo:** Cobró $${balance.cajaRulo.ingresos.toLocaleString('es-AR')} | Pagó $${balance.cajaRulo.egresos.toLocaleString('es-AR')} | Saldo Neto: $${balance.cajaRulo.saldoNeto.toLocaleString('es-AR')}
+- **Caja Efectivo Local:** Cobró $${balance.cajaEfectivo.ingresos.toLocaleString('es-AR')} | Pagó $${balance.cajaEfectivo.egresos.toLocaleString('es-AR')} | Saldo Neto: $${balance.cajaEfectivo.saldoNeto.toLocaleString('es-AR')}
+- **Compensación entre Socios (50/50):**
+  - Situación: ${balance.compensacion.mensaje}
+  - Detalle: ${balance.compensacion.detalle}
+
+---
+### 4. ESTRUCTURA DE COSTOS Y GASTOS OPERATIVOS
+- **Total de Gastos:** $${balance.totalEgresos.toLocaleString('es-AR')} (${balance.gastosCount} registros)
+- **Distribución por Categorías:**
+${balance.estructuraCostos.map(c => `  - **${c.label}:** $${c.monto.toLocaleString('es-AR')} (${c.porcentaje}% del gasto total)`).join('\n')}
+${topGastos ? `*Mayores Egresos Registrados en el Período:*\n${topGastos}` : ''}
+
+---
+### 5. PUNTO DE EQUILIBRIO (BREAK-EVEN)
+- **Costos Fijos Operativos Base:** $${balance.puntoEquilibrioMonto.toLocaleString('es-AR')} (Alquiler + Servicios + Honorarios docentes)
+- **Cuotas Mínimas Requeridas:** ${balance.puntoEquilibrioSocios} alumnos
+- **Cuotas Cobradas Reales:** ${balance.pagosCount} alumnos
+- **Margen de Seguridad:** ${superavitBreakEven >= 0 ? `+${superavitBreakEven} cuotas sobre el punto de equilibrio (Superávit)` : `${superavitBreakEven} cuotas por debajo del punto de equilibrio (Déficit)`}
+
+---
+### 6. CARTERA DE SOCIOS, MOROSIDAD Y PROYECCIÓN
+${totalSociosActivos > 0 ? `- **Alumnos Activos Registrados:** ${totalSociosActivos}` : ''}
+- **Efectividad de Cobranza:** ${balance.porcentajeCobrado}% cobrado del total facturable
+- **Deuda Pendiente de Cobro:** $${balance.deudaPendienteCobro.toLocaleString('es-AR')}
+- **Alumnos Deudores / Sin Abonar:** ${balance.sociosDeudoresCount} personas
+- **Liquidaciones Docentes Estimadas Pendientes:** $${balance.liquidacionesPendientes.toLocaleString('es-AR')}
+- **Ganancia Neta Proyectada al Cierre:** $${balance.gananciaProyectada.toLocaleString('es-AR')}
+`.trim();
+}

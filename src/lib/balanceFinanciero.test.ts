@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { 
   calcularCompensacionSocios, 
   calcularBalanceMes, 
-  generarMensajeWhatsAppBalance 
+  generarMensajeWhatsAppBalance,
+  generarInformeAnalisisIA 
 } from './balanceFinanciero';
 import { Pago, Gasto, Cliente, Plan, Profesor, Turno, NovedadProfesor } from '../types';
 
@@ -282,7 +283,8 @@ test('Pagos externos (alquiler masajista / terceros) ingresan al balance financi
       fecha_pago: '2026-09-10',
       medio_pago: 'TRANSFERENCIA',
       destino_transferencia: 'JUANCHI',
-      registrado_por: 'admin@kaha.com'
+      registrado_por: 'admin@kaha.com',
+      creado_at: '2026-09-10T12:00:00.000Z'
     }
   ];
 
@@ -302,4 +304,88 @@ test('Pagos externos (alquiler masajista / terceros) ingresan al balance financi
   assert.equal(balance.cajaRulo.ingresos, 0);
   assert.equal(balance.gananciaReal, 50000);
 });
+
+test('generarInformeAnalisisIA produce un informe detallado con rol, métricas, desglose y consignas para IA', () => {
+  const pagos: Pago[] = [
+    {
+      id: 'p1',
+      cliente_id: 'c1',
+      cliente_nombre_completo: 'Alumno 1',
+      monto: 35000,
+      mes_correspondiente: '2026-09',
+      fecha_pago: '2026-09-02',
+      medio_pago: 'TRANSFERENCIA',
+      destino_transferencia: 'JUANCHI',
+      registrado_por: 'admin@kaha.com',
+      creado_at: '2026-09-02T12:00:00.000Z'
+    },
+    {
+      id: 'p2',
+      cliente_id: 'ext-masajista',
+      cliente_nombre_completo: 'Masajista (Alquiler del local)',
+      es_externo: true,
+      concepto: 'Alquiler consultorio',
+      monto: 40000,
+      mes_correspondiente: '2026-09',
+      fecha_pago: '2026-09-05',
+      medio_pago: 'TRANSFERENCIA',
+      destino_transferencia: 'RULO',
+      registrado_por: 'admin@kaha.com',
+      creado_at: '2026-09-05T12:00:00.000Z'
+    }
+  ];
+
+  const gastos: Gasto[] = [
+    {
+      id: 'g1',
+      concepto: 'Alquiler galpón',
+      monto: 30000,
+      categoria: 'ALQUILER',
+      fecha: '2026-09-01',
+      efectuado_por: 'JUANCHI_TRANSFERENCIA',
+      registrado_por: 'admin@kaha.com',
+      creado_at: '2026-09-01T10:00:00.000Z'
+    }
+  ];
+
+  const balance = calcularBalanceMes({
+    mes: '2026-09',
+    pagos,
+    gastos,
+    clientes: [],
+    planes: [],
+    profesores: [],
+    turnos: [],
+    novedadesProfesores: []
+  });
+
+  const informe = generarInformeAnalisisIA({
+    balance,
+    nombreMes: 'Septiembre 2026',
+    pagosMes: pagos,
+    gastosMes: gastos,
+    totalSociosActivos: 50,
+    comparativaMesAnterior: {
+      variacionGanancia: 15000,
+      variacionPorcentual: 25
+    }
+  });
+
+  // Verificamos presencia de las secciones clave
+  assert.match(informe, /INFORME FINANCIERO Y OPERATIVO — KAHA BOX/);
+  assert.match(informe, /INSTRUCCIÓN PARA LA IA/);
+  assert.match(informe, /RESUMEN GENERAL Y RENTABILIDAD/);
+  assert.match(informe, /COMPOSICIÓN DE INGRESOS/);
+  assert.match(informe, /ESTADO DE CAJAS Y CUENTAS BANCARIAS/);
+  assert.match(informe, /ESTRUCTURA DE COSTOS Y GASTOS OPERATIVOS/);
+  assert.match(informe, /PUNTO DE EQUILIBRIO/);
+  assert.match(informe, /CARTERA DE SOCIOS, MOROSIDAD Y PROYECCIÓN/);
+
+  // Verificamos que contenga los datos de los pagos externos y los gastos
+  assert.match(informe, /Masajista \(Alquiler del local\)/);
+  assert.match(informe, /Alquiler consultorio/);
+  assert.match(informe, /Alquiler galpón/);
+  assert.match(informe, /Alumnos Activos Registrados/);
+});
+
 
