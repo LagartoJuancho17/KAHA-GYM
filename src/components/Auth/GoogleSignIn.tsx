@@ -56,6 +56,16 @@ export const GoogleSignIn: React.FC = () => {
                 if (payload) {
                   setTimeout(async () => {
                     await signInWithGoogle(payload.email, payload.name || payload.given_name, payload.picture);
+                    // El servidor verifica firma, audiencia y rol. La decodificación
+                    // local sólo sirve para la UI, nunca autoriza envíos pagados.
+                    const receiptAuth = await fetch('/api/auth/google-receipts', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'same-origin',
+                      body: JSON.stringify({ credential: response.credential })
+                    }).catch(() => undefined);
+                    if (receiptAuth?.ok) sessionStorage.setItem('kaha_receipt_auth', '1');
+                    else sessionStorage.removeItem('kaha_receipt_auth');
                     setLoading(false);
                   }, 800);
                 } else {

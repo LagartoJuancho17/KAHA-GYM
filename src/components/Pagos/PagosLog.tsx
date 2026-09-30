@@ -1,6 +1,7 @@
 // src/components/Pagos/PagosLog.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useGym } from '../../GymContext';
+import { supabase } from '../../supabaseClient';
 import { Pago, MedioPago, Gasto, OrigenGasto } from '../../types';
 import { 
   Plus, DollarSign, ArrowDownRight, ArrowUpRight, X, Trash2,
@@ -81,10 +82,23 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
   const [showImportStatementModal, setShowImportStatementModal] = useState(false);
   const [receiptClientText, setReceiptClientText] = useState<string | null>(null);
-  const [recibosMultiples, setRecibosMultiples] = useState<Array<{ cliente_nombre: string, messageText: string, telefono: string, copiado: boolean }>>([]);
+  const [recibosMultiples, setRecibosMultiples] = useState<Array<{ cliente_nombre: string, messageText: string, telefono: string, copiado: boolean, envioAutomatico?: boolean }>>([]);
   const [showRecibosModal, setShowRecibosModal] = useState(false);
+  const [estadosRecibos, setEstadosRecibos] = useState<Record<string, string>>({});
   const [pagoParaEliminar, setPagoParaEliminar] = useState<import('../../types').Pago | null>(null);
   const [pagoParaEditar, setPagoParaEditar] = useState<import('../../types').Pago | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    const load = async () => {
+      const { data } = await supabase.from('recibos_whatsapp').select('pago_id,estado');
+      if (active && data) setEstadosRecibos(Object.fromEntries(data.map(row => [row.pago_id, row.estado])));
+    };
+    void load();
+    const timer = window.setInterval(load, 30000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
 
   // ─── PRIVACY / VISIBILIDAD DE BALANCE ─────────────────────────────
   const [mostrarBalance, setMostrarBalance] = useState<boolean>(() => {
@@ -388,6 +402,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             clientes={clientes}
             planes={planes}
             onOpenReceipt={handleOpenReceipt}
+            estadosRecibos={estadosRecibos}
             onAddPagoClick={() => setShowAddPagoModal(true)}
             onConciliarCSVClick={() => setShowImportStatementModal(true)}
             onActualizarDestino={actualizarDestinoPago}

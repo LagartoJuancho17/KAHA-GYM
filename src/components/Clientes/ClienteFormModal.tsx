@@ -31,6 +31,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
     nombre_completo: '',
     email: '',
     telefono: '',
+    recibos_whatsapp_consentimiento: false,
     tipo: 'FIJO' as TipoCliente,
     plan_id: planes[0]?.id || '',
     exencion_cobro: 'NINGUNA' as 'NINGUNA' | 'SUSPENDIDO' | 'POSTERGADO' | 'PERDONADO' | 'BECADO',
@@ -51,7 +52,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
   const [montoParcial, setMontoParcial] = useState('');
 
   const resetForm = () => {
-    setClienteForm({ codigo_socio: '', nombre_completo: '', email: '', telefono: '', tipo: 'FIJO', plan_id: planes[0]?.id || '', exencion_cobro: 'NINGUNA', deuda_acumulada: 0, precio_personalizado: '', dias_personalizados: '', nota_plan_personalizado: '' });
+    setClienteForm({ codigo_socio: '', nombre_completo: '', email: '', telefono: '', recibos_whatsapp_consentimiento: false, tipo: 'FIJO', plan_id: planes[0]?.id || '', exencion_cobro: 'NINGUNA', deuda_acumulada: 0, precio_personalizado: '', dias_personalizados: '', nota_plan_personalizado: '' });
     setIsCustomPlan(false);
     setFormError(''); setFormSuccess('');
     setWizardStep(1); setNewClientId(null);
@@ -75,7 +76,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       if (cl) {
         const hasCustom = cl.precio_personalizado != null || cl.dias_personalizados != null || Boolean(cl.nota_plan_personalizado);
         setIsCustomPlan(hasCustom);
-        setClienteForm({ codigo_socio: cl.codigo_socio || '', nombre_completo: `${cl.nombre} ${cl.apellido}`.trim(), email: cl.email, telefono: cl.telefono, tipo: cl.tipo, plan_id: cl.plan_id, exencion_cobro: cl.exencion_cobro || 'NINGUNA', deuda_acumulada: cl.deuda_acumulada, precio_personalizado: cl.precio_personalizado ?? '', dias_personalizados: cl.dias_personalizados ?? '', nota_plan_personalizado: cl.nota_plan_personalizado || '' });
+        setClienteForm({ codigo_socio: cl.codigo_socio || '', nombre_completo: `${cl.nombre} ${cl.apellido}`.trim(), email: cl.email, telefono: cl.telefono, recibos_whatsapp_consentimiento: cl.recibos_whatsapp_consentimiento === true, tipo: cl.tipo, plan_id: cl.plan_id, exencion_cobro: cl.exencion_cobro || 'NINGUNA', deuda_acumulada: cl.deuda_acumulada, precio_personalizado: cl.precio_personalizado ?? '', dias_personalizados: cl.dias_personalizados ?? '', nota_plan_personalizado: cl.nota_plan_personalizado || '' });
       }
     } else {
       resetForm();
@@ -167,6 +168,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       codigo_socio: clienteForm.codigo_socio,
       email: clienteForm.email,
       telefono: clienteForm.telefono,
+      recibos_whatsapp_consentimiento: clienteForm.recibos_whatsapp_consentimiento,
       tipo: clienteForm.tipo,
       plan_id: clienteForm.plan_id || planes[0]?.id || '',
       exencion_cobro: clienteForm.exencion_cobro,
@@ -221,6 +223,7 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
       codigo_socio: clienteForm.codigo_socio,
       email: clienteForm.email,
       telefono: clienteForm.telefono,
+      recibos_whatsapp_consentimiento: clienteForm.recibos_whatsapp_consentimiento,
       tipo: clienteForm.tipo,
       plan_id: clienteForm.plan_id || planes[0]?.id || '',
       exencion_cobro: exencion,
@@ -294,6 +297,11 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
               <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Celular / WhatsApp</label>
               <input type="text" placeholder="ej: 11-5432-8822" value={clienteForm.telefono} onChange={(e) => setClienteForm(prev => ({ ...prev, telefono: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black outline-hidden bg-white" id="form-telefono" />
             </div>
+
+            <label className="flex items-start gap-2 text-xs text-zinc-700">
+              <input type="checkbox" checked={clienteForm.recibos_whatsapp_consentimiento} onChange={e => setClienteForm(prev => ({ ...prev, recibos_whatsapp_consentimiento: e.target.checked }))} id="form-consentimiento-recibos-wa" />
+              <span>El socio autorizó recibir comprobantes de pago de KAHA por WhatsApp. Marcá esta opción sólo después de obtener su consentimiento.</span>
+            </label>
 
             <div className="space-y-1">
               <label className="text-zinc-500 font-semibold block text-[10px] uppercase">Plan Base Contratado</label>

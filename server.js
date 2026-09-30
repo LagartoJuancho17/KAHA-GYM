@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeArgPhone, isSendablePhone } from './services/notify/phone.js';
+import { createPaymentReceiptHandler } from './services/notify/paymentReceipt.js';
+import { createReceiptAuth } from './services/notify/receiptAuth.js';
 import { normalizarSupabaseUrl } from './services/supabase/baseUrl.js';
 
 // Load environment variables from .env
@@ -35,6 +37,12 @@ if (process.env.SUPABASE_URL && supabaseUrl !== process.env.SUPABASE_URL.trim())
 const supabase = (supabaseUrl && supabaseServiceKey)
   ? createClient(supabaseUrl, supabaseServiceKey)
   : null;
+
+// Sólo un administrador autenticado con Google puede disparar recibos.
+const receiptAuth = createReceiptAuth();
+app.post('/api/auth/google-receipts', receiptAuth.login);
+app.post('/api/auth/google-receipts/logout', receiptAuth.logout);
+app.post('/api/send-payment-receipt', receiptAuth.requireAdmin, createPaymentReceiptHandler({ db: supabase }));
 
 // Sólo el host, nunca la clave: sirve para diagnosticar a qué proyecto pega el
 // servidor sin exponer nada sensible.

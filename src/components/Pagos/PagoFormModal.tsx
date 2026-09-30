@@ -1,6 +1,8 @@
 // src/components/Pagos/PagoFormModal.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useGym } from '../../GymContext';
+import { supabase } from '../../supabaseClient';
+import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { MedioPago } from '../../types';
 import { X, Trash2, Search, Users, Check, Plus, Calendar, Building2, UserCheck } from 'lucide-react';
 import {
@@ -413,7 +415,8 @@ export const PagoFormModal: React.FC<PagoFormModalProps> = ({ onClose, onSuccess
           generatedReceipts.push({
             cliente_nombre: `${clObj.apellido}, ${clObj.nombre} (${b.mes_correspondiente})`,
             messageText: textMsg,
-            telefono: clObj.telefono || '5491123456789',
+            telefono: clObj.telefono || '',
+            envioAutomatico: Boolean(supabase && sessionStorage.getItem('kaha_receipt_auth') === '1' && !usaVariosMedios && clObj.recibos_whatsapp_consentimiento && normalizarTelefonoWhatsApp(clObj.telefono)),
             copiado: false
           });
         }

@@ -36,6 +36,7 @@ export interface Cliente {
   apellido: string;
   email: string;
   telefono: string;
+  recibos_whatsapp_consentimiento?: boolean;
   tipo: TipoCliente;
   estado: EstadoCliente;
   plan_id: string;
@@ -218,5 +219,4 @@ export interface ToastMessage {
   type: 'add' | 'delete' | 'success' | 'error';
   message: string;
 }
-
 

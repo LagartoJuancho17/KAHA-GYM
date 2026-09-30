@@ -535,6 +535,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           apellido: c.apellido,
           email: c.email,
           telefono: c.telefono || '',
+          recibos_whatsapp_consentimiento: c.recibos_whatsapp_consentimiento === true,
           tipo: c.tipo as TipoCliente,
           estado: c.estado as EstadoCliente,
           plan_id: c.plan_id || 'p-none',
@@ -1483,6 +1484,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           apellido: newClient.apellido,
           email: newClient.email,
           telefono: newClient.telefono,
+          recibos_whatsapp_consentimiento: newClient.recibos_whatsapp_consentimiento === true,
           tipo: newClient.tipo,
           estado: newClient.estado,
           plan_id: planUuid,
@@ -1666,7 +1668,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (supabase) {
       const allowedColumns = [
-        'nombre', 'apellido', 'email', 'telefono', 'tipo', 'estado',
+        'nombre', 'apellido', 'email', 'telefono', 'recibos_whatsapp_consentimiento', 'tipo', 'estado',
         'plan_id', 'activo', 'deuda_acumulada', 'ultimo_mes_pagado',
         'exencion_cobro', 'autorizado',
         'precio_personalizado', 'dias_personalizados', 'nota_plan_personalizado'
@@ -1686,13 +1688,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (error) {
             console.error("Error al actualizar cliente en Supabase:", error);
             // Si falta la columna en Supabase (error 42703 o PGRST204), reintentar sin las columnas no existentes para guardar el resto
-            if (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('precio_personalizado') || error.message?.includes('dias_personalizados') || error.message?.includes('deuda_perdonada')) {
+            if (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('precio_personalizado') || error.message?.includes('dias_personalizados') || error.message?.includes('deuda_perdonada') || error.message?.includes('recibos_whatsapp_consentimiento')) {
               console.warn("Reintentando actualización de cliente sin campos extendidos...");
               const safePayload = { ...payload };
               delete safePayload.precio_personalizado;
               delete safePayload.dias_personalizados;
               delete safePayload.nota_plan_personalizado;
               delete safePayload.deuda_perdonada;
+              delete safePayload.recibos_whatsapp_consentimiento;
               if (Object.keys(safePayload).length > 0) {
                 supabase.from('clientes').update(safePayload).eq('id', id).then(({ error: retryErr }) => {
                   if (retryErr) console.error("Error en reintento de cliente en Supabase:", retryErr);
@@ -4593,6 +4596,28 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } else {
           console.log(`[Supabase] ${nuevosPagos.length} pagos insertados exitosamente.`);
+          // El recibo sale sólo después de que Supabase confirmó las filas.
+          // Los pagos divididos en varios medios se dejan para envío manual:
+          // cada fila representa sólo una parte y enviar ambas duplicaría chats.
+          if (sessionStorage.getItem('kaha_receipt_auth') === '1') {
+            nuevosPagos.forEach(np => {
+              const cliente = clientes.find(c => c.id === np.cliente_id);
+              const partesDelMismoCobro = nuevosPagos.filter(p => p.cliente_id === np.cliente_id && p.mes_correspondiente === np.mes_correspondiente);
+              if (!cliente?.recibos_whatsapp_consentimiento || partesDelMismoCobro.length !== 1) return;
+              fetch('/api/send-payment-receipt', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId: np.id })
+              }).then(async response => {
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.status === 'FALLIDO' || result.status === 'INCIERTO') {
+                  addToast('error', `No se confirmó el envío automático del recibo de ${cliente.nombre}. Revisá su estado antes de enviarlo manualmente.`);
+                }
+                if (response.status === 401) sessionStorage.removeItem('kaha_receipt_auth');
+              }).catch(() => addToast('error', `No se pudo confirmar el envío automático del recibo de ${cliente.nombre}.`));
+            });
+          }
         }
       });
 
@@ -5258,6 +5283,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const signOutGoogle = () => {
+    sessionStorage.removeItem('kaha_receipt_auth');
+    void fetch('/api/auth/google-receipts/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
     addAuditLog('SESION_CERRADA_GOOGLE', { email: googleUser?.email });
     setGoogleUser(null);
     setPendingRegistrationUser(null);
