@@ -4,11 +4,13 @@ import {
   X, FileSpreadsheet, Download, ExternalLink, 
   Check, RefreshCw, AlertCircle, Copy, Settings, ChevronDown, ChevronUp, Sparkles 
 } from 'lucide-react';
+import { useGym } from '../../GymContext';
 import { Pago, Cliente, Plan } from '../../types';
 import { 
   generarFilasFacturacionRulo, 
   generarCSVFacturacionRulo, 
   enviarAGoogleSheets,
+  puedeVerFacturacionRulo,
   DEFAULT_WEBHOOK_URL,
   DEFAULT_SPREADSHEET_URL
 } from '../../lib/facturacionRulo';
@@ -32,6 +34,7 @@ export const FacturacionRuloModal: React.FC<FacturacionRuloModalProps> = ({
   clientes,
   planes
 }) => {
+  const { googleUser } = useGym();
   const [webhookUrl, setWebhookUrl] = useState<string>(() => {
     try {
       return localStorage.getItem('kaha_rulo_webhook_url') || DEFAULT_WEBHOOK_URL;
@@ -59,6 +62,7 @@ export const FacturacionRuloModal: React.FC<FacturacionRuloModalProps> = ({
   }, [mes, pagos, clientes, planes]);
 
   if (!isOpen) return null;
+  if (!puedeVerFacturacionRulo(googleUser?.email)) return null;
 
   // Manejar guardado de URLs
   const handleGuardarConfig = () => {

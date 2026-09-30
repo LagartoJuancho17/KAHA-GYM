@@ -20,6 +20,20 @@ export const DEFAULT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbyq_
 export const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1afcgosXC5CrGEj3KjP0gTOlKzX25GD0YCtrJUuRElU8/edit';
 
 /**
+ * Verifica si el usuario actual tiene permisos para ver y gestionar la Facturación de Rulo.
+ * Restringido exclusivamente a los correos de ianvelazquez y totoarr17 (Tobías Arraiza).
+ */
+export function puedeVerFacturacionRulo(email?: string | null): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  return (
+    clean.includes('ianvelazquez') ||
+    clean.includes('totoarr17') ||
+    clean.includes('tobiasarraiza')
+  );
+}
+
+/**
  * Formatea un número al estilo de moneda de la plantilla AFIP: " $  65.000,00 "
  */
 export function formatearMonedaAFIP(monto: number): string {

@@ -5,9 +5,28 @@ import {
   obtenerRangoMesAFIP,
   determinarDescripcionItem,
   generarFilasFacturacionRulo,
-  generarCSVFacturacionRulo
+  generarCSVFacturacionRulo,
+  puedeVerFacturacionRulo
 } from './facturacionRulo';
 import { Pago, Cliente, Plan } from '../types';
+
+test('puedeVerFacturacionRulo autoriza solo a ianvelazquez y totoarr17', () => {
+  // Permitidos
+  assert.equal(puedeVerFacturacionRulo('ianvelazquez97@gmail.com'), true);
+  assert.equal(puedeVerFacturacionRulo('IANVELAZQUEZ97@GMAIL.COM'), true);
+  assert.equal(puedeVerFacturacionRulo('totoarr17@gmail.com'), true);
+  assert.equal(puedeVerFacturacionRulo('tobiasarraiza17@gmail.com'), true);
+  assert.equal(puedeVerFacturacionRulo('totoarr17@hotmail.com'), true);
+
+  // No permitidos
+  assert.equal(puedeVerFacturacionRulo('jmferrariprofe@gmail.com'), false);
+  assert.equal(puedeVerFacturacionRulo('denisetomatis@gmail.com'), false);
+  assert.equal(puedeVerFacturacionRulo('lucasobueno@live.com'), false);
+  assert.equal(puedeVerFacturacionRulo('socio@gmail.com'), false);
+  assert.equal(puedeVerFacturacionRulo(null), false);
+  assert.equal(puedeVerFacturacionRulo(undefined), false);
+  assert.equal(puedeVerFacturacionRulo(''), false);
+});
 
 test('formatearMonedaAFIP formatea correctamente con espacio y decimales', () => {
   const res = formatearMonedaAFIP(65000);
