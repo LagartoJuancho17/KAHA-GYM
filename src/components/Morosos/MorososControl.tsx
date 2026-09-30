@@ -3,17 +3,20 @@ import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente, MedioPago } from '../../types';
 import { 
-  AlertTriangle, ShieldAlert, DollarSign, X, Receipt, UserMinus, Mail
+  AlertTriangle, ShieldAlert, DollarSign, X, Receipt, UserMinus, Mail, MessageCircle
 } from 'lucide-react';
 import { MorososCronSimulator } from './MorososCronSimulator';
 import { MorososList } from './MorososList';
 import { AdminBajasReviewModal } from './AdminBajasReviewModal';
 import { EmailReporteMorososAdminModal } from '../Notifications/EmailReporteMorososAdminModal';
 import { MorososDobleCheckModal, MorososDobleCheckConfig } from './MorososDobleCheckModal';
+import { RondaRecordatoriosModal } from './RondaRecordatoriosModal';
+import { armarRonda } from '../../lib/rondaRecordatorios';
 
 export const MorososControl: React.FC = () => {
   const { 
-    clientes, planes, registrarPago, updateCliente, altaCliente, bajaLogicaCliente, googleUser
+    clientes, planes, registrarPago, updateCliente, altaCliente, bajaLogicaCliente, googleUser,
+    pagos, auditLogs
   } = useGym();
 
   const [simularFecha, setSimularFecha] = useState(new Date().toISOString().slice(0, 10)); // Fecha actual como default
@@ -30,6 +33,7 @@ export const MorososControl: React.FC = () => {
 
   // Modales de Bajas y Reporte Email
   const [showBajasModal, setShowBajasModal] = useState(false);
+  const [showRondaModal, setShowRondaModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Estado del Modal de Doble Chequeo de Autorización
@@ -39,6 +43,12 @@ export const MorososControl: React.FC = () => {
   const diaHoy = new Date().getDate();
 
   // --- CALCULO KPIs DE CONTROL ---
+  // Cuantos faltan avisar hoy. El boton solo aparece si hay alguien.
+  const rondaPendiente = useMemo(
+    () => armarRonda({ clientes, planes, pagos, logs: auditLogs }).pendientes.length,
+    [clientes, planes, pagos, auditLogs]
+  );
+
   const clientesActivos = useMemo(() => clientes.filter(c => c.activo), [clientes]);
   const totalActivosCount = clientesActivos.length;
 
@@ -190,6 +200,17 @@ export const MorososControl: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {rondaPendiente > 0 && (
+            <button
+              onClick={() => setShowRondaModal(true)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
+              id="btn-ronda-recordatorios"
+              title="Mandar los recordatorios de pago uno por uno, sin buscar socio por socio"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>Mandar recordatorios ({rondaPendiente})</span>
+            </button>
+          )}
           <button
             onClick={() => setShowEmailModal(true)}
             className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
@@ -412,6 +433,11 @@ export const MorososControl: React.FC = () => {
       )}
 
       {/* MODAL REVISIÓN DE BAJAS DE TURNOS FIJOS (DÍA 10+) */}
+      <RondaRecordatoriosModal
+        isOpen={showRondaModal}
+        onClose={() => setShowRondaModal(false)}
+      />
+
       <AdminBajasReviewModal
         isOpen={showBajasModal}
         onClose={() => setShowBajasModal(false)}
