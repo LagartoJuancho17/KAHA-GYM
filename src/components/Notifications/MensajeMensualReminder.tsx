@@ -63,7 +63,7 @@ interface MensajeMensualReminderProps {
 }
 
 export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ visible = true }) => {
-  const { addNovedad, deleteNovedad } = useGym();
+  const { addNovedad, deleteNovedad, novedades } = useGym();
   const [shouldRender, setShouldRender] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -79,19 +79,39 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     const hoy = new Date();
     const diaHoy = hoy.getDate();
     const { yyyy, mm } = getMesActual();
+    const proximoMes = getProximoMesNombre();
+    const mesActualNombre = MESES_ES[hoy.getMonth()];
 
-    // ── Auto-borrado el día 5 del mes ──────────────────────────────────────
-    // Si ya pasó el 1ro del mes siguiente al que se publicó, borramos la novedad
-    // Ej: si publicamos en agosto (mm=8), borramos el 5 de septiembre (mm=9)
-    // Buscamos el ID guardado del mes ANTERIOR (el que se publicó 3 días antes)
+    // ── 1. Verificar si ya está publicado en la base de datos (novedades) ───
+    // Si ya existe una novedad con el título del próximo mes y el texto del recordatorio,
+    // NO mostrar el banner flotante en ningún dispositivo ni navegador.
+    const yaPublicado = (novedades || []).some(n => 
+      n.titulo?.trim().toLowerCase() === proximoMes.toLowerCase() &&
+      n.contenido?.includes('¡Se viene un nuevo mes en KAHA!')
+    );
+
+    if (yaPublicado) {
+      setShouldRender(false);
+      return;
+    }
+
+    // ── 2. Limpieza de mensajes mensuales viejos de meses anteriores ─────────
+    const viejosMensajes = (novedades || []).filter(n => 
+      n.contenido?.includes('¡Se viene un nuevo mes en KAHA!') &&
+      n.titulo?.trim().toLowerCase() !== proximoMes.toLowerCase() &&
+      n.titulo?.trim().toLowerCase() !== mesActualNombre.toLowerCase()
+    );
+    for (const viejo of viejosMensajes) {
+      deleteNovedad(viejo.id);
+    }
+
+    // ── 3. Auto-borrado el día 5 del mes ───────────────────────────────────
     const mesAnterior = mm === 1 ? 12 : mm - 1;
     const yyyyAnterior = mm === 1 ? yyyy - 1 : yyyy;
     const novedadIdMesAnterior = localStorage.getItem(novedadIdStorageKey(yyyyAnterior, mesAnterior));
     if (novedadIdMesAnterior && diaHoy >= 5) {
-      // Borrar la novedad del mes anterior de la cartelera
       deleteNovedad(novedadIdMesAnterior);
       localStorage.removeItem(novedadIdStorageKey(yyyyAnterior, mesAnterior));
-      console.log('[KAHA] Novedad mensual auto-borrada el día 5:', novedadIdMesAnterior);
     }
 
     const diasRestantes = diasRestantesDelMes();
@@ -113,19 +133,17 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     // Leer estado guardado en localStorage
     const savedState = localStorage.getItem(stateStorageKey(yyyy, mm));
     if (savedState === 'done' || savedState === 'dismissed') {
-      // Si ya lo marcó como enviado o lo quitó de la vista, no mostrar
       setShouldRender(false);
       return;
     }
 
     setShouldRender(true);
-    // Si guardó 'closed', empieza cerrado (mostrando el botón flotante). Si no hay guardado o es 'open', empieza abierto.
     if (savedState === 'closed') {
       setIsOpen(false);
     } else {
       setIsOpen(true);
     }
-  }, [visible, deleteNovedad]);
+  }, [visible, deleteNovedad, novedades]);
 
   useEffect(() => {
     checkStatus();
@@ -176,6 +194,29 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
 
     try {
       const proximoMes = getProximoMesNombre();
+      const mesActualNombre = MESES_ES[new Date().getMonth()];
+
+      // 1. Evitar duplicar: si ya existe publicado en la base de datos, no volver a crearlo
+      const yaExiste = (novedades || []).find(n => 
+        n.titulo?.trim().toLowerCase() === proximoMes.toLowerCase() &&
+        n.contenido?.includes('¡Se viene un nuevo mes en KAHA!')
+      );
+
+      if (yaExiste) {
+        const { yyyy, mm } = getMesActual();
+        localStorage.setItem(stateStorageKey(yyyy, mm), 'done');
+        setShouldRender(false);
+        setIsOpen(false);
+        return;
+      }
+
+      // 2. Limpiar automáticamente cualquier novedad de mensaje mensual de meses pasados
+      const viejas = (novedades || []).filter(n => 
+        n.contenido?.includes('¡Se viene un nuevo mes en KAHA!') &&
+        n.titulo?.trim().toLowerCase() !== proximoMes.toLowerCase() &&
+        n.titulo?.trim().toLowerCase() !== mesActualNombre.toLowerCase()
+      );
+      viejas.forEach(v => deleteNovedad(v.id));
 
       const result = addNovedad({
         titulo: proximoMes,
