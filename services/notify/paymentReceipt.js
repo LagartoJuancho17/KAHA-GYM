@@ -38,7 +38,7 @@ export function createPaymentReceiptHandler({ db, fetchImpl = fetch, env = proce
 
     let result = { estado: 'INCIERTO', error_codigo: 'network_error' };
     try {
-      const response = await fetchImpl(`https://graph.facebook.com/${env.WHATSAPP_API_VERSION || 'v21.0'}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+      const response = await fetchImpl(`https://graph.facebook.com/${env.WHATSAPP_API_VERSION || 'v26.0'}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
         method: 'POST',
         signal: AbortSignal.timeout(8000),
         headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
