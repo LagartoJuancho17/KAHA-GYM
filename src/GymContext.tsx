@@ -5070,13 +5070,17 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let targetSocioId: string | null = null;
     let userName = cleanMail.split('@')[0];
 
-    if (
+    if (cleanMail === 'ianvelazquez97@gmail.com' || cleanMail.startsWith('ianvelazquez')) {
+      if (cleanPass !== 'kaha5330') {
+        throw new Error('Contraseña de administrador incorrecta.');
+      }
+      detectedRole = 'ADMIN';
+    } else if (
       cleanMail === 'tobiasarraiza17@gmail.com' ||
       cleanMail === 'totoarr17@gmail.com' ||
-      cleanMail === 'jmferrariprofe@gmail.com' ||
-      cleanMail === 'ianvelazquez97@gmail.com'
+      cleanMail === 'jmferrariprofe@gmail.com'
     ) {
-      if (cleanPass !== 'admin123' && cleanPass !== 'kaha2026' && cleanPass !== 'admin') {
+      if (cleanPass !== 'admin123' && cleanPass !== 'kaha2026' && cleanPass !== 'admin' && cleanPass !== 'kaha5330') {
         throw new Error('Contraseña de administrador incorrecta.');
       }
       detectedRole = 'ADMIN';
