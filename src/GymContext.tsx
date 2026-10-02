@@ -1,5 +1,4 @@
-// src/GymContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, PagoEnRevision,
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
@@ -145,7 +144,7 @@ interface GymContextType {
   // Novedades Methods
   addNovedad: (novedad: Omit<Novedad, 'id' | 'fecha'>) => { success: boolean; message: string; id?: string };
   updateNovedad: (id: string, updates: Partial<Novedad>) => { success: boolean; message: string };
-  deleteNovedad: (id: string) => void;
+  deleteNovedad: (id: string, silent?: boolean) => void;
 
   // Morosidad Simulation
   ejecutarCronMorosidad: (simularFecha: string) => { procesados: number; nuevosMorosos: number; deudaTotal: number; suspendidosSemanaCount: number; dadosBajaCount: number; logLineas: string[] };
@@ -3672,6 +3671,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWaitlistReservas(updatedWl);
     localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updatedWl));
 
+    // Si el socio tenía una suspensión registrada para esta fecha, la limpiamos ya que
+    // explícitamente eligió volver a anotarse en la espera para esta fecha
+    if ((cliente.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha)) {
+      const updatedClientes = clientes.map(c => {
+        if (c.id === clienteId) {
+          return {
+            ...c,
+            clases_suspendidas: (c.clases_suspendidas || []).filter(s => !(s.turno_id === turnoId && s.fecha === fecha))
+          };
+        }
+        return c;
+      });
+      setClientes(updatedClientes);
+      if (supabase) {
+        const target = updatedClientes.find(c => c.id === clienteId);
+        if (target) {
+          supabase.from('clientes').update({ clases_suspendidas: target.clases_suspendidas || [] }).eq('id', clienteId).then();
+        }
+      }
+    }
+
     // Persistir en Supabase. Sin esto la espera vivía SOLO en el localStorage del
     // navegador que la creó: el admin no la veía, se perdía al cambiar de
     // dispositivo o limpiar el navegador. Era el bug de "no me quedan guardados".
@@ -3695,6 +3715,36 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('gym_waitlist_reservas', JSON.stringify(filtered));
     persistirEsperaEnSupabase('baja', clienteId, turnoId, fecha);
 
+    // Si tiene prioridad VIP o espera fija, registrar también la suspensión de esa fecha
+    // para evitar que el algoritmo lo vuelva a sintetizar automáticamente como vip-auto
+    const esVip = sociosPrioritarios.has(clavePrioridad(clienteId, turnoId));
+    const turnoActual = turnos.find(t => t.id === turnoId);
+    const esFija = (turnoActual?.lista_espera_ids || []).includes(clienteId);
+    if (esVip || esFija) {
+      const yaSuspendida = (cliente.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha);
+      if (!yaSuspendida) {
+        const updatedClientes = clientes.map(c => {
+          if (c.id === clienteId) {
+            return {
+              ...c,
+              clases_suspendidas: [
+                ...(c.clases_suspendidas || []),
+                { turno_id: turnoId, fecha, reintegrado: true, creado_at: new Date().toISOString() }
+              ]
+            };
+          }
+          return c;
+        });
+        setClientes(updatedClientes);
+        if (supabase) {
+          const target = updatedClientes.find(c => c.id === clienteId);
+          if (target) {
+            supabase.from('clientes').update({ clases_suspendidas: target.clases_suspendidas || [] }).eq('id', clienteId).then();
+          }
+        }
+      }
+    }
+
     addAuditLog('LISTA_ESPERA_RESERVA_REMOVIDO', { 
       cliente: `${cliente.nombre} ${cliente.apellido}`, 
       turno_id: turnoId, 
@@ -3704,7 +3754,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Te has retirado de la lista de espera.' };
   };
 
-  const procesarPromocionListaEspera = (turnoId: string, fecha: string, currentClientes: Cliente[]): Cliente[] => {
+  const procesarPromocionListaEspera = (
+    turnoId: string, 
+    fecha: string, 
+    currentClientes: Cliente[],
+    excludeClienteId?: string
+  ): Cliente[] => {
     // ITERATIVO con una copia LOCAL de la espera, no recursivo sobre el closure de
     // `waitlistReservas`. Antes, cuando el primero de la cola era invalido (socio
     // dado de baja mientras esperaba), el codigo hacia
@@ -3716,6 +3771,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // La baja de un socio (bajaLogicaCliente) ahora limpia sus filas de espera,
     // pero igual conviene que esta funcion no dependa de eso para no crashear.
     let esperaLocal = waitlistReservas;
+    if (excludeClienteId) {
+      esperaLocal = esperaLocal.filter(w => !(w.cliente_id === excludeClienteId && w.turno_id === turnoId && w.fecha === fecha));
+    }
     const entradasAEliminar: typeof waitlistReservas = [];
 
     let candidateClient: Cliente | undefined;
@@ -3728,6 +3786,14 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         break;
       }
       const candidato = waitingList[0];
+
+      // Si el candidato es el socio excluido (el que acaba de bajarse), jamás puede promoverse a su propio lugar
+      if (excludeClienteId && candidato.cliente_id === excludeClienteId) {
+        entradasAEliminar.push(candidato);
+        esperaLocal = esperaLocal.filter(w => w.id !== candidato.id && w.cliente_id !== excludeClienteId);
+        continue;
+      }
+
       const cliente = currentClientes.find(c => c.id === candidato.cliente_id && c.activo);
       if (cliente) {
         candidateClient = cliente;
@@ -3849,15 +3915,22 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (c.id === clienteId) {
         const filtradas = (c.reservas_individuales || []).filter(r => r.id !== reservaId);
         
-        const clasesSuspendidas = [...(c.clases_suspendidas || [])];
-        if (!reintegrado) {
-          clasesSuspendidas.push({
-            turno_id: reserva.turno_id,
-            fecha: reserva.fecha,
-            reintegrado: false,
-            creado_at: new Date().toISOString()
-          });
-        }
+        // Registrar siempre la suspensión/cancelación para que el sistema sepa
+        // que el socio no asistirá en esta fecha y NO lo vuelva a auto-promover (especialmente si es VIP).
+        const yaSuspendida = (c.clases_suspendidas || []).some(
+          s => s.turno_id === reserva.turno_id && s.fecha === reserva.fecha
+        );
+        const clasesSuspendidas = yaSuspendida
+          ? [...(c.clases_suspendidas || [])]
+          : [
+              ...(c.clases_suspendidas || []),
+              {
+                turno_id: reserva.turno_id,
+                fecha: reserva.fecha,
+                reintegrado,
+                creado_at: new Date().toISOString()
+              }
+            ];
 
         return {
           ...c,
@@ -3868,7 +3941,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
 
-    const finalClientes = procesarPromocionListaEspera(reserva.turno_id, reserva.fecha, updatedClientes);
+    // Limpiar también cualquier fila en la espera de este turno y fecha para este socio
+    const newWl = waitlistReservas.filter(w => !(w.cliente_id === clienteId && w.turno_id === reserva.turno_id && w.fecha === reserva.fecha));
+    setWaitlistReservas(newWl);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
+    persistirEsperaEnSupabase('baja', clienteId, reserva.turno_id, reserva.fecha);
+
+    const finalClientes = procesarPromocionListaEspera(reserva.turno_id, reserva.fecha, updatedClientes, clienteId);
     saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
 
     if (supabase) {
@@ -3937,7 +4016,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
 
-    const finalClientes = procesarPromocionListaEspera(turnoId, fecha, updatedClientes);
+    const finalClientes = procesarPromocionListaEspera(turnoId, fecha, updatedClientes, clienteId);
     saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
 
     if (supabase) {
@@ -4151,7 +4230,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Process waitlist promotions for each freed variable slot
       for (const slot of cancelledVariableSlots) {
-        updatedClientes = procesarPromocionListaEspera(slot.turnoId, slot.fecha, updatedClientes);
+        updatedClientes = procesarPromocionListaEspera(slot.turnoId, slot.fecha, updatedClientes, clienteId);
       }
 
       saveState(updatedClientes, planes, historialPrecios, turnos, pagos, localRecs, auditLogs, novedades);
@@ -5509,11 +5588,19 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Novedad modificada exitosamente.' };
   };
 
-  const deleteNovedad = (id: string) => {
-    const matched = novedades.find(n => n.id === id);
-    const updated = novedades.filter(n => n.id !== id);
-    setNovedades(updated);
-    localStorage.setItem('gym_novedades', JSON.stringify(updated));
+  const deleteNovedad = (id: string, silent: boolean = false) => {
+    let matchedTitle: string | undefined;
+    setNovedades(prev => {
+      const matched = prev.find(n => n.id === id);
+      matchedTitle = matched?.titulo;
+      const updated = prev.filter(n => n.id !== id);
+      try {
+        localStorage.setItem('gym_novedades', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('[KAHA] Error saving to localStorage:', e);
+      }
+      return updated;
+    });
 
     // Sincronizar a Supabase en paralelo
     if (supabase) {
@@ -5522,8 +5609,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    addAuditLog('NOVEDAD_ELIMINADA', { id, titulo: matched?.titulo });
-    addToast('delete', 'Novedad eliminada exitosamente.');
+    addAuditLog('NOVEDAD_ELIMINADA', { id, titulo: matchedTitle });
+    if (!silent) {
+      addToast('delete', 'Novedad eliminada exitosamente.');
+    }
   };
 
   const borrarHistorial = () => {
@@ -5545,23 +5634,33 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.location.reload();
   };
 
-  const addToast = (type: 'add' | 'delete' | 'success' | 'error', message: string) => {
-    if (rolActivo === 'ADMIN' || rolActivo === 'OPERADOR') {
-      playAudioTone(type);
-      triggerVibration(type);
-    }
+  const addToast = useCallback((type: 'add' | 'delete' | 'success' | 'error', message: string) => {
+    setToasts(prev => {
+      // Evitar duplicar toasts idénticos si ya están en pantalla
+      if (prev.some(t => t.message === message && t.type === type)) {
+        return prev;
+      }
+      if (rolActivo === 'ADMIN' || rolActivo === 'OPERADOR') {
+        playAudioTone(type);
+        triggerVibration(type);
+      }
+      const newToast: ToastMessage = {
+        id: `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        type,
+        message
+      };
+      return [...prev, newToast];
+    });
+  }, [rolActivo]);
 
-    const newToast: ToastMessage = {
-      id: `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      type,
-      message
-    };
-    setToasts(prev => [...prev, newToast]);
-  };
-
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => {
+      const target = prev.find(t => t.id === id);
+      if (!target) return prev.filter(t => t.id !== id);
+      // Elimina el toast seleccionado y cualquier duplicado idéntico por seguridad
+      return prev.filter(t => t.id !== id && !(t.message === target.message && t.type === target.type));
+    });
+  }, []);
 
   return (
     <GymContext.Provider value={{

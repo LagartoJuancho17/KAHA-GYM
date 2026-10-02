@@ -20,8 +20,12 @@ import { Footer } from '../Common/Footer';
 import {
   TITULO_RECORDATORIO_DEUDA,
   MENSAJE_RECORDATORIO_DEUDA,
+  TITULO_AVISO_VENCIMIENTO,
+  MENSAJE_AVISO_VENCIMIENTO,
+  DIA_BAJA_RESERVA,
   socioEstaDebiendo
 } from '../../lib/recordatorioDeuda';
+import { hoyArgentina } from '../../lib/fechas';
 
 export const SocioPanel: React.FC = () => {
   const { 
@@ -66,8 +70,13 @@ export const SocioPanel: React.FC = () => {
     return socio.deuda_acumulada > 0 || socio.estado === 'CON_DEUDA' || socio.estado === 'MOROSO';
   }, [socio, isBecado]);
 
-  // Fix 2b: Current month hasn't been paid yet
-  const currentCalendarMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  // Mes calendario actual en Argentina
+  const currentCalendarMonth = useMemo(() => hoyArgentina().slice(0, 7), []);
+  const diaDelMes = useMemo(() => Number(hoyArgentina().slice(8, 10)), []);
+  const mesAnteriorStr = useMemo(() => {
+    const [year, month] = currentCalendarMonth.split('-').map(Number);
+    return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
+  }, [currentCalendarMonth]);
 
   const isCurrentMonthUnpaid = useMemo(() => {
     if (!socio || isBecado) return false;
@@ -97,19 +106,27 @@ export const SocioPanel: React.FC = () => {
     });
   }, [socio, pagos]);
 
+  // Si arrastra deuda de meses anteriores o ya es día 10 en adelante, el turno ya quedó liberado
+  const tieneDeudaPrevia = useMemo(() => {
+    if (!socio) return false;
+    return Boolean(socio.ultimo_mes_pagado && socio.ultimo_mes_pagado < mesAnteriorStr);
+  }, [socio, mesAnteriorStr]);
+
+  const esTurnoLiberado = diaDelMes >= DIA_BAJA_RESERVA || tieneDeudaPrevia;
+
   const recordatorioNovedad = useMemo(() => {
     if (!isDebiendo || !socio) return null;
     return {
       id: `recordatorio-pago-${currentCalendarMonth}-${socio.id}`,
-      titulo: TITULO_RECORDATORIO_DEUDA,
-      contenido: MENSAJE_RECORDATORIO_DEUDA,
-      fecha: `${currentCalendarMonth}-06`,
+      titulo: esTurnoLiberado ? TITULO_RECORDATORIO_DEUDA : TITULO_AVISO_VENCIMIENTO,
+      contenido: esTurnoLiberado ? MENSAJE_RECORDATORIO_DEUDA : MENSAJE_AVISO_VENCIMIENTO,
+      fecha: `${currentCalendarMonth}-${String(esTurnoLiberado ? DIA_BAJA_RESERVA : 5).padStart(2, '0')}`,
       categoria: 'ARANCELES' as const,
       creado_por: 'KAHA GYM',
       destacado: true,
       socio_id: socio.id
     };
-  }, [isDebiendo, socio, currentCalendarMonth]);
+  }, [isDebiendo, socio, currentCalendarMonth, esTurnoLiberado]);
 
   const socioNovedades = useMemo(() => {
     let list = novedades.filter(n => {
@@ -640,11 +657,13 @@ export const SocioPanel: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-widest">
-                    {isDebiendo ? '💚 Recordatorio' : '¡Nuevo mes!'}
+                    {isDebiendo 
+                      ? (esTurnoLiberado ? '💚 Recordatorio' : '💚 Aviso de Cuota') 
+                      : '¡Nuevo mes!'}
                   </p>
                   <h3 className="text-lg font-black text-slate-900 tracking-tight mt-0.5">
                     {isDebiendo 
-                      ? '💚 Te dejamos un pequeño recordatorio' 
+                      ? (esTurnoLiberado ? TITULO_RECORDATORIO_DEUDA : TITULO_AVISO_VENCIMIENTO) 
                       : `Ya empezó ${new Date().toLocaleString('es-AR', { month: 'long' })} 🎉`
                     }
                   </h3>
@@ -654,17 +673,36 @@ export const SocioPanel: React.FC = () => {
               {/* Body */}
               {isDebiendo ? (
                 <div className="text-slate-700 text-xs leading-relaxed font-sans space-y-2">
-                  <p>
-                    Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
-                  </p>
-                  <p>
-                    Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
-                  </p>
-                  <p className="font-bold text-emerald-950">
-                    ¡Queremos que sigas siendo parte de KAHA!
-                    <br />
-                    Cualquier cosa, estamos acá para ayudarte. 💚
-                  </p>
+                  {esTurnoLiberado ? (
+                    <>
+                      <p>
+                        Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona.
+                      </p>
+                      <p>
+                        Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝
+                      </p>
+                      <p className="font-bold text-emerald-950">
+                        ¡Queremos que sigas siendo parte de KAHA!
+                        <br />
+                        Cualquier cosa, estamos acá para ayudarte. 💚
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        Todavía no nos figura el pago de la cuota de este mes.
+                      </p>
+                      <p>
+                        Si no llegamos a registrarlo antes del día {DIA_BAJA_RESERVA}, tu turno fijo queda liberado para que lo tome otra persona.
+                      </p>
+                      <p>
+                        Si tuviste alguna dificultad o necesitás unos días más, escribinos y lo vemos. Con que nos avises alcanza para que te lo guardemos. 🤝
+                      </p>
+                      <p className="font-bold text-emerald-950">
+                        ¡Gracias por ser parte de KAHA! 💚
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <p className="text-slate-600 text-sm leading-relaxed font-sans">

@@ -1,21 +1,23 @@
 import React, { useMemo } from 'react';
 import { Pago, Cliente, Plan } from '../../types';
 import { Search, Plus, Upload, DollarSign, Trash2, Pencil, Eye, EyeOff } from 'lucide-react';
+import { hoyArgentina } from '../../lib/fechas';
 
-// Genera los últimos N meses dinámicamente
-function generarUltimosMeses(n = 12) {
+// Genera los últimos N meses dinámicamente según la hora de Argentina
+function generarUltimosMeses(n = 18) {
   const meses: { value: string; label: string }[] = [];
-  const now = new Date();
+  const hoy = hoyArgentina().slice(0, 7);
+  const [hoyAnio, hoyMes] = hoy.split('-').map(Number);
   const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   for (let i = 0; i < n; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(hoyAnio, hoyMes - 1 - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = `${MESES_ES[d.getMonth()]} ${d.getFullYear()}`;
     meses.push({ value, label });
   }
   return meses;
 }
-const MESES_OPCIONES = generarUltimosMeses(12);
+const MESES_OPCIONES = generarUltimosMeses(18);
 
 interface PagosTableProps {
   buscarCliente: string;

@@ -3,6 +3,7 @@
 // Determinista, sin dependencias de DOM ni React para pruebas unitarias fiables.
 
 import { Pago, Gasto, Cliente, Plan, Profesor, Turno, NovedadProfesor, OrigenGasto } from '../types';
+import { estaEnReposo } from './reposo';
 
 export interface DesgloseCaja {
   ingresos: number;
@@ -93,26 +94,32 @@ export function calcularCompensacionSocios(
   const diferenciaJuanchi = saldoJuanchi - cuotaJuanchi;
 
   if (diferenciaJuanchi > 0) {
-    // Juanchi tiene de más en su cuenta -> debe transferir a Rulo
+    // Juanchi tiene saldo mayor / absorbió menos gastos -> transfiere a Rulo
     const monto = Math.round(diferenciaJuanchi);
+    const detalle = baseTotal < 0
+      ? `El mes registra saldo neto deficitario (gastos mayores a cobros). Rulo absorbió $${Math.abs(saldoRulo - saldoJuanchi).toLocaleString('es-AR')} más en egresos netos que Juanchi. Para compensar los costos 50% / 50%, Juanchi transfiere $${monto.toLocaleString('es-AR')} a Rulo.`
+      : `Juanchi tiene $${saldoJuanchi.toLocaleString('es-AR')} y Rulo tiene $${saldoRulo.toLocaleString('es-AR')}. Para equilibrar (${Math.round(pctJuanchi * 100)}% / ${Math.round(pctRulo * 100)}%), Juanchi transfiere $${monto.toLocaleString('es-AR')} a Rulo.`;
     return {
       baseTotal,
       cuotaEquitativa: cuotaJuanchi,
       debeTransferir: 'JUANCHI',
       montoTransferencia: monto,
       mensaje: `Juanchi debe transferir $${monto.toLocaleString('es-AR')} a Rulo`,
-      detalle: `Juanchi tiene $${saldoJuanchi.toLocaleString('es-AR')} y Rulo tiene $${saldoRulo.toLocaleString('es-AR')}. Para equilibrar (${Math.round(pctJuanchi * 100)}% / ${Math.round(pctRulo * 100)}%), Juanchi transfiere $${monto.toLocaleString('es-AR')} a Rulo.`
+      detalle
     };
   } else if (diferenciaJuanchi < 0) {
-    // Rulo tiene de más en su cuenta -> debe transferir a Juanchi
+    // Rulo tiene saldo mayor / absorbió menos gastos -> transfiere a Juanchi
     const monto = Math.round(Math.abs(diferenciaJuanchi));
+    const detalle = baseTotal < 0
+      ? `El mes registra saldo neto deficitario (gastos mayores a cobros). Juanchi absorbió $${Math.abs(saldoJuanchi - saldoRulo).toLocaleString('es-AR')} más en egresos netos que Rulo. Para compensar los costos 50% / 50%, Rulo transfiere $${monto.toLocaleString('es-AR')} a Juanchi.`
+      : `Rulo tiene $${saldoRulo.toLocaleString('es-AR')} y Juanchi tiene $${saldoJuanchi.toLocaleString('es-AR')}. Para equilibrar (${Math.round(pctRulo * 100)}% / ${Math.round(pctJuanchi * 100)}%), Rulo transfiere $${monto.toLocaleString('es-AR')} a Juanchi.`;
     return {
       baseTotal,
       cuotaEquitativa: cuotaRulo,
       debeTransferir: 'RULO',
       montoTransferencia: monto,
       mensaje: `Rulo debe transferir $${monto.toLocaleString('es-AR')} a Juanchi`,
-      detalle: `Rulo tiene $${saldoRulo.toLocaleString('es-AR')} y Juanchi tiene $${saldoJuanchi.toLocaleString('es-AR')}. Para equilibrar (${Math.round(pctRulo * 100)}% / ${Math.round(pctJuanchi * 100)}%), Rulo transfiere $${monto.toLocaleString('es-AR')} a Juanchi.`
+      detalle
     };
   }
 
@@ -221,18 +228,23 @@ export function calcularBalanceMes({
   const margenRealPorcentaje = totalIngresos > 0 ? Math.round((gananciaReal / totalIngresos) * 100) : 0;
 
   // 6. Deuda Pendiente de Cobro de Clientes Activos
-  const clientesActivos = (clientes || []).filter(c => c.activo);
+  const clientesActivos = (clientes || []).filter(c => c.activo && !estaEnReposo(c));
   let deudaPendienteCobro = 0;
   let sociosDeudoresCount = 0;
 
   clientesActivos.forEach(c => {
+    // Si fue creado después del mes analizado, no pertenecía a este período
+    if (c.creado_at && c.creado_at.slice(0, 7) > mes) return;
+
     // Si ya tiene pago en este mes, no debe cuota de este mes
     const pagoEsteMes = pagosMes.some(p => p.cliente_id === c.id);
-    if (pagoEsteMes || c.exencion_cobro === 'BECADO') return;
+    if (pagoEsteMes || c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO') return;
 
     const plan = (planes || []).find(p => p.id === c.plan_id);
     const montoCuota = c.precio_personalizado ?? plan?.precio ?? 0;
-    const deuda = (c.deuda_acumulada && c.deuda_acumulada > 0) ? c.deuda_acumulada : montoCuota;
+    // Si la cuota del socio es mayor a 0, la deuda del mes analizado corresponde al valor de dicha cuota.
+    // Si no tiene plan o precio asignado, pero registra deuda acumulada, se toma la deuda acumulada.
+    const deuda = montoCuota > 0 ? montoCuota : (c.deuda_acumulada && c.deuda_acumulada > 0 ? c.deuda_acumulada : 0);
 
     if (deuda > 0) {
       deudaPendienteCobro += deuda;
@@ -247,7 +259,10 @@ export function calcularBalanceMes({
       g.categoria === 'PROFESORES' && g.concepto.toLowerCase().includes(prof.nombre.toLowerCase())
     );
     if (!yaLiquidado) {
-      const turnosProf = (turnos || []).filter(t => t.profesor === prof.nombre || t.profesor === prof.id);
+      const turnosProf = (turnos || []).filter(t => 
+        (t.profesor && t.profesor.trim().toLowerCase() === prof.nombre.trim().toLowerCase()) || 
+        t.profesor === prof.id
+      );
       let clasesTeoricas = 0;
       turnosProf.forEach(t => {
         const diaIdx = DIA_IDX[t.dia] || 0;

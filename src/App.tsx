@@ -1,5 +1,4 @@
-// src/App.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GymProvider, useGym } from './GymContext';
 import { RoleSwitcher } from './components/Auth/RoleSwitcher';
 import { Dashboard } from './components/Dashboard';
@@ -834,12 +833,15 @@ interface ToastItemProps {
 }
 
 function ToastItem({ toast, onClose }: ToastItemProps) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      onClose(toast.id);
+      onCloseRef.current(toast.id);
     }, 4000);
     return () => clearTimeout(timer);
-  }, [toast.id, onClose]);
+  }, [toast.id]);
 
   const isDelete = toast.type === 'delete';
   const isError = toast.type === 'error';
@@ -872,7 +874,11 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
   }
 
   return (
-    <div className={`pointer-events-auto flex items-center justify-between gap-3 p-4 rounded-2xl border ${borderColor} ${bgColor} shadow-xl animate-slide-in-right transition-all duration-300 w-full`}>
+    <div 
+      className={`pointer-events-auto flex items-center justify-between gap-3 p-4 rounded-2xl border ${borderColor} ${bgColor} shadow-xl animate-slide-in-right transition-all duration-300 w-full cursor-pointer select-none hover:shadow-2xl`}
+      onClick={() => onClose(toast.id)}
+      role="alert"
+    >
       <div className="flex items-center gap-3">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconColor}`}>
           <Icon className="w-5 h-5" />
@@ -880,8 +886,12 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
         <p className={`text-xs font-semibold ${textColor}`}>{toast.message}</p>
       </div>
       <button 
-        onClick={() => onClose(toast.id)}
-        className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose(toast.id);
+        }}
+        className="text-slate-400 hover:text-slate-700 p-2 hover:bg-slate-100 rounded-xl transition-all cursor-pointer shrink-0 flex items-center justify-center"
         aria-label="Cerrar notificación"
       >
         <X className="w-4 h-4" />

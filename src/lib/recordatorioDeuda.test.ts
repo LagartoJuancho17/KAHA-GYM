@@ -71,6 +71,19 @@ describe('Recordatorio de Deuda y Validación Estricta de Deudores', () => {
     assert.strictEqual(debiendo, false);
   });
 
+  it('REGRESION: socio en día 1 con cuota imputada y estado CON_DEUDA NO está debiendo aún si pagó mes anterior', () => {
+    // Al iniciar el mes, calculoDeuda imputa la cuota del mes a deuda_acumulada y pone estado CON_DEUDA.
+    // Esto no debe tratarse como mora ni mostrar "tu turno queda disponible" en el día 1.
+    const fechaSimulada = new Date('2026-10-01T12:00:00Z');
+    const debiendo = socioEstaDebiendo({
+      deuda_acumulada: 75000,
+      estado: 'CON_DEUDA',
+      ultimo_mes_pagado: '2026-09',
+      fechaReferencia: fechaSimulada
+    });
+    assert.strictEqual(debiendo, false);
+  });
+
   it('socio con deuda acumulada previa > 0 SÍ está debiendo aunque sea día 2', () => {
     const fechaSimulada = new Date('2026-09-02T10:00:00Z');
     const debiendo = socioEstaDebiendo({

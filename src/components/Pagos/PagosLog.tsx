@@ -16,6 +16,7 @@ import { PagosTable } from './PagosTable';
 import { PagoDeleteModal } from './PagoDeleteModal';
 import { PagoEditModal } from './PagoEditModal';
 import { BalanceTab } from './BalanceTab';
+import { hoyArgentina } from '../../lib/fechas';
 
 interface PagosLogProps {
   showAddPagoModal: boolean;
@@ -50,20 +51,21 @@ const ORIGENES_GASTO: { id: OrigenGasto; label: string; shortLabel: string; emoj
   { id: 'EFECTIVO_CAJA', label: 'Efectivo de Caja', shortLabel: 'Efectivo Caja', emoji: '💵', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
 ];
 
-// Genera los últimos N meses desde hoy de forma dinámica
-function generarUltimosMeses(n = 12) {
+// Genera los últimos N meses desde hoy de forma dinámica según la hora de Argentina
+function generarUltimosMeses(n = 18) {
   const meses: { value: string; label: string }[] = [];
-  const now = new Date();
+  const hoy = hoyArgentina().slice(0, 7);
+  const [hoyAnio, hoyMes] = hoy.split('-').map(Number);
   const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   for (let i = 0; i < n; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(hoyAnio, hoyMes - 1 - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = `${MESES_ES[d.getMonth()]} ${d.getFullYear()}`;
     meses.push({ value, label });
   }
   return meses;
 }
-const MESES_OPCIONES = generarUltimosMeses(12);
+const MESES_OPCIONES = generarUltimosMeses(18);
 
 export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAddPagoModal }) => {
   const { 
@@ -78,7 +80,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   // ─── INGRESOS STATE ──────────────────────────────────────────────
   const [buscarCliente, setBuscarCliente] = useState('');
   const [filtroMedio, setFiltroMedio] = useState<string>('TODOS');
-  const [filtroMes, setFiltroMes] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [filtroMes, setFiltroMes] = useState<string>(() => hoyArgentina().slice(0, 7));
 
   const [showImportStatementModal, setShowImportStatementModal] = useState(false);
   const [receiptClientText, setReceiptClientText] = useState<string | null>(null);
@@ -115,7 +117,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   };
 
   // ─── EGRESOS STATE ───────────────────────────────────────────────
-  const [filtroMesGastos, setFiltroMesGastos] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [filtroMesGastos, setFiltroMesGastos] = useState<string>(() => hoyArgentina().slice(0, 7));
   const [filtroCatGastos, setFiltroCatGastos] = useState<string>('TODOS');
   const [filtroOrigenGasto, setFiltroOrigenGasto] = useState<string>('TODOS');
   const [showGastoModal, setShowGastoModal] = useState(false);
@@ -124,17 +126,17 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     monto: '',
     categoria: 'OTROS' as Gasto['categoria'],
     efectuado_por: 'JUANCHI_TRANSFERENCIA' as OrigenGasto,
-    fecha: new Date().toISOString().slice(0, 10)
+    fecha: hoyArgentina()
   });
   const [gastoErr, setGastoErr] = useState('');
   const [gastoOk, setGastoOk] = useState('');
 
   // ─── LIQUIDACION STATE ───────────────────────────────────────────
-  const [filtroMesLiq, setFiltroMesLiq] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [filtroMesLiq, setFiltroMesLiq] = useState<string>(() => hoyArgentina().slice(0, 7));
   const [showNovedadModal, setShowNovedadModal] = useState(false);
   const [novedadForm, setNovedadForm] = useState({
     profesor_id: '',
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyArgentina(),
     turno_id: '',
     tipo: 'AUSENCIA' as 'AUSENCIA' | 'REEMPLAZO',
     reemplazo_profesor_id: ''

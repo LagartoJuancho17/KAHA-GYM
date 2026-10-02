@@ -388,4 +388,47 @@ test('generarInformeAnalisisIA produce un informe detallado con rol, métricas, 
   assert.match(informe, /Alumnos Activos Registrados/);
 });
 
+test('Compensación con balance deficitario (inicio de mes): Juanchi y Rulo equilibran egresos', () => {
+  // Caso real del 1 de octubre: Rulo pagó más gastos que Juanchi
+  const comp = calcularCompensacionSocios(-1292611, -3467750, 0);
+  assert.equal(comp.debeTransferir, 'JUANCHI');
+  // Base total = -4.760.361. Cuota 50% = -2.380.180. Diferencia Juanchi = -1.292.611 - (-2.380.180) = 1.087.569
+  assert.equal(comp.montoTransferencia, 1087569);
+  assert.match(comp.detalle, /saldo neto deficitario/);
+  assert.match(comp.detalle, /Rulo absorbió/);
+});
+
+test('Balance con cambio de mes: excluye socios en reposo, perdonados y altas futuras', () => {
+  const planes: Plan[] = [
+    { id: 'p1', nombre: 'Pase Libre', precio: 50000, dias_por_semana: 5 }
+  ] as unknown as Plan[];
+
+  const clientes: Cliente[] = [
+    // Socio normal activo deudor en septiembre
+    { id: 'c1', nombre: 'Activo', apellido: '1', email: 'c1@test.com', activo: true, plan_id: 'p1', creado_at: '2026-08-01' },
+    // Socio en reposo (no debe sumar a deuda pendiente)
+    { id: 'c2', nombre: 'Reposo', apellido: '2', email: 'c2@test.com', activo: true, plan_id: 'p1', creado_at: '2026-08-01', reposo: { desde: '2026-09-01', hasta: '2027-03-01' } },
+    // Socio perdonado (no debe sumar a deuda)
+    { id: 'c3', nombre: 'Perdonado', apellido: '3', email: 'c3@test.com', activo: true, plan_id: 'p1', creado_at: '2026-08-01', exencion_cobro: 'PERDONADO' },
+    // Socio nuevo de octubre (en balance de septiembre no existía)
+    { id: 'c4', nombre: 'Futuro', apellido: '4', email: 'c4@test.com', activo: true, plan_id: 'p1', creado_at: '2026-10-01' }
+  ] as unknown as Cliente[];
+
+  const balanceSep = calcularBalanceMes({
+    mes: '2026-09',
+    pagos: [],
+    gastos: [],
+    clientes,
+    planes,
+    profesores: [],
+    turnos: [],
+    novedadesProfesores: []
+  });
+
+  // Solo c1 debe contar como deudor en septiembre (1 socio = $50.000)
+  assert.equal(balanceSep.sociosDeudoresCount, 1);
+  assert.equal(balanceSep.deudaPendienteCobro, 50000);
+});
+
+
 

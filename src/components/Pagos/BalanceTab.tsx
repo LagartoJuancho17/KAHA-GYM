@@ -13,27 +13,14 @@ import {
 } from '../../lib/balanceFinanciero';
 import { FacturacionRuloModal } from './FacturacionRuloModal';
 import { puedeVerFacturacionRulo } from '../../lib/facturacionRulo';
+import { hoyArgentina } from '../../lib/fechas';
 
 interface BalanceTabProps {
   mostrarBalance: boolean;
   onToggleBalance: () => void;
 }
 
-// Genera los últimos 12 meses para el selector
-function generarUltimosMeses(n = 12) {
-  const meses: { value: string; label: string }[] = [];
-  const now = new Date();
-  const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  for (let i = 0; i < n; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = `${MESES_ES[d.getMonth()]} ${d.getFullYear()}`;
-    meses.push({ value, label });
-  }
-  return meses;
-}
-
-const MESES_OPCIONES = generarUltimosMeses(12);
+const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggleBalance }) => {
   const { 
@@ -43,7 +30,7 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
   } = useGym();
 
   const [mesSeleccionado, setMesSeleccionado] = useState<string>(() => {
-    return new Date().toISOString().slice(0, 7);
+    return hoyArgentina().slice(0, 7);
   });
 
   const [incluirEfectivo, setIncluirEfectivo] = useState<boolean>(() => {
@@ -75,14 +62,54 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
     return puedeVerFacturacionRulo(googleUser?.email);
   }, [googleUser?.email]);
 
+  // Lista dinámica de meses: incluye los últimos 18 meses, el mes actual de Argentina,
+  // y cualquier mes histórico que registre pagos o gastos.
+  const mesesOpciones = useMemo(() => {
+    const setMeses = new Set<string>();
+    const mesHoy = hoyArgentina().slice(0, 7);
+    setMeses.add(mesHoy);
+    if (mesSeleccionado) setMeses.add(mesSeleccionado);
+
+    // Últimos 18 meses hacia atrás desde hoy
+    const [hoyAnio, hoyNumMes] = mesHoy.split('-').map(Number);
+    for (let i = 0; i < 18; i++) {
+      const d = new Date(hoyAnio, hoyNumMes - 1 - i, 1);
+      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      setMeses.add(val);
+    }
+
+    // Meses con pagos registrados
+    (pagos || []).forEach(p => {
+      if (p.mes_correspondiente && /^\d{4}-\d{2}$/.test(p.mes_correspondiente)) {
+        setMeses.add(p.mes_correspondiente);
+      }
+    });
+
+    // Meses con gastos registrados
+    (gastos || []).forEach(g => {
+      if (g.fecha && g.fecha.length >= 7) {
+        const m = g.fecha.slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(m)) {
+          setMeses.add(m);
+        }
+      }
+    });
+
+    const ordenados = Array.from(setMeses).sort().reverse();
+    return ordenados.map(value => {
+      const [year, month] = value.split('-').map(Number);
+      const label = `${MESES_ES[(month || 1) - 1]} ${year}`;
+      return { value, label };
+    });
+  }, [pagos, gastos, mesSeleccionado]);
+
   // Nombre legible del mes seleccionado
   const nombreMesSeleccionado = useMemo(() => {
-    const found = MESES_OPCIONES.find(m => m.value === mesSeleccionado);
+    const found = mesesOpciones.find(m => m.value === mesSeleccionado);
     if (found) return found.label;
     const [year, month] = mesSeleccionado.split('-').map(Number);
-    const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     return `${MESES_ES[(month || 1) - 1]} ${year}`;
-  }, [mesSeleccionado]);
+  }, [mesSeleccionado, mesesOpciones]);
 
   // Cálculo del balance del mes corriente
   const balance = useMemo(() => {
@@ -135,7 +162,11 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
   const handleCopiarIA = () => {
     const pagosMes = (pagos || []).filter(p => p.mes_correspondiente === mesSeleccionado);
     const gastosMes = (gastos || []).filter(g => (g.fecha || '').startsWith(mesSeleccionado));
-    const totalSociosActivos = (clientes || []).filter(c => c.activo).length;
+    const totalSociosActivos = (clientes || []).filter(c => {
+      if (!c.activo || c.reposo?.desde) return false;
+      if (c.creado_at && c.creado_at.slice(0, 7) > mesSeleccionado) return false;
+      return true;
+    }).length;
 
     const texto = generarInformeAnalisisIA({
       balance,
@@ -172,15 +203,15 @@ export const BalanceTab: React.FC<BalanceTabProps> = ({ mostrarBalance, onToggle
             onChange={e => setMesSeleccionado(e.target.value)}
             className="border border-zinc-300 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-900 bg-zinc-50 outline-hidden focus:border-zinc-800 cursor-pointer shadow-2xs"
           >
-            {MESES_OPCIONES.map(m => (
+            {mesesOpciones.map(m => (
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
           </select>
 
           {/* Botón rápido mes actual */}
-          {mesSeleccionado !== new Date().toISOString().slice(0, 7) && (
+          {mesSeleccionado !== hoyArgentina().slice(0, 7) && (
             <button
-              onClick={() => setMesSeleccionado(new Date().toISOString().slice(0, 7))}
+              onClick={() => setMesSeleccionado(hoyArgentina().slice(0, 7))}
               className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
             >
               Ir a Mes Actual

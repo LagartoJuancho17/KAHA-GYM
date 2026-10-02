@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Copy, Check, X, Bell, Calendar, ChevronDown, ChevronUp, MessageCircle, Send, EyeOff } from 'lucide-react';
 import { useGym } from '../../GymContext';
 
@@ -70,6 +70,11 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
   const [expanded, setExpanded] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
+  const novedadesRef = useRef(novedades);
+  novedadesRef.current = novedades;
+  const deleteNovedadRef = useRef(deleteNovedad);
+  deleteNovedadRef.current = deleteNovedad;
+
   const checkStatus = useCallback(() => {
     if (!visible) {
       setShouldRender(false);
@@ -81,11 +86,12 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     const { yyyy, mm } = getMesActual();
     const proximoMes = getProximoMesNombre();
     const mesActualNombre = MESES_ES[hoy.getMonth()];
+    const currentNovedades = novedadesRef.current || [];
 
     // ── 1. Verificar si ya está publicado en la base de datos (novedades) ───
     // Si ya existe una novedad con el título del próximo mes y el texto del recordatorio,
     // NO mostrar el banner flotante en ningún dispositivo ni navegador.
-    const yaPublicado = (novedades || []).some(n => 
+    const yaPublicado = currentNovedades.some(n => 
       n.titulo?.trim().toLowerCase() === proximoMes.toLowerCase() &&
       n.contenido?.includes('¡Se viene un nuevo mes en KAHA!')
     );
@@ -96,13 +102,13 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     }
 
     // ── 2. Limpieza de mensajes mensuales viejos de meses anteriores ─────────
-    const viejosMensajes = (novedades || []).filter(n => 
+    const viejosMensajes = currentNovedades.filter(n => 
       n.contenido?.includes('¡Se viene un nuevo mes en KAHA!') &&
       n.titulo?.trim().toLowerCase() !== proximoMes.toLowerCase() &&
       n.titulo?.trim().toLowerCase() !== mesActualNombre.toLowerCase()
     );
     for (const viejo of viejosMensajes) {
-      deleteNovedad(viejo.id);
+      deleteNovedadRef.current(viejo.id, true);
     }
 
     // ── 3. Auto-borrado el día 5 del mes ───────────────────────────────────
@@ -110,7 +116,7 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     const yyyyAnterior = mm === 1 ? yyyy - 1 : yyyy;
     const novedadIdMesAnterior = localStorage.getItem(novedadIdStorageKey(yyyyAnterior, mesAnterior));
     if (novedadIdMesAnterior && diaHoy >= 5) {
-      deleteNovedad(novedadIdMesAnterior);
+      deleteNovedadRef.current(novedadIdMesAnterior, true);
       localStorage.removeItem(novedadIdStorageKey(yyyyAnterior, mesAnterior));
     }
 
@@ -143,13 +149,26 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
     } else {
       setIsOpen(true);
     }
-  }, [visible, deleteNovedad, novedades]);
+  }, [visible]);
 
   useEffect(() => {
     checkStatus();
     const interval = setInterval(checkStatus, 30 * 60 * 1000); // Chequea cada 30 min
     return () => clearInterval(interval);
   }, [checkStatus]);
+
+  // Si novedades cambia externamente, actualizar visibilidad si ya se publicó
+  useEffect(() => {
+    if (!visible) return;
+    const proximoMes = getProximoMesNombre();
+    const yaPublicado = (novedades || []).some(n => 
+      n.titulo?.trim().toLowerCase() === proximoMes.toLowerCase() &&
+      n.contenido?.includes('¡Se viene un nuevo mes en KAHA!')
+    );
+    if (yaPublicado) {
+      setShouldRender(false);
+    }
+  }, [novedades, visible]);
 
   const handleCopiar = async () => {
     try {
@@ -216,7 +235,7 @@ export const MensajeMensualReminder: React.FC<MensajeMensualReminderProps> = ({ 
         n.titulo?.trim().toLowerCase() !== proximoMes.toLowerCase() &&
         n.titulo?.trim().toLowerCase() !== mesActualNombre.toLowerCase()
       );
-      viejas.forEach(v => deleteNovedad(v.id));
+      viejas.forEach(v => deleteNovedad(v.id, true));
 
       const result = addNovedad({
         titulo: proximoMes,

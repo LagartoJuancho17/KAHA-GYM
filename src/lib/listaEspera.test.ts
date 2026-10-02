@@ -196,6 +196,32 @@ test('Socio con Prioridad que ya tiene reserva en una fecha puntual no entra en 
   assert.equal(espera21[0].cliente_id, 'juana');
 });
 
+test('REGRESION: Socio con Prioridad (VIP) que canceló o suspendió su clase en una fecha puntual NO entra en espera', () => {
+  const prioridades = vip(['angeles', 'VIERNES-20:00']);
+  const clientes = [
+    {
+      id: 'angeles',
+      activo: true,
+      clases_suspendidas: [{ turno_id: 'VIERNES-20:00', fecha: '2026-10-02' }]
+    }
+  ];
+  // El viernes 02/10 donde canceló/suspendió: NO debe figurar en lista de espera
+  const esperaHoy = esperaDelTurno([], 'VIERNES-20:00', '2026-10-02', prioridades, { clientes });
+  assert.equal(esperaHoy.length, 0, 'No debe sintetizarse en espera si canceló/suspendió la clase');
+
+  // Incluso con una fila explícita en espera, si tiene suspensión ese día queda excluida
+  const filaExplicita = [
+    w('wl-1', 'angeles', '2026-10-01T10:00:00Z', 'VIERNES-20:00', '2026-10-02')
+  ];
+  const esperaConFila = esperaDelTurno(filaExplicita, 'VIERNES-20:00', '2026-10-02', prioridades, { clientes });
+  assert.equal(esperaConFila.length, 0, 'No debe quedar en espera si suspendió');
+
+  // El viernes siguiente (09/10 sin suspensión): sí figura con prioridad
+  const esperaSemanaSiguiente = esperaDelTurno([], 'VIERNES-20:00', '2026-10-09', prioridades, { clientes });
+  assert.equal(esperaSemanaSiguiente.length, 1);
+  assert.equal(esperaSemanaSiguiente[0].cliente_id, 'angeles');
+});
+
 // --- Lista de Espera de Matriz Fija con prioridad en Turnera semanal --------
 
 test('Matriz Fija: Alumno en lista_espera_ids (Jaqueline Sadras) figura automáticamente en Turnera semanal', () => {

@@ -99,7 +99,19 @@ export function esperaDelTurno(
     listaEsperaFija?: string[];
   }
 ): WaitlistReserva[] {
-  const delTurno = [...(todas || []).filter(w => w.turno_id === turnoId && w.fecha === fecha)];
+  const delTurno = [...(todas || []).filter(w => {
+    if (w.turno_id !== turnoId || w.fecha !== fecha) return false;
+    if (opciones?.clientes) {
+      const cl = opciones.clientes.find(c => c.id === w.cliente_id);
+      if (cl) {
+        if (cl.activo === false) return false;
+        if (cl.turnos_fijos?.includes(turnoId)) return false;
+        if ((cl.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === fecha)) return false;
+        if ((cl.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha)) return false;
+      }
+    }
+    return true;
+  })];
 
   // Lista de espera fija del turno (de la matriz fija semanal)
   const listaFija = opciones?.listaEsperaFija || (opciones?.turnos?.find(t => t.id === turnoId)?.lista_espera_ids) || [];

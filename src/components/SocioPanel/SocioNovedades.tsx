@@ -6,8 +6,13 @@ import { Megaphone, Award, User, Search, AlertTriangle, CheckCircle2 } from 'luc
 import {
   TITULO_RECORDATORIO_DEUDA,
   MENSAJE_RECORDATORIO_DEUDA,
+  TITULO_AVISO_VENCIMIENTO,
+  MENSAJE_AVISO_VENCIMIENTO,
+  DIA_BAJA_RESERVA,
+  DIA_AVISO_VENCIMIENTO,
   socioEstaDebiendo
 } from '../../lib/recordatorioDeuda';
+import { hoyArgentina } from '../../lib/fechas';
 
 export const SocioNovedades: React.FC = () => {
   const { novedades, clientes, pagos, selectedSocioId } = useGym();
@@ -21,11 +26,13 @@ export const SocioNovedades: React.FC = () => {
     const socio = clientes.find(c => c.id === selectedSocioId);
     if (!socio) return null;
 
-    const hoy = new Date();
-    const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    const hoyArg = hoyArgentina();
+    const [year, month, day] = hoyArg.split('-').map(Number);
+    const mesActual = `${year}-${String(month).padStart(2, '0')}`;
+    const mesAnterior = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
     const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    const nombreMes = MESES_ES[hoy.getMonth()];
+    const nombreMes = MESES_ES[month - 1];
 
     // Validación estricta: SOLAMENTE a los socios que están debiendo
     const debiendo = socioEstaDebiendo({
@@ -36,21 +43,24 @@ export const SocioNovedades: React.FC = () => {
       exencion_cobro: socio.exencion_cobro,
       pagos,
       socioId: socio.id,
-      fechaReferencia: hoy
+      fechaReferencia: new Date(year, month - 1, day)
     });
 
     if (!debiendo) return null;
 
-    return { nombreMes, mesActual, socio };
+    const tieneDeudaPrevia = Boolean(socio.ultimo_mes_pagado && socio.ultimo_mes_pagado < mesAnterior);
+    const esTurnoLiberado = day >= DIA_BAJA_RESERVA || tieneDeudaPrevia;
+
+    return { nombreMes, mesActual, socio, esTurnoLiberado };
   }, [selectedSocioId, pagos, clientes]);
 
   const recordatorioNovedad = useMemo<Novedad | null>(() => {
     if (!alertaPago || !selectedSocioId) return null;
     return {
       id: `recordatorio-pago-${alertaPago.mesActual}-${selectedSocioId}`,
-      titulo: TITULO_RECORDATORIO_DEUDA,
-      contenido: MENSAJE_RECORDATORIO_DEUDA,
-      fecha: `${alertaPago.mesActual}-06`,
+      titulo: alertaPago.esTurnoLiberado ? TITULO_RECORDATORIO_DEUDA : TITULO_AVISO_VENCIMIENTO,
+      contenido: alertaPago.esTurnoLiberado ? MENSAJE_RECORDATORIO_DEUDA : MENSAJE_AVISO_VENCIMIENTO,
+      fecha: `${alertaPago.mesActual}-${String(alertaPago.esTurnoLiberado ? DIA_BAJA_RESERVA : DIA_AVISO_VENCIMIENTO).padStart(2, '0')}`,
       categoria: 'ARANCELES',
       creado_por: 'KAHA GYM',
       destacado: true,

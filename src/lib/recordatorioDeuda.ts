@@ -68,11 +68,15 @@ export interface SocioCheckDeudaParams {
 }
 
 /**
- * Determina estrictamente si un socio "está debiendo" o no.
+ * Determina estrictamente si un socio "está debiendo" o no a efectos de recordatorios y cobros.
  * Devuelve true si y solo si:
- * - Tiene deuda acumulada mayor a 0 o estado CON_DEUDA / MOROSO, O
- * - Pasó la fecha prevista de pago (a partir del día 6) y no registra pago del mes actual.
- * Los socios con exención sin deuda y los socios al día devuelven false.
+ * - Tiene estado explícito MOROSO (plazo vencido de mes actual o previo), O
+ * - Ya pagó el mes actual pero aún arrastra saldo deudor previo (> 0), O
+ * - No pagó el mes actual y ya llegó o pasó el día de aviso (día 5 en adelante), O
+ * - Está dentro de los primeros días (días 1 a 4) pero no pagó el mes anterior (arrastra mora).
+ * 
+ * Los socios al día, los socios dentro de los días 1 a 4 con mes previo pago,
+ * los socios con exención sin deuda y los socios en reposo devuelven false.
  */
 export const socioEstaDebiendo = (params: SocioCheckDeudaParams): boolean => {
   const {
@@ -98,19 +102,40 @@ export const socioEstaDebiendo = (params: SocioCheckDeudaParams): boolean => {
     return false;
   }
 
-  // 1. Deuda acumulada explícita o estado de mora
-  if (deuda_acumulada > 0 || estado === 'CON_DEUDA' || estado === 'MOROSO') {
+  // 1. Estado explícito MOROSO siempre debe
+  if (estado === 'MOROSO') {
     return true;
   }
 
-  // 2. Control de mes en curso: a partir del día 6 (el plazo es 1 al 5)
   const diaMes = fechaReferencia.getDate();
-  const mesActual = `${fechaReferencia.getFullYear()}-${String(fechaReferencia.getMonth() + 1).padStart(2, '0')}`;
+  const yearRef = fechaReferencia.getFullYear();
+  const monthRef = fechaReferencia.getMonth(); // 0-indexed (0 = Enero)
+  const mesActual = `${yearRef}-${String(monthRef + 1).padStart(2, '0')}`;
+  const mesAnterior = monthRef === 0
+    ? `${yearRef - 1}-12`
+    : `${yearRef}-${String(monthRef).padStart(2, '0')}`;
 
   const tienePagoMes = (ultimo_mes_pagado && ultimo_mes_pagado >= mesActual) ||
     (socioId ? pagos.some(p => p.cliente_id === socioId && p.mes_correspondiente === mesActual) : false);
 
-  if (diaMes >= 6 && !tienePagoMes) {
+  // 2. Si ya pagó el mes actual: solo debe si todavía arrastra deuda previa
+  if (tienePagoMes) {
+    return deuda_acumulada > 0;
+  }
+
+  // 3. No pagó el mes actual:
+  // Si ya llegó o pasó la fecha de aviso de vencimiento (día 5 en adelante):
+  if (diaMes >= DIA_AVISO_VENCIMIENTO) {
+    return true;
+  }
+
+  // 4. Días 1 a 4 (inicio del mes en curso, plazo regular de gracia 1 al 5):
+  // En GymContext, al inicio de mes a todos los socios se les imputa la cuota en
+  // deuda_acumulada y pasan a CON_DEUDA. Pero un socio que pagó el mes anterior
+  // está en su plazo regular de pago, NO está en mora.
+  // Solo debe si NO pagó el mes anterior (arrastra mora de meses pasados).
+  const tienePagoMesAnterior = Boolean(ultimo_mes_pagado && ultimo_mes_pagado >= mesAnterior);
+  if (!tienePagoMesAnterior) {
     return true;
   }
 
