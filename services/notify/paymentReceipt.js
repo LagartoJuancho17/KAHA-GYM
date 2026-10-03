@@ -8,9 +8,15 @@ export function paymentReceiptParameters(payment, client) {
   ];
 }
 
+export function senderPhoneMatches(expected, actual) {
+  const expectedPhone = normalizeArgPhone(expected);
+  const actualPhone = normalizeArgPhone(actual);
+  return Boolean(expectedPhone && actualPhone && expectedPhone === actualPhone);
+}
+
 export function createPaymentReceiptHandler({ db, fetchImpl = fetch, env = process.env }) {
   return async (req, res) => {
-    if (!db || !env.SUPABASE_SERVICE_ROLE_KEY || !env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    if (!db || !env.SUPABASE_SERVICE_ROLE_KEY || !env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID || !env.WHATSAPP_EXPECTED_SENDER) {
       return res.status(503).json({ error: 'not_configured' });
     }
     const paymentId = req.body?.paymentId;
@@ -30,6 +36,25 @@ export function createPaymentReceiptHandler({ db, fetchImpl = fetch, env = proce
     const to = normalizeArgPhone(client.telefono);
     if (!isSendablePhone(to)) return res.status(200).json({ status: 'invalid_phone' });
 
+    // Check Meta's actual sender before reserving the payment. A wrong phone ID
+    // must never send a receipt from another KAHA number or consume the claim.
+    const graphBase = `https://graph.facebook.com/${env.WHATSAPP_API_VERSION || 'v26.0'}/${env.WHATSAPP_PHONE_NUMBER_ID}`;
+    let senderPhone;
+    try {
+      const senderResponse = await fetchImpl(`${graphBase}?fields=display_phone_number`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(8000),
+        headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` }
+      });
+      if (!senderResponse.ok) return res.status(503).json({ error: 'sender_lookup_failed' });
+      senderPhone = (await senderResponse.json()).display_phone_number;
+    } catch {
+      return res.status(503).json({ error: 'sender_lookup_failed' });
+    }
+    if (!senderPhoneMatches(env.WHATSAPP_EXPECTED_SENDER, senderPhone)) {
+      return res.status(503).json({ error: 'sender_mismatch' });
+    }
+
     // pago_id is unique. A repeated request cannot send a second message, including when
     // Meta accepted the first request but the network response was lost.
     const { error: claimError } = await db.from('recibos_whatsapp').insert({ pago_id: paymentId, estado: 'ENVIANDO' });
@@ -38,7 +63,7 @@ export function createPaymentReceiptHandler({ db, fetchImpl = fetch, env = proce
 
     let result = { estado: 'INCIERTO', error_codigo: 'network_error' };
     try {
-      const response = await fetchImpl(`https://graph.facebook.com/${env.WHATSAPP_API_VERSION || 'v26.0'}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+      const response = await fetchImpl(`${graphBase}/messages`, {
         method: 'POST',
         signal: AbortSignal.timeout(8000),
         headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
