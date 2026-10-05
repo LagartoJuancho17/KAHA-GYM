@@ -4,7 +4,7 @@ import { useGym } from '../../GymContext';
 import { Cliente, Turno } from '../../types';
 import { 
   Download, Copy, Check, X, Calendar, Moon, Sun, 
-  ChevronLeft, ChevronRight, Eye, Sparkles, Layers, UserCheck
+  ChevronLeft, ChevronRight, Eye, Sparkles, Layers, Share2, ExternalLink
 } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 import { esperaDelTurno } from '../../lib/listaEspera';
@@ -70,8 +70,29 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
   const [showDesglose, setShowDesglose] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [isMobileDevice, setIsMobileDevice] = useState<boolean>(false);
+  const [canShareFiles, setCanShareFiles] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Mobile and Web Share detection
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1);
+      setIsMobileDevice(Boolean(mobile));
+
+      if (typeof File !== 'undefined' && typeof navigator.canShare === 'function') {
+        try {
+          const testFile = new File([''], 'test.png', { type: 'image/png' });
+          setCanShareFiles(navigator.canShare({ files: [testFile] }));
+        } catch {
+          setCanShareFiles(false);
+        }
+      }
+    }
+  }, []);
 
   // Sync mode if initialMode changes when modal opens
   useEffect(() => {
@@ -472,25 +493,86 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
     ctx.fillText(`Generado el ${fechaHoraGen} hs · KAHA GYM Sistema Oficial`, paddingX + contentW - 10, footerY + 16);
 
     ctx.restore();
+
+    // Generate blob preview URL for real <img> tag (essential for mobile long-press)
+    canvas.toBlob(blob => {
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        setPreviewUrl(prev => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+      }
+    }, 'image/png');
   }, [isOpen, mode, weekOffset, theme, showProfesor, showDesglose, weekDates, weekLabel, turnos, clientes, recuperos, waitlistReservas, sociosPrioritarios]);
+
+  // Cleanup object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   if (!isOpen) return null;
 
-  const handleDownload = () => {
+  // Universal Download / Share Handler for Desktop and Mobile (iOS / Android)
+  const handleDownload = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     setDownloading(true);
 
+    const fileName = mode === 'SEMANAL' 
+      ? `kaha-gym-turnera-semanal-${weekDates['LUNES'] || 'semana'}.png`
+      : 'kaha-gym-matriz-fija-semanal.png';
+
     try {
-      const fileNamePrefix = mode === 'SEMANAL' 
-        ? `kaha-gym-turnera-semanal-${weekDates['LUNES'] || 'semana'}`
-        : 'kaha-gym-matriz-fija-semanal';
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+      if (!blob) throw new Error('No se pudo generar la imagen');
+
+      // 1. Web Share API (Primary and native on iOS Safari & Android Chrome)
+      if (typeof File !== 'undefined' && typeof navigator !== 'undefined' && navigator.canShare) {
+        try {
+          const file = new File([blob], fileName, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Turnera KAHA GYM',
+              text: mode === 'SEMANAL' ? `Turnera Semanal KAHA GYM (${weekLabel})` : 'Matriz Fija Semanal KAHA GYM'
+            });
+            return;
+          }
+        } catch (shareErr: any) {
+          // If the user cancelled or swiped down the share sheet, exit smoothly
+          if (shareErr?.name === 'AbortError') return;
+          console.warn('Web Share intentó y falló, continuando con fallback de descarga:', shareErr);
+        }
+      }
+
+      // 2. Blob URL Download (Standard for Desktop Chrome, Firefox, Edge, Safari Desktop)
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = `${fileNamePrefix}.png`;
-      link.href = canvas.toDataURL('image/png', 1.0);
+      link.download = fileName;
+      link.href = blobUrl;
+      link.target = '_blank';
+      document.body.appendChild(link);
       link.click();
-    } catch (err) {
-      console.error('Error al descargar la imagen:', err);
+      document.body.removeChild(link);
+
+      // Clean up after small delay
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+    } catch (err: any) {
+      console.error('Error al descargar o compartir imagen:', err);
+
+      // 3. Fallback: Open image in new window/tab so user can long-press to save
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const w = window.open('');
+        if (w) {
+          w.document.write(`<title>Turnera KAHA GYM</title><body style="margin:0;background:#090d16;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;"><img src="${dataUrl}" style="max-width:100%;height:auto;display:block;" alt="Turnera KAHA GYM"/><p style="color:#fff;font-family:sans-serif;text-align:center;padding:16px;font-size:14px;">Mantené presionada la imagen para Guardar en Fotos o Compartir</p></body>`);
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback failed:', fallbackErr);
+      }
     } finally {
       setTimeout(() => setDownloading(false), 500);
     }
@@ -520,20 +602,34 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
     }
   };
 
+  const handleOpenFullscreen = () => {
+    if (previewUrl) {
+      window.open(previewUrl, '_blank');
+    } else if (canvasRef.current) {
+      const dataUrl = canvasRef.current.toDataURL('image/png');
+      const w = window.open('');
+      if (w) {
+        w.document.write(`<title>Turnera KAHA GYM</title><body style="margin:0;background:#090d16;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;"><img src="${dataUrl}" style="max-width:100%;height:auto;" alt="Turnera"/><p style="color:#fff;font-family:sans-serif;padding:12px;font-size:13px;">Mantené presionada la imagen para Guardar o Compartir</p></body>`);
+      }
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-3 sm:p-5 backdrop-blur-md font-sans text-xs">
-      <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden animate-scale-up">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-2 sm:p-5 backdrop-blur-md font-sans text-xs">
+      <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-5xl max-h-[96vh] flex flex-col overflow-hidden animate-scale-up">
         
         {/* MODAL HEADER */}
-        <div className="bg-zinc-950 text-white p-4 sm:p-5 flex justify-between items-center shrink-0 border-b border-zinc-800">
+        <div className="bg-zinc-950 text-white p-3.5 sm:p-5 flex justify-between items-center shrink-0 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-              <Download className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+              {isMobileDevice ? <Share2 className="w-4 h-4" /> : <Download className="w-4 h-4" />}
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Descargar Turnera en Imagen</h3>
-              <p className="text-zinc-400 text-xs mt-0.5">
-                Exportá la grilla completa con los 13 horarios sin cortes, lista para enviar por WhatsApp o imprimir
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                {isMobileDevice ? 'Guardar / Compartir Turnera' : 'Descargar Turnera en Imagen'}
+              </h3>
+              <p className="text-zinc-400 text-[11px] sm:text-xs mt-0.5 hidden xs:block">
+                Grilla completa con los 13 horarios sin cortes, lista para WhatsApp o imprimir
               </p>
             </div>
           </div>
@@ -547,44 +643,44 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
         </div>
 
         {/* MODAL CONTROLS / OPTIONS */}
-        <div className="p-4 bg-zinc-50 border-b border-zinc-200 flex flex-wrap gap-4 items-center justify-between shrink-0">
+        <div className="p-3 sm:p-4 bg-zinc-50 border-b border-zinc-200 flex flex-col md:flex-row gap-2.5 sm:gap-4 items-stretch md:items-center justify-between shrink-0 overflow-x-auto">
           
           {/* MODO TOGGLE (SEMANAL vs FIJA) */}
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-500 font-bold text-[11px] uppercase tracking-wider">Tipo:</span>
-            <div className="bg-zinc-200/80 p-0.5 rounded-lg flex gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-zinc-500 font-bold text-[10px] sm:text-[11px] uppercase tracking-wider">Tipo:</span>
+            <div className="bg-zinc-200/80 p-0.5 rounded-lg flex gap-1 flex-1 sm:flex-initial">
               <button
                 type="button"
                 onClick={() => setMode('SEMANAL')}
-                className={`px-3 py-1.5 rounded-md font-bold text-xs transition-all cursor-pointer border-none flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-bold text-[11px] sm:text-xs transition-all cursor-pointer border-none flex items-center justify-center gap-1.5 flex-1 sm:flex-initial ${
                   mode === 'SEMANAL'
                     ? 'bg-white text-zinc-900 shadow-xs'
                     : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
                 }`}
               >
-                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Turnera Semanal (Tiempo Real)</span>
+                <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Semanal (Tiempo Real)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setMode('FIJA')}
-                className={`px-3 py-1.5 rounded-md font-bold text-xs transition-all cursor-pointer border-none flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-bold text-[11px] sm:text-xs transition-all cursor-pointer border-none flex items-center justify-center gap-1.5 flex-1 sm:flex-initial ${
                   mode === 'FIJA'
                     ? 'bg-white text-zinc-900 shadow-xs'
                     : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5 text-violet-600" />
-                <span>Matriz Fija Semanal</span>
+                <Layers className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+                <span>Matriz Fija</span>
               </button>
             </div>
           </div>
 
           {/* WEEK SELECTOR (WHEN IN SEMANAL MODE) */}
           {mode === 'SEMANAL' && (
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-500 font-bold text-[11px] uppercase tracking-wider">Semana:</span>
-              <div className="flex items-center bg-white border border-zinc-200 rounded-lg p-1 shadow-2xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-zinc-500 font-bold text-[10px] sm:text-[11px] uppercase tracking-wider">Semana:</span>
+              <div className="flex items-center bg-white border border-zinc-200 rounded-lg p-0.5 sm:p-1 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setWeekOffset(prev => prev - 1)}
@@ -593,7 +689,7 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="px-2 font-mono font-bold text-zinc-800 text-xs min-w-[130px] text-center">
+                <span className="px-2 font-mono font-bold text-zinc-800 text-[11px] sm:text-xs min-w-[110px] sm:min-w-[130px] text-center">
                   {weekLabel || 'Cargando...'}
                 </span>
                 <button
@@ -611,20 +707,20 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
                   onClick={() => setWeekOffset(semanaOffsetInicial())}
                   className="text-xs text-emerald-600 hover:underline font-bold cursor-pointer border-none bg-transparent"
                 >
-                  Semana actual
+                  Actual
                 </button>
               )}
             </div>
           )}
 
           {/* THEME & DETAILS TOGGLES */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
             {/* TEMA */}
-            <div className="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg p-1 shadow-2xs">
+            <div className="flex items-center gap-1 bg-white border border-zinc-200 rounded-lg p-0.5 sm:p-1 shadow-2xs">
               <button
                 type="button"
                 onClick={() => setTheme('DARK')}
-                className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer border-none ${
+                className={`px-2 py-1 rounded-md text-[11px] sm:text-xs font-bold flex items-center gap-1 cursor-pointer border-none ${
                   theme === 'DARK' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
                 }`}
               >
@@ -634,7 +730,7 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setTheme('LIGHT')}
-                className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer border-none ${
+                className={`px-2 py-1 rounded-md text-[11px] sm:text-xs font-bold flex items-center gap-1 cursor-pointer border-none ${
                   theme === 'LIGHT' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
                 }`}
               >
@@ -644,86 +740,127 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
             </div>
 
             {/* MOSTRAR PROFESORES */}
-            <label className="flex items-center gap-1.5 text-xs text-zinc-700 font-semibold cursor-pointer select-none">
+            <label className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-700 font-semibold cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={showProfesor}
                 onChange={e => setShowProfesor(e.target.checked)}
                 className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
               />
-              <span>Profesores</span>
+              <span>Profs</span>
             </label>
 
             {/* DESGLOSE F/V/R */}
             {mode === 'SEMANAL' && (
-              <label className="flex items-center gap-1.5 text-xs text-zinc-700 font-semibold cursor-pointer select-none">
+              <label className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-700 font-semibold cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={showDesglose}
                   onChange={e => setShowDesglose(e.target.checked)}
                   className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
-                <span>Desglose F/V/R</span>
+                <span>F/V/R</span>
               </label>
             )}
           </div>
         </div>
 
         {/* MODAL BODY: LIVE PREVIEW CONTAINER */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-zinc-900/95 flex flex-col items-center justify-center">
+        <div className="p-3 sm:p-6 overflow-y-auto flex-1 bg-zinc-900/95 flex flex-col items-center justify-center">
           <div className="w-full max-w-4xl bg-black/40 p-2 sm:p-3 rounded-2xl border border-zinc-800 shadow-2xl flex flex-col items-center">
-            <div className="flex items-center justify-between w-full pb-2 px-2 text-zinc-400 font-sans text-[11px]">
+            <div className="flex items-center justify-between w-full pb-2 px-1 text-zinc-400 font-sans text-[11px]">
               <span className="flex items-center gap-1.5 font-bold text-zinc-300">
                 <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                Vista previa de la imagen exportada (1440 × 1180 px en 2x Retina):
+                Vista previa completa (13 horarios):
               </span>
-              <span className="text-[10px] text-zinc-500">Muestra todos los 13 horarios sin cortes</span>
+              <button
+                type="button"
+                onClick={handleOpenFullscreen}
+                className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-none p-0"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Ver completa</span>
+              </button>
             </div>
 
-            <div className="w-full overflow-auto max-h-[50vh] rounded-xl border border-zinc-800 bg-zinc-950 flex justify-center p-2">
-              <canvas 
-                ref={canvasRef} 
-                className="max-w-full h-auto rounded-lg shadow-lg block"
-                style={{ maxHeight: '48vh' }}
-              />
+            {/* PREVIEW IMAGE CONTAINER (USING REAL <img> FOR MOBILE TOUCH/SAVE SUPPORT) */}
+            <div className="w-full overflow-auto max-h-[46vh] sm:max-h-[52vh] rounded-xl border border-zinc-800 bg-zinc-950 flex flex-col items-center justify-center p-2 relative">
+              {previewUrl ? (
+                <img 
+                  src={previewUrl} 
+                  alt="Turnera KAHA GYM" 
+                  className="max-w-full h-auto rounded-lg shadow-lg block select-none cursor-pointer"
+                  style={{ maxHeight: '44vh' }}
+                  title="Mantené presionada la imagen para Guardar o Compartir"
+                />
+              ) : (
+                <div className="py-16 text-zinc-500 font-medium text-xs flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 animate-spin text-emerald-400" />
+                  <span>Generando imagen de alta resolución...</span>
+                </div>
+              )}
+
+              {/* Hidden Canvas used for rendering in memory */}
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
+
+            {/* MOBILE TOUCH HINT BANNER */}
+            <div className="w-full mt-2.5 py-1.5 px-3 bg-emerald-950/70 border border-emerald-800/60 rounded-lg text-emerald-300 text-[10.5px] sm:text-xs flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <span>📱</span>
+                <span>
+                  <strong>Tip en celular:</strong> Podés tocar el botón verde abajo o <strong>mantener presionada la imagen</strong> arriba para guardarla directamente en tu galería de fotos.
+                </span>
+              </span>
             </div>
           </div>
         </div>
 
         {/* MODAL FOOTER WITH ACTIONS */}
-        <div className="p-4 bg-white border-t border-zinc-200 flex flex-wrap gap-3 items-center justify-between shrink-0">
-          <div className="text-xs text-zinc-500 font-medium">
-            💡 <strong className="text-zinc-700">Tip:</strong> Podés descargar el archivo en PNG o copiarlo directamente para pegar con <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-300 rounded text-[10px] font-mono font-bold">Ctrl+V</kbd> en WhatsApp Web.
+        <div className="p-3 sm:p-4 bg-white border-t border-zinc-200 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between shrink-0">
+          <div className="text-[11px] sm:text-xs text-zinc-500 font-medium hidden md:block">
+            💡 Podés descargar el archivo o copiarlo directamente para pegar con <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-300 rounded text-[10px] font-mono font-bold">Ctrl+V</kbd> en WhatsApp Web.
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-xl font-bold transition-all cursor-pointer bg-white"
+              className="px-3.5 py-2 border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-xl font-bold transition-all cursor-pointer bg-white text-xs"
             >
               Cerrar
             </button>
 
-            <button
-              type="button"
-              onClick={handleCopyClipboard}
-              className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-zinc-300 shadow-2xs"
-              title="Copiar imagen directamente al portapapeles"
-            >
-              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-zinc-700" />}
-              <span>{copied ? '¡Copiada al portapapeles!' : 'Copiar Imagen'}</span>
-            </button>
+            {!isMobileDevice && (
+              <button
+                type="button"
+                onClick={handleCopyClipboard}
+                className="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-zinc-300 shadow-2xs text-xs"
+                title="Copiar imagen directamente al portapapeles"
+              >
+                {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-zinc-700" />}
+                <span>{copied ? '¡Copiada!' : 'Copiar Imagen'}</span>
+              </button>
+            )}
 
             <button
               type="button"
               onClick={handleDownload}
               disabled={downloading}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer border-none shadow-sm disabled:opacity-50"
+              className="flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border-none shadow-sm disabled:opacity-50 text-xs sm:text-xs"
               id="btn-confirm-download-turnera"
             >
-              <Download className="w-4 h-4" />
-              <span>{downloading ? 'Generando...' : 'Descargar Imagen PNG'}</span>
+              {isMobileDevice && canShareFiles ? (
+                <>
+                  <Share2 className="w-4 h-4 text-emerald-100" />
+                  <span>{downloading ? 'Procesando...' : 'Guardar / Compartir (Celular)'}</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-emerald-100" />
+                  <span>{downloading ? 'Generando...' : 'Descargar Imagen PNG'}</span>
+                </>
+              )}
             </button>
           </div>
         </div>
