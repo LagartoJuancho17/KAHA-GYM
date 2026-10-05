@@ -42,6 +42,7 @@ interface GymContextType {
 
   // Gastos, Profesores and Novedades
   registrarGasto: (gasto: Omit<Gasto, 'id' | 'creado_at'>) => { success: boolean; message: string };
+  actualizarGasto: (id: string, updates: Partial<Omit<Gasto, 'id' | 'creado_at'>>) => { success: boolean; message: string };
   eliminarGasto: (id: string) => void;
   registrarProfesor: (profesor: Omit<Profesor, 'id' | 'activo'>) => { success: boolean; message: string };
   updateProfesor: (id: string, updates: Partial<Profesor>) => { success: boolean; message: string };
@@ -5442,6 +5443,41 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Gasto registrado exitosamente.' };
   };
 
+  const actualizarGasto = (id: string, updates: Partial<Omit<Gasto, 'id' | 'creado_at'>>) => {
+    const prevGasto = gastos.find(g => g.id === id);
+    if (!prevGasto) return { success: false, message: 'Gasto no encontrado.' };
+
+    const updatedGastos = gastos.map(g =>
+      g.id === id ? { ...g, ...updates } : g
+    );
+    setGastos(updatedGastos);
+    localStorage.setItem('gym_gastos', JSON.stringify(updatedGastos));
+
+    if (supabase) {
+      const payload: any = {};
+      if (updates.concepto !== undefined) payload.concepto = updates.concepto;
+      if (updates.monto !== undefined) payload.monto = updates.monto;
+      if (updates.categoria !== undefined) payload.categoria = updates.categoria;
+      if (updates.efectuado_por !== undefined) payload.efectuado_por = updates.efectuado_por;
+      if (updates.fecha !== undefined) payload.fecha = updates.fecha;
+      if (updates.registrado_por !== undefined) payload.registrado_por = updates.registrado_por;
+
+      supabase.from('gastos').update(payload).eq('id', id).then(({ error }) => {
+        if (error) console.warn('[KAHA] Error al actualizar gasto en Supabase:', error.message);
+      });
+    }
+
+    addAuditLog('GASTO_ACTUALIZADO', { 
+      id,
+      concepto: updates.concepto ?? prevGasto.concepto, 
+      monto: updates.monto ?? prevGasto.monto,
+      categoria: updates.categoria ?? prevGasto.categoria,
+      efectuado_por: updates.efectuado_por ?? prevGasto.efectuado_por
+    });
+    addToast('success', 'Gasto actualizado exitosamente.');
+    return { success: true, message: 'Gasto actualizado exitosamente.' };
+  };
+
   const eliminarGasto = (id: string) => {
     setGastos(prev => {
       const updated = prev.filter(g => g.id !== id);
@@ -5684,7 +5720,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       aprobarPagoTransferencia,
       rechazarPagoTransferencia,
       addNotificacion, marcarNotificacionesLeidas, eliminarNotificacion,
-      registrarGasto, eliminarGasto, registrarProfesor, updateProfesor, eliminarProfesor, registrarNovedadProfesor, eliminarNovedadProfesor,
+      registrarGasto, actualizarGasto, eliminarGasto, registrarProfesor, updateProfesor, eliminarProfesor, registrarNovedadProfesor, eliminarNovedadProfesor,
       addNovedad, updateNovedad, deleteNovedad,
       ejecutarCronMorosidad,
       borrarHistorial,

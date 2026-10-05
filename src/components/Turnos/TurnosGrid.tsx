@@ -12,8 +12,9 @@ import { TurnoDetailsModal } from './TurnoDetailsModal';
 import { TurnoRealtimeModal } from './TurnoRealtimeModal';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { SociosPrioritariosModal } from './SociosPrioritariosModal';
+import { TurnoExportModal } from './TurnoExportModal';
 import { SearchableSelect } from '../Common/SearchableSelect';
-import { History, Crown } from 'lucide-react';
+import { History, Crown, Download } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 import { esperaDelTurno } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
@@ -27,6 +28,8 @@ export const TurnosGrid: React.FC = () => {
   } = useGym();
 
   const [showPrioritariosModal, setShowPrioritariosModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportInitialMode, setExportInitialMode] = useState<'SEMANAL' | 'FIJA'>('SEMANAL');
   const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('TIEMPO_REAL');
   const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(() => semanaOffsetInicial());
   
@@ -293,6 +296,19 @@ export const TurnosGrid: React.FC = () => {
             <span>Socios con Prioridad</span>
           </button>
 
+          <button
+            onClick={() => {
+              setExportInitialMode(subTab === 'GRILLA' ? 'FIJA' : 'SEMANAL');
+              setShowExportModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer border-none"
+            id="btn-descargar-imagen-turnera"
+            title="Descargar imagen completa de la turnera (Semanal o Fija) con todos los horarios"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-100" />
+            <span>Descargar Imagen</span>
+          </button>
+
           <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 flex-wrap gap-1">
             <button
               onClick={() => setSubTab('TIEMPO_REAL')}
@@ -324,23 +340,39 @@ export const TurnosGrid: React.FC = () => {
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start text-xs">
           {/* MATRIX GRILLA DE TURNOS */}
           <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-xs xl:col-span-3 space-y-4">
-            <div className="flex justify-between items-center bg-zinc-50 p-3 rounded-lg border border-zinc-200 text-xs text-zinc-600 font-sans">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-50 p-3 rounded-lg border border-zinc-200 text-xs text-zinc-600 font-sans gap-3">
               <span className="font-semibold text-zinc-800">Haz clic en cualquier celda para administrar el turno semanal: fijos, flexibles, lista de espera o cupo máximo.</span>
               
-              {/* LEYENDAS COLORES */}
-              <div className="hidden sm:flex items-center gap-4 font-bold text-[9px] uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                  <span>Libre (&lt;70%)</span>
+              <div className="flex items-center gap-4 shrink-0 flex-wrap">
+                {/* LEYENDAS COLORES */}
+                <div className="hidden sm:flex items-center gap-4 font-bold text-[9px] uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span>Libre (&lt;70%)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <span>Saturación (70-90%)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span>Lleno (&gt;=90%)</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                  <span>Saturación (70-90%)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                  <span>Lleno (&gt;=90%)</span>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportInitialMode('FIJA');
+                    setShowExportModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-900 hover:bg-black text-white font-bold text-xs cursor-pointer border-none shadow-xs transition-all"
+                  title="Descargar imagen de la Matriz Fija Semanal con todos los horarios"
+                  id="btn-export-fija-png"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Descargar Matriz (PNG)</span>
+                </button>
               </div>
             </div>
 
@@ -449,17 +481,33 @@ export const TurnosGrid: React.FC = () => {
                 </p>
               </div>
 
-              {/* LEYENDAS */}
-              <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/80">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span> Libre (&lt;70%)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-full inline-block"></span> Sat. (70-90%)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full inline-block"></span> Lleno (&gt;=90%)
-                </span>
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* LEYENDAS */}
+                <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/80">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span> Libre (&lt;70%)
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 bg-amber-500 rounded-full inline-block"></span> Sat. (70-90%)
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full inline-block"></span> Lleno (&gt;=90%)
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportInitialMode('SEMANAL');
+                    setShowExportModal(true);
+                  }}
+                  className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer border-none shadow-sm"
+                  title="Descargar imagen completa de la turnera semanal con todos los horarios"
+                  id="btn-export-semanal-png"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-100" />
+                  <span>Descargar Turnera Semanal (PNG)</span>
+                </button>
               </div>
             </div>
 
@@ -1098,6 +1146,12 @@ export const TurnosGrid: React.FC = () => {
       <SociosPrioritariosModal
         isOpen={showPrioritariosModal}
         onClose={() => setShowPrioritariosModal(false)}
+      />
+
+      <TurnoExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        initialMode={exportInitialMode}
       />
     </div>
   );

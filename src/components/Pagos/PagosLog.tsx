@@ -6,7 +6,7 @@ import { Pago, MedioPago, Gasto, OrigenGasto } from '../../types';
 import { 
   Plus, DollarSign, ArrowDownRight, ArrowUpRight, X, Trash2,
   TrendingDown, Calendar, ChevronRight, AlertCircle, Receipt, Check,
-  Eye, EyeOff, User
+  Eye, EyeOff, User, Pencil, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 import { PagoFormModal } from './PagoFormModal';
@@ -70,7 +70,7 @@ const MESES_OPCIONES = generarUltimosMeses(18);
 export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAddPagoModal }) => {
   const { 
     pagos, clientes, planes, 
-    gastos, registrarGasto, eliminarGasto,
+    gastos, registrarGasto, actualizarGasto, eliminarGasto,
     profesores, turnos, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
     actualizarDestinoPago, eliminarPago
   } = useGym();
@@ -117,9 +117,21 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   };
 
   // ─── EGRESOS STATE ───────────────────────────────────────────────
+  type OrdenGastos = 
+    | 'FECHA_DESC' 
+    | 'FECHA_ASC' 
+    | 'ALFABETICO_ASC' 
+    | 'ALFABETICO_DESC' 
+    | 'MONTO_ASC' 
+    | 'MONTO_DESC' 
+    | 'CATEGORIA_ASC' 
+    | 'CATEGORIA_DESC';
+
   const [filtroMesGastos, setFiltroMesGastos] = useState<string>(() => hoyArgentina().slice(0, 7));
   const [filtroCatGastos, setFiltroCatGastos] = useState<string>('TODOS');
   const [filtroOrigenGasto, setFiltroOrigenGasto] = useState<string>('TODOS');
+  const [ordenGastos, setOrdenGastos] = useState<OrdenGastos>('FECHA_DESC');
+  const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [showGastoModal, setShowGastoModal] = useState(false);
   const [gastoForm, setGastoForm] = useState({
     concepto: '',
@@ -189,14 +201,76 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   };
 
   // ─── EGRESOS HANDLERS ───────────────────────────────────────────
+  const toggleOrdenColumna = (tipo: 'concepto' | 'categoria' | 'fecha' | 'monto') => {
+    if (tipo === 'concepto') {
+      setOrdenGastos(prev => prev === 'ALFABETICO_ASC' ? 'ALFABETICO_DESC' : 'ALFABETICO_ASC');
+    } else if (tipo === 'categoria') {
+      setOrdenGastos(prev => prev === 'CATEGORIA_ASC' ? 'CATEGORIA_DESC' : 'CATEGORIA_ASC');
+    } else if (tipo === 'fecha') {
+      setOrdenGastos(prev => prev === 'FECHA_DESC' ? 'FECHA_ASC' : 'FECHA_DESC');
+    } else if (tipo === 'monto') {
+      setOrdenGastos(prev => prev === 'MONTO_ASC' ? 'MONTO_DESC' : 'MONTO_ASC');
+    }
+  };
+
+  const handleOpenAddGasto = () => {
+    setEditingGastoId(null);
+    setGastoForm({
+      concepto: '',
+      monto: '',
+      categoria: 'OTROS',
+      efectuado_por: 'JUANCHI_TRANSFERENCIA',
+      fecha: hoyArgentina()
+    });
+    setGastoErr('');
+    setGastoOk('');
+    setShowGastoModal(true);
+  };
+
+  const handleOpenEditGasto = (g: Gasto) => {
+    setEditingGastoId(g.id);
+    setGastoForm({
+      concepto: g.concepto,
+      monto: g.monto.toString(),
+      categoria: g.categoria,
+      efectuado_por: g.efectuado_por || 'EFECTIVO_CAJA',
+      fecha: g.fecha
+    });
+    setGastoErr('');
+    setGastoOk('');
+    setShowGastoModal(true);
+  };
+
   const gastosFiltrados = useMemo(() => {
-    return gastos.filter(g => {
+    const list = gastos.filter(g => {
       if (!g.fecha.startsWith(filtroMesGastos)) return false;
       if (filtroCatGastos !== 'TODOS' && g.categoria !== filtroCatGastos) return false;
       if (filtroOrigenGasto !== 'TODOS' && (g.efectuado_por || 'EFECTIVO_CAJA') !== filtroOrigenGasto) return false;
       return true;
     });
-  }, [gastos, filtroMesGastos, filtroCatGastos, filtroOrigenGasto]);
+
+    return list.sort((a, b) => {
+      switch (ordenGastos) {
+        case 'ALFABETICO_ASC':
+          return (a.concepto || '').localeCompare(b.concepto || '', 'es', { sensitivity: 'base' });
+        case 'ALFABETICO_DESC':
+          return (b.concepto || '').localeCompare(a.concepto || '', 'es', { sensitivity: 'base' });
+        case 'MONTO_ASC':
+          return a.monto - b.monto;
+        case 'MONTO_DESC':
+          return b.monto - a.monto;
+        case 'CATEGORIA_ASC':
+          return (a.categoria || '').localeCompare(b.categoria || '', 'es', { sensitivity: 'base' }) || (a.concepto || '').localeCompare(b.concepto || '', 'es');
+        case 'CATEGORIA_DESC':
+          return (b.categoria || '').localeCompare(a.categoria || '', 'es', { sensitivity: 'base' }) || (a.concepto || '').localeCompare(b.concepto || '', 'es');
+        case 'FECHA_ASC':
+          return (a.fecha || '').localeCompare(b.fecha || '') || (a.creado_at || '').localeCompare(b.creado_at || '');
+        case 'FECHA_DESC':
+        default:
+          return (b.fecha || '').localeCompare(a.fecha || '') || (b.creado_at || '').localeCompare(a.creado_at || '');
+      }
+    });
+  }, [gastos, filtroMesGastos, filtroCatGastos, filtroOrigenGasto, ordenGastos]);
 
   const gastosTotalFiltrado = gastosFiltrados.reduce((s, g) => s + g.monto, 0);
 
@@ -214,20 +288,41 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     const monto = parseFloat(gastoForm.monto);
     if (!gastoForm.concepto.trim()) { setGastoErr('El concepto es obligatorio.'); return; }
     if (isNaN(monto) || monto <= 0) { setGastoErr('El monto debe ser mayor a 0.'); return; }
-    const res = registrarGasto({ 
-      concepto: gastoForm.concepto.trim(), 
-      monto, 
-      categoria: gastoForm.categoria, 
-      efectuado_por: gastoForm.efectuado_por,
-      fecha: gastoForm.fecha, 
-      registrado_por: 'admin@gimnasio.com.ar' 
-    });
-    if (res.success) {
-      setGastoOk('¡Gasto registrado!');
-      setGastoForm({ concepto: '', monto: '', categoria: 'OTROS', efectuado_por: 'JUANCHI_TRANSFERENCIA', fecha: new Date().toISOString().slice(0, 10) });
-      setTimeout(() => { setShowGastoModal(false); setGastoOk(''); }, 1200);
+
+    if (editingGastoId) {
+      const res = actualizarGasto(editingGastoId, {
+        concepto: gastoForm.concepto.trim(),
+        monto,
+        categoria: gastoForm.categoria,
+        efectuado_por: gastoForm.efectuado_por,
+        fecha: gastoForm.fecha
+      });
+      if (res.success) {
+        setGastoOk('¡Gasto actualizado con éxito!');
+        setTimeout(() => {
+          setShowGastoModal(false);
+          setEditingGastoId(null);
+          setGastoOk('');
+        }, 1000);
+      } else {
+        setGastoErr(res.message);
+      }
     } else {
-      setGastoErr(res.message);
+      const res = registrarGasto({ 
+        concepto: gastoForm.concepto.trim(), 
+        monto, 
+        categoria: gastoForm.categoria, 
+        efectuado_por: gastoForm.efectuado_por,
+        fecha: gastoForm.fecha, 
+        registrado_por: 'admin@gimnasio.com.ar' 
+      });
+      if (res.success) {
+        setGastoOk('¡Gasto registrado!');
+        setGastoForm({ concepto: '', monto: '', categoria: 'OTROS', efectuado_por: 'JUANCHI_TRANSFERENCIA', fecha: new Date().toISOString().slice(0, 10) });
+        setTimeout(() => { setShowGastoModal(false); setGastoOk(''); }, 1000);
+      } else {
+        setGastoErr(res.message);
+      }
     }
   };
 
@@ -489,9 +584,28 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                   {ORIGENES_GASTO.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
               </div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+                <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Ordenar:</span>
+                <select 
+                  value={ordenGastos} 
+                  onChange={e => setOrdenGastos(e.target.value as OrdenGastos)} 
+                  className="border border-zinc-200 rounded-md py-1 px-2 text-zinc-700 bg-white text-xs font-semibold cursor-pointer"
+                  id="select-orden-gastos"
+                >
+                  <option value="FECHA_DESC">Fecha: Más recientes</option>
+                  <option value="FECHA_ASC">Fecha: Más antiguos</option>
+                  <option value="ALFABETICO_ASC">Alfabético: A - Z</option>
+                  <option value="ALFABETICO_DESC">Alfabético: Z - A</option>
+                  <option value="MONTO_ASC">Monto: Menor a mayor ($)</option>
+                  <option value="MONTO_DESC">Monto: Mayor a menor ($)</option>
+                  <option value="CATEGORIA_ASC">Categoría: A - Z</option>
+                  <option value="CATEGORIA_DESC">Categoría: Z - A</option>
+                </select>
+              </div>
             </div>
             <button
-              onClick={() => { setGastoErr(''); setGastoOk(''); setShowGastoModal(true); }}
+              onClick={handleOpenAddGasto}
               className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
               id="btn-add-gasto"
             >
@@ -507,18 +621,65 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
             <table className="w-full text-left text-xs font-sans">
               <thead>
                 <tr className="bg-zinc-50 text-zinc-500 font-semibold border-b border-zinc-200 uppercase tracking-wider text-[10px]">
-                  <th className="p-4">Concepto</th>
-                  <th className="p-4">Categoría</th>
+                  <th className="p-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleOrdenColumna('concepto')}
+                      className="inline-flex items-center gap-1 hover:text-zinc-900 transition-colors font-semibold uppercase tracking-wider text-[10px] cursor-pointer bg-transparent border-none p-0 text-inherit"
+                      title="Ordenar por Concepto"
+                    >
+                      <span>Concepto</span>
+                      {ordenGastos === 'ALFABETICO_ASC' && <ArrowUp className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos === 'ALFABETICO_DESC' && <ArrowDown className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos !== 'ALFABETICO_ASC' && ordenGastos !== 'ALFABETICO_DESC' && <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                    </button>
+                  </th>
+                  <th className="p-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleOrdenColumna('categoria')}
+                      className="inline-flex items-center gap-1 hover:text-zinc-900 transition-colors font-semibold uppercase tracking-wider text-[10px] cursor-pointer bg-transparent border-none p-0 text-inherit"
+                      title="Ordenar por Categoría"
+                    >
+                      <span>Categoría</span>
+                      {ordenGastos === 'CATEGORIA_ASC' && <ArrowUp className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos === 'CATEGORIA_DESC' && <ArrowDown className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos !== 'CATEGORIA_ASC' && ordenGastos !== 'CATEGORIA_DESC' && <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                    </button>
+                  </th>
                   <th className="p-4">Efectuado por</th>
-                  <th className="p-4">Fecha</th>
-                  <th className="p-4">Registrado por</th>
-                  <th className="p-4 text-right">Monto</th>
-                  <th className="p-4 text-center">Acción</th>
+                  <th className="p-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleOrdenColumna('fecha')}
+                      className="inline-flex items-center gap-1 hover:text-zinc-900 transition-colors font-semibold uppercase tracking-wider text-[10px] cursor-pointer bg-transparent border-none p-0 text-inherit"
+                      title="Ordenar por Fecha"
+                    >
+                      <span>Fecha</span>
+                      {ordenGastos === 'FECHA_ASC' && <ArrowUp className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos === 'FECHA_DESC' && <ArrowDown className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos !== 'FECHA_ASC' && ordenGastos !== 'FECHA_DESC' && <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                    </button>
+                  </th>
+                  <th className="p-4 text-right">
+                    <button
+                      type="button"
+                      onClick={() => toggleOrdenColumna('monto')}
+                      className="inline-flex items-center gap-1 hover:text-zinc-900 transition-colors font-semibold uppercase tracking-wider text-[10px] cursor-pointer bg-transparent border-none p-0 text-inherit ml-auto"
+                      title="Ordenar por Monto"
+                    >
+                      <span>Monto</span>
+                      {ordenGastos === 'MONTO_ASC' && <ArrowUp className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos === 'MONTO_DESC' && <ArrowDown className="w-3 h-3 text-rose-600" />}
+                      {ordenGastos !== 'MONTO_ASC' && ordenGastos !== 'MONTO_DESC' && <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                    </button>
+                  </th>
+                  <th className="p-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-zinc-700 font-medium">
                 {gastosFiltrados.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-zinc-400 italic">Sin gastos registrados para el período seleccionado.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-zinc-400 italic">Sin gastos registrados para el período seleccionado.</td></tr>
                 ) : (
                   gastosFiltrados.map(g => {
                     const origenObj = ORIGENES_GASTO.find(o => o.id === g.efectuado_por) || ORIGENES_GASTO[2];
@@ -536,16 +697,26 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                           </span>
                         </td>
                         <td className="p-4 font-mono text-zinc-500 text-[10px]">{g.fecha}</td>
-                        <td className="p-4 font-mono text-zinc-400 text-[10px]">{g.registrado_por}</td>
                         <td className="p-4 text-right font-mono font-bold text-rose-600">${g.monto.toLocaleString('es-AR')}</td>
                         <td className="p-4 text-center">
-                          <button
-                            onClick={() => eliminarGasto(g.id)}
-                            className="p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-md transition-colors cursor-pointer border-none bg-transparent"
-                            title="Eliminar gasto"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleOpenEditGasto(g)}
+                              className="p-1.5 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 rounded-md transition-colors cursor-pointer border-none bg-transparent"
+                              title="Editar gasto"
+                              id={`btn-edit-gasto-${g.id}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => eliminarGasto(g.id)}
+                              className="p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-md transition-colors cursor-pointer border-none bg-transparent"
+                              title="Eliminar gasto"
+                              id={`btn-delete-gasto-${g.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -555,7 +726,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
               {gastosFiltrados.length > 0 && (
                 <tfoot>
                   <tr className="bg-zinc-50 border-t border-zinc-200">
-                    <td colSpan={5} className="p-4 font-bold text-xs text-zinc-600 uppercase tracking-wider">Total del período</td>
+                    <td colSpan={4} className="p-4 font-bold text-xs text-zinc-600 uppercase tracking-wider">Total del período</td>
                     <td className="p-4 text-right font-mono font-bold text-rose-700 text-sm">${gastosTotalFiltrado.toLocaleString('es-AR')}</td>
                     <td></td>
                   </tr>
@@ -804,27 +975,61 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm font-sans text-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-md overflow-hidden">
             <div className="bg-zinc-900 text-white p-5 flex justify-between items-center">
-              <h3 className="text-base font-bold">Registrar Gasto / Egreso</h3>
-              <button onClick={() => setShowGastoModal(false)} className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg cursor-pointer border-none"><X className="w-4 h-4" /></button>
+              <div className="flex items-center gap-2">
+                {editingGastoId ? (
+                  <Pencil className="w-4 h-4 text-rose-400" />
+                ) : (
+                  <Plus className="w-4 h-4 text-rose-400" />
+                )}
+                <h3 className="text-base font-bold">
+                  {editingGastoId ? 'Editar Gasto / Egreso' : 'Registrar Gasto / Egreso'}
+                </h3>
+              </div>
+              <button 
+                onClick={() => { setShowGastoModal(false); setEditingGastoId(null); }} 
+                className="text-zinc-400 hover:text-white bg-zinc-800 p-1.5 rounded-lg cursor-pointer border-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <form onSubmit={handleGastoSubmit} className="p-5 space-y-4 text-xs font-sans">
               {gastoErr && <div className="bg-red-50 text-red-700 p-2.5 rounded-lg border border-red-200 font-semibold">{gastoErr}</div>}
               {gastoOk && <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg border border-emerald-200 font-semibold">{gastoOk}</div>}
               <div className="space-y-1">
                 <label className="text-zinc-500 font-bold block text-[10px] uppercase">Concepto *</label>
-                <input type="text" required placeholder="Ej: Alquiler del salón, gas, etc." value={gastoForm.concepto} onChange={e => setGastoForm(prev => ({ ...prev, concepto: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2.5 text-xs outline-hidden focus:border-zinc-500 font-medium" />
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="Ej: Alquiler del salón, gas, etc." 
+                  value={gastoForm.concepto} 
+                  onChange={e => setGastoForm(prev => ({ ...prev, concepto: e.target.value }))} 
+                  className="w-full border border-zinc-200 rounded-lg p-2.5 text-xs outline-hidden focus:border-zinc-500 font-medium" 
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-zinc-500 font-bold block text-[10px] uppercase">Monto ARS *</label>
                   <div className="relative">
                     <span className="absolute left-2.5 top-2.5 text-zinc-400 font-mono text-xs">$</span>
-                    <input type="number" required min="1" value={gastoForm.monto} onChange={e => setGastoForm(prev => ({ ...prev, monto: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2.5 pl-6 text-xs font-mono font-bold outline-hidden focus:border-zinc-500" />
+                    <input 
+                      type="number" 
+                      required 
+                      min="1" 
+                      value={gastoForm.monto} 
+                      onChange={e => setGastoForm(prev => ({ ...prev, monto: e.target.value }))} 
+                      className="w-full border border-zinc-200 rounded-lg p-2.5 pl-6 text-xs font-mono font-bold outline-hidden focus:border-zinc-500" 
+                    />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-zinc-500 font-bold block text-[10px] uppercase">Fecha *</label>
-                  <input type="date" required value={gastoForm.fecha} onChange={e => setGastoForm(prev => ({ ...prev, fecha: e.target.value }))} className="w-full border border-zinc-200 rounded-lg p-2.5 text-xs font-mono outline-hidden focus:border-zinc-500 font-bold" />
+                  <input 
+                    type="date" 
+                    required 
+                    value={gastoForm.fecha} 
+                    onChange={e => setGastoForm(prev => ({ ...prev, fecha: e.target.value }))} 
+                    className="w-full border border-zinc-200 rounded-lg p-2.5 text-xs font-mono outline-hidden focus:border-zinc-500 font-bold" 
+                  />
                 </div>
               </div>
               <div className="space-y-1">
@@ -865,8 +1070,19 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 </div>
               </div>
               <div className="pt-2 border-t border-zinc-100 flex justify-end gap-2 font-semibold">
-                <button type="button" onClick={() => setShowGastoModal(false)} className="px-4 py-2 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-all cursor-pointer bg-white">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-all shadow-sm cursor-pointer border-none">Registrar Gasto</button>
+                <button 
+                  type="button" 
+                  onClick={() => { setShowGastoModal(false); setEditingGastoId(null); }} 
+                  className="px-4 py-2 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-all cursor-pointer bg-white"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-all shadow-sm cursor-pointer border-none font-bold"
+                >
+                  {editingGastoId ? 'Guardar Cambios' : 'Registrar Gasto'}
+                </button>
               </div>
             </form>
           </div>
