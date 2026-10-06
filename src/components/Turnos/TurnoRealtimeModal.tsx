@@ -2,10 +2,12 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle, Mail } from 'lucide-react';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
+import { TurnoClassEmailModal } from './TurnoClassEmailModal';
 import { esperaDelTurno, esPrioritario } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
+import { esEmailValido, AlumnoClaseEmail } from '../../lib/emailClase';
 
 interface TurnoRealtimeModalProps {
   selectedSlot: { id: string; date: string };
@@ -42,6 +44,9 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   const [motivoPreset, setMotivoPreset] = useState<'LLUVIA' | 'CORTE_LUZ' | 'RETRASO' | 'PROFESOR' | 'CUSTOM'>('LLUVIA');
   const [customMensaje, setCustomMensaje] = useState('');
   const [showHistorial, setShowHistorial] = useState(false);
+
+  // Estado para el modal de Email a Alumnos de la Clase
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   const getCellRealtimeData = (turnoId: string, fecha: string) => {
     const turno = turnos.find(t => t.id === turnoId);
@@ -246,6 +251,32 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     return items.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [rtData.fijos, rtData.suspendidos, rtData.variables, rtData.recuperos]);
 
+  // Alumnos mapeados con sus datos de contacto para el modal de Email
+  const alumnosParaEmail = useMemo<AlumnoClaseEmail[]>(() => {
+    return checklistItems.map(item => {
+      const socio = clientes.find(c => c.id === item.clienteId);
+      const rawEmail = (socio?.email || '').trim();
+      const esInvitado = Boolean(
+        socio?.apellido?.includes('Invitado') ||
+        (rawEmail.startsWith('invitado-') && rawEmail.endsWith('@kaha.com'))
+      );
+      const emailValido = esEmailValido(rawEmail);
+
+      return {
+        id: item.key,
+        clienteId: item.clienteId,
+        nombreCompleto: item.nombre,
+        nombre: socio?.nombre || item.nombre.split(',')[1]?.trim() || item.nombre,
+        apellido: socio?.apellido || item.nombre.split(',')[0]?.trim() || '',
+        email: rawEmail,
+        tipo: item.tipo,
+        presente: item.presente,
+        esInvitado,
+        emailValido
+      };
+    });
+  }, [checklistItems, clientes]);
+
   const handleToggleAttendance = (item: typeof checklistItems[0]) => {
     setRealtimeError(null);
     setRealtimeSuccess(null);
@@ -369,15 +400,29 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             <div className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest font-sans border-b border-zinc-200 pb-1.5 flex justify-between items-center">
               <span>Checklist de Asistencia ({checklistItems.length})</span>
               {checklistItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleOpenWspModal}
-                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
-                  id="btn-wsp-broadcast-trigger"
-                >
-                  <MessageCircle className="w-3 h-3 text-emerald-100" />
-                  <span>Aviso WhatsApp</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleOpenWspModal}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
+                    id="btn-wsp-broadcast-trigger"
+                    title="Enviar aviso por WhatsApp a los alumnos"
+                  >
+                    <MessageCircle className="w-3 h-3 text-emerald-100" />
+                    <span>Aviso WhatsApp</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailModal(true)}
+                    className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
+                    id="btn-email-class-trigger"
+                    title="Enviar email personalizado a los alumnos de esta clase"
+                  >
+                    <Mail className="w-3 h-3 text-sky-100" />
+                    <span>Email a la Clase</span>
+                  </button>
+                </div>
               )}
             </div>
             
@@ -933,6 +978,16 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         onClose={() => setShowHistorial(false)}
         filtroTurnoIdInicial={selectedSlot.id}
         filtroFechaInicial={selectedSlot.date}
+      />
+
+      {/* MODAL EMAIL A ALUMNOS DE LA CLASE */}
+      <TurnoClassEmailModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        turnoId={selectedSlot.id}
+        fecha={selectedSlot.date}
+        profesor={rtData.profesor}
+        alumnos={alumnosParaEmail}
       />
     </div>
   );
