@@ -25,9 +25,9 @@ const socio = (over: Partial<SocioNotificable> = {}): SocioNotificable => ({
   ...over
 });
 
-describe('Aviso del día 5', () => {
-  it('el calendario es 5 para avisar y 10 para dar de baja', () => {
-    assert.strictEqual(DIA_AVISO_VENCIMIENTO, 5);
+describe('Aviso de vencimiento', () => {
+  it('el calendario es 10 para avisar y dar de baja', () => {
+    assert.strictEqual(DIA_AVISO_VENCIMIENTO, 10);
     assert.strictEqual(DIA_BAJA_RESERVA, 10);
   });
 

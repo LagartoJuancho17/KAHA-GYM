@@ -4924,8 +4924,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const diaDelMes = simFechaObj.getUTCDate(); // usar UTC para evitar desfases de timezone locales
     const deMesFormato = simularFecha.slice(0, 7); // "YYYY-MM"
 
-    // Regla: si el día 5 a las 23:59 (hora Argentina) no hay pago del mes -> MOROSO
-    const esFechaLimitePasada = diaDelMes > 5 || (diaDelMes === 5);
+    // Regla: a partir del día 10 a las 23:59 (hora Argentina) sin pago del mes -> MOROSO
+    const esFechaLimitePasada = diaDelMes >= 10;
 
     let procesados = 0;
     let nuevosMorosos = 0;
@@ -4951,7 +4951,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const pagoEsteMes = cli.ultimo_mes_pagado >= deMesFormato;
       const tieneExencion = cli.exencion_cobro && cli.exencion_cobro !== 'NINGUNA';
 
-      // 1. Cargar deuda y cambiar estado a MOROSO si venció el plazo
+      // 1. Cargar deuda y cambiar estado a MOROSO si venció el plazo (día 10+)
       if (pagoEsteMes) {
         if (deudaActualizada <= 0) {
           nuevoEstado = 'ACTIVO';
@@ -4964,7 +4964,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           deudaActualizada = precioPlan; // cargar la cuota este mes
         }
       } else if (!esFechaLimitePasada && nuevoEstado === 'ACTIVO') {
-        nuevoEstado = 'ACTIVO'; // Aún en periodo de gracia
+        nuevoEstado = 'ACTIVO'; // Aún en periodo regular de pago (días 1 al 9)
       }
 
       if (deudaActualizada > 0) {
@@ -4983,64 +4983,6 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (tieneExencion) {
           logLineas.push(`>> [EXCEPCIÓN] Socio ${cli.nombre} ${cli.apellido} exceptuado de penalizaciones por estado: ${cli.exencion_cobro}.`);
         } else {
-          // Regla Día 1: Recordatorio
-          if (diaDelMes === 1) {
-            logLineas.push(`>> [NOTIFICACIÓN - DÍA 1] Enviando recordatorio a ${cli.nombre} ${cli.apellido}: "iniciamos el mes...acordate que el pago se realiza del 1 al 5 por favor...con el abono del plan se renuevan automáticamente tus cupos fijos"`);
-          }
-
-          // Regla Día 5: Aviso
-          if (diaDelMes === 5) {
-            logLineas.push(`>> [NOTIFICACIÓN - DÍA 5] Enviando aviso a ${cli.nombre} ${cli.apellido}: "recordá que mañana vence la fecha para el pago...de no abonar la siguiente semana los turnos fijos se borran automáticamente..."`);
-          }
-
-          // Regla Día 6 (del 6 al 9 inclusive): Suspensión momentánea y recordatorio
-          if (diaDelMes >= 6) {
-            logLineas.push(`>> [NOTIFICACIÓN - DÍA 6+] Enviando recordatorio a ${cli.nombre} ${cli.apellido}: "💚 Te dejamos un pequeño recordatorio: Ya pasó la fecha prevista para realizar el pago y, a partir de ahora, tu turno fijo queda disponible para ser ocupado por otra persona. Si tuviste alguna dificultad o necesitás unos días más, escribinos cuando puedas. Podemos conversarlo y, si es posible, mantener reservado tu turno para que no lo pierdas. 🤝 ¡Queremos que sigas siendo parte de KAHA! Cualquier cosa, estamos acá para ayudarte. 💚"`);
-          }
-
-          if (diaDelMes >= 6 && diaDelMes <= 9) {
-            if (cli.turnos_fijos.length > 0) {
-              const fechasSemana = [
-                `${deMesFormato}-06`,
-                `${deMesFormato}-07`,
-                `${deMesFormato}-08`,
-                `${deMesFormato}-09`
-              ];
-
-              const weekdaysMap = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-
-              let nuevasSuspensiones = [...(cli.clases_suspendidas || [])];
-              let suspendidoParaSocio = false;
-
-              fechasSemana.forEach(fechaStr => {
-                const dateObj = new Date(fechaStr + 'T00:00:00');
-                const dayName = weekdaysMap[dateObj.getDay()];
-
-                cli.turnos_fijos.forEach(tfId => {
-                  if (tfId.startsWith(dayName)) {
-                    // Check if already suspended for this date
-                    const yaSuspendido = nuevasSuspensiones.some(s => s.turno_id === tfId && s.fecha === fechaStr);
-                    if (!yaSuspendido) {
-                      nuevasSuspensiones.push({
-                        turno_id: tfId,
-                        fecha: fechaStr,
-                        reintegrado: false,
-                        creado_at: new Date().toISOString()
-                      });
-                      suspendidoParaSocio = true;
-                      suspendidosSemanaCount++;
-                      logLineas.push(`>> [ACCIÓN - DÍA 6] Suspendido turno ${tfId} para ${cli.nombre} ${cli.apellido} el día ${fechaStr}`);
-                    }
-                  }
-                });
-              });
-
-              if (suspendidoParaSocio) {
-                cli.clases_suspendidas = nuevasSuspensiones;
-              }
-            }
-          }
-
           // Regla Día 10 (10 en adelante): Revisión manual del Admin (no se baja a ciegas)
           if (diaDelMes >= 10) {
             if (cli.turnos_fijos.length > 0) {

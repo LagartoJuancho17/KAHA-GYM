@@ -275,10 +275,10 @@ export const TurnosGrid: React.FC = () => {
         </div>
 
         {/* ACCIONES Y SUB TOOGLE */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
             onClick={() => setShowHistorialModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white font-semibold text-xs transition-all shadow-xs cursor-pointer border-none"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
             id="btn-ver-historial-turnos"
             title="Ver auditoría e historial de altas, bajas, recuperos y lista de espera"
           >
@@ -288,7 +288,7 @@ export const TurnosGrid: React.FC = () => {
 
           <button
             onClick={() => setShowPrioritariosModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer border-none"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
             id="btn-socios-prioritarios"
             title="Socios que entran primero en la lista de espera de un turno"
           >
@@ -301,7 +301,7 @@ export const TurnosGrid: React.FC = () => {
               setExportInitialMode(subTab === 'GRILLA' ? 'FIJA' : 'SEMANAL');
               setShowExportModal(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer border-none"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
             id="btn-descargar-imagen-turnera"
             title="Descargar imagen completa de la turnera (Semanal o Fija) con todos los horarios"
           >
@@ -309,10 +309,10 @@ export const TurnosGrid: React.FC = () => {
             <span>Descargar Imagen</span>
           </button>
 
-          <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 flex-wrap gap-1">
+          <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 gap-1 w-full sm:w-auto">
             <button
               onClick={() => setSubTab('TIEMPO_REAL')}
-              className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
+              className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center ${
                 subTab === 'TIEMPO_REAL'
                   ? 'bg-white text-zinc-900 shadow-sm font-bold'
                   : 'text-zinc-500 hover:text-zinc-950'
@@ -323,7 +323,7 @@ export const TurnosGrid: React.FC = () => {
             </button>
             <button
               onClick={() => setSubTab('GRILLA')}
-              className={`px-3 py-1.5 rounded-md transition-all font-medium text-xs cursor-pointer border-none bg-transparent ${
+              className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center ${
                 subTab === 'GRILLA'
                   ? 'bg-white text-zinc-950 shadow-sm font-semibold'
                   : 'text-zinc-500 hover:text-zinc-950'
@@ -471,27 +471,27 @@ export const TurnosGrid: React.FC = () => {
 
       {subTab === 'TIEMPO_REAL' && (
         <div className="space-y-6 animate-fade-in font-sans text-xs">
-          <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-md border border-slate-800">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-widest font-mono">Consola de Control</span>
-                <h3 className="text-lg font-bold tracking-tight text-white mt-1">Turnera de Tiempo Real Semanal</h3>
+                <h3 className="text-base sm:text-lg font-bold tracking-tight text-white mt-1">Turnera de Tiempo Real Semanal</h3>
                 <p className="text-slate-400 text-xs mt-1">
                   Muestra la ocupación real calculada para cada día de la semana actual. Haz clic en un casillero para gestionar asistencias variables, avisos de faltas y recuperos de ese día específico.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                 {/* LEYENDAS */}
-                <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/80">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span> Libre (&lt;70%)
+                <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-slate-400 font-mono bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-800/80">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block"></span> Libre (&lt;70%)
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 bg-amber-500 rounded-full inline-block"></span> Sat. (70-90%)
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-amber-500 rounded-full inline-block"></span> Sat. (70-90%)
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full inline-block"></span> Lleno (&gt;=90%)
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-red-500 rounded-full inline-block"></span> Lleno (&gt;=90%)
                   </span>
                 </div>
 
@@ -501,33 +501,33 @@ export const TurnosGrid: React.FC = () => {
                     setExportInitialMode('SEMANAL');
                     setShowExportModal(true);
                   }}
-                  className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer border-none shadow-sm"
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-[11px] sm:text-xs transition-all flex items-center gap-1.5 cursor-pointer border-none shadow-sm shrink-0"
                   title="Descargar imagen completa de la turnera semanal con todos los horarios"
                   id="btn-export-semanal-png"
                 >
                   <Download className="w-3.5 h-3.5 text-emerald-100" />
-                  <span>Descargar Turnera Semanal (PNG)</span>
+                  <span>Descargar Turnera (PNG)</span>
                 </button>
               </div>
             </div>
 
             {/* NAVEGACIÓN SEMANAL ADMIN/PROFESORES */}
-            <div className="flex justify-between items-center bg-slate-950/90 p-3 rounded-xl border border-slate-800 mt-4 max-w-xl mx-auto">
+            <div className="flex justify-between items-center bg-slate-950/90 p-2 sm:p-3 rounded-xl border border-slate-800 mt-4 max-w-xl mx-auto gap-1.5 sm:gap-3">
               <button
                 onClick={() => setRealtimeWeekOffset(prev => prev - 1)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-all flex items-center gap-1 cursor-pointer border border-slate-700"
+                className="px-2 sm:px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-[11px] sm:text-xs transition-all flex items-center gap-1 cursor-pointer border border-slate-700 shrink-0"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Semana Anterior
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Semana </span>Anterior
               </button>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1.5">
-                  <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Semana Visualizada</span>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <div className="text-center min-w-0 flex-1 px-1">
+                <div className="flex items-center justify-center gap-1 flex-wrap">
+                  <span className="text-[8.5px] sm:text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Semana Visualizada</span>
+                  <span className="text-[8.5px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 truncate">
                     {etiquetaSemanaRelativa(realtimeWeekOffset)}
                   </span>
                 </div>
-                <span className="text-xs font-bold text-white mt-0.5 block">
+                <span className="text-[11px] sm:text-xs font-bold text-white mt-0.5 block truncate">
                   {(() => {
                     const lunes = weekDates['LUNES'];
                     const viernes = weekDates['VIERNES'];
@@ -543,7 +543,7 @@ export const TurnosGrid: React.FC = () => {
                 {realtimeWeekOffset !== semanaOffsetInicial() && (
                   <button
                     onClick={() => setRealtimeWeekOffset(semanaOffsetInicial())}
-                    className="text-[10px] text-emerald-400/80 hover:text-emerald-300 underline mt-0.5 cursor-pointer block mx-auto transition-colors"
+                    className="text-[9.5px] sm:text-[10px] text-emerald-400/80 hover:text-emerald-300 underline mt-0.5 cursor-pointer block mx-auto transition-colors truncate max-w-full"
                   >
                     Volver a {semanaOffsetInicial() === 1 ? 'semana por arrancar' : 'semana en curso'}
                   </button>
@@ -551,10 +551,10 @@ export const TurnosGrid: React.FC = () => {
               </div>
               <button
                 onClick={() => setRealtimeWeekOffset(prev => prev + 1)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-all flex items-center gap-1 cursor-pointer border border-slate-700"
+                className="px-2 sm:px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-[11px] sm:text-xs transition-all flex items-center gap-1 cursor-pointer border border-slate-700 shrink-0"
               >
-                Semana Siguiente
-                <ChevronRight className="w-4 h-4" />
+                Siguiente<span className="hidden sm:inline"> Semana</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

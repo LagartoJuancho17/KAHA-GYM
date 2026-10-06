@@ -397,14 +397,14 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
           {/* Checklist de Asistencia */}
           <div className="space-y-2.5">
-            <div className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest font-sans border-b border-zinc-200 pb-1.5 flex justify-between items-center">
+            <div className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest font-sans border-b border-zinc-200 pb-1.5 flex flex-wrap justify-between items-center gap-1.5">
               <span>Checklist de Asistencia ({checklistItems.length})</span>
               {checklistItems.length > 0 && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={handleOpenWspModal}
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
+                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
                     id="btn-wsp-broadcast-trigger"
                     title="Enviar aviso por WhatsApp a los alumnos"
                   >
@@ -415,7 +415,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                   <button
                     type="button"
                     onClick={() => setShowEmailModal(true)}
-                    className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
+                    className="px-2 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border-none shadow-xs"
                     id="btn-email-class-trigger"
                     title="Enviar email personalizado a los alumnos de esta clase"
                   >

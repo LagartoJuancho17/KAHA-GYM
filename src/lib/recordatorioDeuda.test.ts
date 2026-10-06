@@ -49,8 +49,8 @@ describe('Recordatorio de Deuda y Validación Estricta de Deudores', () => {
     assert.strictEqual(debiendo, false);
   });
 
-  it('socio que NO pagó y ya es día 6 en adelante SÍ está debiendo', () => {
-    const fechaSimulada = new Date('2026-09-06T10:00:00Z');
+  it('socio que NO pagó y ya es día 10 en adelante SÍ está debiendo', () => {
+    const fechaSimulada = new Date('2026-09-10T10:00:00Z');
     const debiendo = socioEstaDebiendo({
       deuda_acumulada: 0,
       estado: 'ACTIVO',
@@ -60,8 +60,8 @@ describe('Recordatorio de Deuda y Validación Estricta de Deudores', () => {
     assert.strictEqual(debiendo, true);
   });
 
-  it('socio que no pagó pero aún está dentro de los días 1 al 5 NO está debiendo aún', () => {
-    const fechaSimulada = new Date('2026-09-04T15:00:00Z');
+  it('socio que no pagó pero aún está dentro de los días 1 al 9 NO está debiendo aún', () => {
+    const fechaSimulada = new Date('2026-09-09T15:00:00Z');
     const debiendo = socioEstaDebiendo({
       deuda_acumulada: 0,
       estado: 'ACTIVO',

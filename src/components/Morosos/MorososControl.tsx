@@ -91,10 +91,9 @@ export const MorososControl: React.FC = () => {
     }
 
     return list.map(c => {
-      // Calcular días aproximados de atraso basándose en el día de gracia (día 5)
-      // Si simularFecha es mayor que el día 5 de mayo, calcular atraso.
+      // Calcular días aproximados de atraso basándose en la fecha límite (día 10)
       const simDia = parseInt(simularFecha.slice(8, 10));
-      const atrasoDias = c.estado === 'MOROSO' ? Math.max(1, simDia - 5) : 0;
+      const atrasoDias = c.estado === 'MOROSO' ? Math.max(1, simDia - 10) : 0;
 
       return {
         ...c,

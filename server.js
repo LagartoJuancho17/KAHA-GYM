@@ -723,7 +723,7 @@ async function sociosQueDeben() {
     if (exento && deuda <= 0) return false;
     if (deuda > 0 || c.estado === 'CON_DEUDA' || c.estado === 'MOROSO') return true;
     const pagoEsteMes = c.ultimo_mes_pagado && c.ultimo_mes_pagado >= mesActual;
-    return diaDelMes >= 6 && !pagoEsteMes;
+    return diaDelMes >= 10 && !pagoEsteMes;
   });
 }
 
@@ -759,58 +759,13 @@ async function enviarMailSimple({ email, asunto, titulo, cuerpo }) {
   return { ok: true, id: data.id };
 }
 
-// --- DÍA 5: aviso al socio con la fecha límite ---
+// --- DÍA 5: DESHABILITADO POR SOLICITUD (Solo rige el proceso del día 10) ---
 app.post('/api/cron/aviso-deuda', async (req, res) => {
-  try {
-    const candado = await tomarCandadoDelDia('AVISO_DIA_5');
-    if (!candado.ok) {
-      console.log(`>> [aviso-deuda] No se envía: ${candado.motivo}`, candado.detalle || "");
-      // El detalle va en la respuesta a propósito: un cron que falla en silencio
-      // es justamente lo que tuvo roto el reporte del día 10 durante meses.
-      // Se informa el host (no la clave) para poder distinguir "cache viejo" de
-      // "está apuntando a otro proyecto de Supabase" sin adivinar.
-      return res.status(200).json({
-        ok: true,
-        omitido: true,
-        motivo: candado.motivo,
-        detalle: candado.detalle,
-        supabase_host: supabaseHost
-      });
-    }
-
-    const deudores = await sociosQueDeben();
-    console.log(`>> [aviso-deuda] ${deudores.length} socio(s) con deuda.`);
-
-    let enviados = 0, errores = 0;
-    for (const socio of deudores) {
-      const cuerpo =
-        `Hola ${socio.nombre}! 👋\n\n` +
-        `Todavía no nos figura el pago de la cuota de este mes.\n\n` +
-        `Si no llegamos a registrarlo antes del día ${DIA_BAJA_RESERVA}, tu turno fijo queda liberado ` +
-        `para que lo tome otra persona.\n\n` +
-        `Si tuviste alguna dificultad o necesitás unos días más, escribinos y lo vemos. ` +
-        `Con que nos avises alcanza para que te lo guardemos. 🤝\n\n` +
-        `¡Gracias por ser parte de KAHA! 💚`;
-
-      const r = await enviarMailSimple({
-        email: socio.email,
-        asunto: '💚 Recordatorio de tu cuota — KAHA GYM',
-        titulo: 'Recordatorio de tu cuota',
-        cuerpo
-      });
-      if (r.ok) enviados++; else errores++;
-    }
-
-    await registrarResultadoEnvio('AVISO_DIA_5', candado.fecha, enviados, errores, {
-      socios: deudores.map(d => ({ id: d.id, nombre: `${d.nombre} ${d.apellido}` }))
-    });
-
-    console.log(`>> [aviso-deuda] ${enviados} enviados, ${errores} errores.`);
-    return res.status(200).json({ ok: true, enviados, errores, total: deudores.length });
-  } catch (err) {
-    console.error('>> [aviso-deuda] Error general:', err);
-    return res.status(500).json({ ok: false, error: err.message });
-  }
+  return res.status(200).json({
+    ok: true,
+    omitido: true,
+    motivo: 'deshabilitado_por_solicitud_solo_dia_10'
+  });
 });
 
 // --- DÍA 10: reporte a los administradores ---

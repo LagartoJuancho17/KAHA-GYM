@@ -128,8 +128,8 @@ export function calcularDeudaYEstadoCliente(
         pagoEsteMes: false
       };
     }
-    // Del día 1 al 5 está en plazo de pago -> CON_DEUDA; día 6+ -> MOROSO
-    const nuevoEstado: EstadoCliente = diaDelMes > 5 ? 'MOROSO' : 'CON_DEUDA';
+    // Días 1 al 9 está en plazo de pago -> CON_DEUDA; a partir del día 10 -> MOROSO
+    const nuevoEstado: EstadoCliente = diaDelMes >= 10 ? 'MOROSO' : 'CON_DEUDA';
     return {
       deuda_acumulada: deudaBase,
       estado: nuevoEstado,

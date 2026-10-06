@@ -93,7 +93,7 @@ test('arma la tanda solo con los que deben', () => {
     socio({ id: 'debe', deuda_acumulada: 65000 }),
     socio({ id: 'aldia', deuda_acumulada: 0, ultimo_mes_pagado: '2026-09' })
   ];
-  const r = armarRonda({ clientes, hoy: dia(5) });
+  const r = armarRonda({ clientes, hoy: dia(10) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['debe']);
   assert.equal(r.total, 1);
 });
@@ -102,7 +102,7 @@ test('el socio en reposo no entra en la ronda', () => {
   const clientes = [
     socio({ id: 'reposo', deuda_acumulada: 65000, reposo: { desde: '2026-08-01', hasta: '2027-02-01' } })
   ];
-  assert.equal(armarRonda({ clientes, hoy: dia(5) }).total, 0);
+  assert.equal(armarRonda({ clientes, hoy: dia(10) }).total, 0);
 });
 
 test('ordena por deuda de mayor a menor: lo que mas pesa sale primero', () => {
@@ -111,13 +111,13 @@ test('ordena por deuda de mayor a menor: lo que mas pesa sale primero', () => {
     socio({ id: 'mucho', deuda_acumulada: 130000 }),
     socio({ id: 'medio', deuda_acumulada: 65000 })
   ];
-  const r = armarRonda({ clientes, hoy: dia(5) });
+  const r = armarRonda({ clientes, hoy: dia(10) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['mucho', 'medio', 'poco']);
 });
 
 test('separa a los que ya fueron contactados este mes', () => {
   const clientes = [socio({ id: 'a' }), socio({ id: 'b' })];
-  const r = armarRonda({ clientes, logs: [log('a', '2026-09')], hoy: dia(5) });
+  const r = armarRonda({ clientes, logs: [log('a', '2026-09')], hoy: dia(10) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['b']);
   assert.deepEqual(r.yaContactados.map(i => i.cliente_id), ['a']);
   assert.equal(r.total, 2, 'siguen contando en el total');
@@ -125,7 +125,7 @@ test('separa a los que ya fueron contactados este mes', () => {
 
 test('un contacto del mes pasado no cuenta para este mes', () => {
   const clientes = [socio({ id: 'a' })];
-  const r = armarRonda({ clientes, logs: [log('a', '2026-08')], hoy: dia(5) });
+  const r = armarRonda({ clientes, logs: [log('a', '2026-08')], hoy: dia(10) });
   assert.equal(r.pendientes.length, 1);
 });
 
@@ -137,14 +137,14 @@ test('REGRESION: un socio sin telefono usable no desaparece, va a su propia list
     socio({ id: 'basura', telefono: 'no tiene', deuda_acumulada: 30000 }),
     socio({ id: 'ok', telefono: '11 7840-2722', deuda_acumulada: 10000 })
   ];
-  const r = armarRonda({ clientes, hoy: dia(5) });
+  const r = armarRonda({ clientes, hoy: dia(10) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['ok']);
   assert.deepEqual(r.sinWhatsApp.map(i => i.cliente_id), ['sintel', 'basura']);
   assert.equal(r.total, 3, 'los tres siguen contados');
 });
 
 test('la url de WhatsApp lleva el numero normalizado y el texto', () => {
-  const r = armarRonda({ clientes: [socio({ nombre: 'Ana' })], hoy: dia(5) });
+  const r = armarRonda({ clientes: [socio({ nombre: 'Ana', ultimo_mes_pagado: '2026-07' })], hoy: dia(5) });
   const item = r.pendientes[0];
   assert.equal(item.telefonoWhatsApp, '5491178402722');
   assert.ok(item.urlWhatsApp.startsWith('https://wa.me/5491178402722?text='));
