@@ -4924,8 +4924,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const diaDelMes = simFechaObj.getUTCDate(); // usar UTC para evitar desfases de timezone locales
     const deMesFormato = simularFecha.slice(0, 7); // "YYYY-MM"
 
-    // Regla: a partir del día 10 a las 23:59 (hora Argentina) sin pago del mes -> MOROSO
-    const esFechaLimitePasada = diaDelMes >= 10;
+    // Regla: a partir del día 11 a las 23:59 (hora Argentina) sin pago del mes -> MOROSO
+    const esFechaLimitePasada = diaDelMes >= 11;
 
     let procesados = 0;
     let nuevosMorosos = 0;
@@ -4951,7 +4951,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const pagoEsteMes = cli.ultimo_mes_pagado >= deMesFormato;
       const tieneExencion = cli.exencion_cobro && cli.exencion_cobro !== 'NINGUNA';
 
-      // 1. Cargar deuda y cambiar estado a MOROSO si venció el plazo (día 10+)
+      // 1. Cargar deuda y cambiar estado a MOROSO si venció el plazo (día 11+)
       if (pagoEsteMes) {
         if (deudaActualizada <= 0) {
           nuevoEstado = 'ACTIVO';
@@ -4964,7 +4964,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           deudaActualizada = precioPlan; // cargar la cuota este mes
         }
       } else if (!esFechaLimitePasada && nuevoEstado === 'ACTIVO') {
-        nuevoEstado = 'ACTIVO'; // Aún en periodo regular de pago (días 1 al 9)
+        nuevoEstado = 'ACTIVO'; // Aún en periodo regular de pago (días 1 al 10)
       }
 
       if (deudaActualizada > 0) {
@@ -4983,10 +4983,10 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (tieneExencion) {
           logLineas.push(`>> [EXCEPCIÓN] Socio ${cli.nombre} ${cli.apellido} exceptuado de penalizaciones por estado: ${cli.exencion_cobro}.`);
         } else {
-          // Regla Día 10 (10 en adelante): Revisión manual del Admin (no se baja a ciegas)
-          if (diaDelMes >= 10) {
+          // Regla Día 11 (11 en adelante): Revisión manual del Admin (no se baja a ciegas)
+          if (diaDelMes >= 11) {
             if (cli.turnos_fijos.length > 0) {
-              logLineas.push(`>> [REVISIÓN REQUERIDA - DÍA 10+] Alumno ${cli.nombre} ${cli.apellido} (${cli.turnos_fijos.length} turnos fijos) no pagó la cuota. Requiere confirmación manual del Administrador para proceder con la baja.`);
+              logLineas.push(`>> [REVISIÓN REQUERIDA - DÍA 11+] Alumno ${cli.nombre} ${cli.apellido} (${cli.turnos_fijos.length} turnos fijos) no pagó la cuota. Requiere confirmación manual del Administrador para proceder con la baja.`);
             }
           }
         }

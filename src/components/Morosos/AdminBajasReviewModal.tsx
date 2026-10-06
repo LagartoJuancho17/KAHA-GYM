@@ -248,7 +248,7 @@ Equipo KAHA 💚`;
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-sans font-bold text-base sm:text-lg text-white">
-                  Revisión de Bajas de Turno Fijo (Día 10+)
+                  Revisión de Bajas de Turno Fijo (Día 11+)
                 </h3>
                 <span className="bg-red-500/20 text-red-300 border border-red-500/30 text-[9px] font-mono px-2 py-0.5 rounded-full font-bold uppercase">
                   Acción Manual Admin

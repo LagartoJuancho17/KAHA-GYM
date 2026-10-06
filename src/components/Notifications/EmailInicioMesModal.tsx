@@ -19,7 +19,7 @@ export const MENSAJE_MAIL_INICIO_MES = `¡Hola! ¿Cómo están?
 
 Comenzamos un nuevo mes y queríamos agradecerles, una vez más, por seguir eligiendo KAHA y permitirnos acompañarlos en este camino de entrenamiento, salud y movimiento. 💚
 
-Les recordamos que, durante los primeros 5 días hábiles del mes, la aplicación asigna automáticamente los turnos fijos a quienes hayan realizado el pago de su cuota.
+Les recordamos que, durante los primeros 10 días del mes, la aplicación asigna automáticamente los turnos fijos a quienes hayan realizado el pago de su cuota.
 
 Si por alguna dificultad económica o por cualquier otro motivo necesitan retrasar el pago, no duden en comunicarse con nosotros. No tenemos ningún problema en ayudarlos y buscar la mejor alternativa; simplemente necesitamos hacerlo manualmente para poder mantenerles la prioridad sobre sus turnos.
 

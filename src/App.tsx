@@ -178,7 +178,11 @@ function InnerApp() {
 
   // Check if Google-logged-in user is a SOCIO
   const socioAsociado = clientes.find(c => c.email.toLowerCase().trim() === googleUser.email.toLowerCase().trim());
-  const esMorosoODadoDeBaja = googleUser.role === 'SOCIO' && socioAsociado && (!socioAsociado.activo || socioAsociado.estado === 'MOROSO');
+  const hoyDiaActual = new Date().getDate();
+  const esMorosoODadoDeBaja = googleUser.role === 'SOCIO' && socioAsociado && (
+    (!socioAsociado.activo && socioAsociado.estado === 'INACTIVO') ||
+    (hoyDiaActual >= 11 && socioAsociado.estado === 'MOROSO')
+  );
   const esPendiente = googleUser.role === 'SOCIO' && socioAsociado && socioAsociado.autorizado === false && socioAsociado.activo;
 
   if (esMorosoODadoDeBaja) {
@@ -196,7 +200,7 @@ function InnerApp() {
             </span>
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Cuenta Inactiva por Morosidad</h2>
             <p className="text-slate-500 text-xs mt-1 leading-relaxed">
-              Pasados los 10 días del principio de mes sin registrar el abono de tu membresía, tu cuenta fue dada de baja del sistema automáticamente.
+              Pasados los 10 primeros días del mes (a partir del día 11) sin registrar el abono de tu membresía, tu cuenta fue pausada del sistema automáticamente.
             </p>
           </div>
 

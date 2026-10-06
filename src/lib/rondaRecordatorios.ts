@@ -30,7 +30,7 @@ export type MotivoMensaje = 'AVISO_VENCIMIENTO' | 'TURNO_LIBERADO';
 
 /**
  * Que texto corresponde segun el dia del mes, siguiendo el calendario acordado:
- * hasta el 9 se avisa con la fecha limite por delante; del 10 en adelante el
+ * hasta el 10 se avisa con la fecha limite por delante; del 11 en adelante el
  * turno ya quedo liberado y el mensaje es otro.
  *
  * Mandar el texto de "ya pasó la fecha" un dia 3 le avisa al socio que perdio el

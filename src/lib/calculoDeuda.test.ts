@@ -35,7 +35,7 @@ test('precioPlanSocio devuelve precio del plan si no hay personalizado', () => {
   assert.equal(precio, 45000);
 });
 
-test('desde el día 1 del mes (días 1 al 5), imputa la cuota del mes y pone estado CON_DEUDA si no pagó', () => {
+test('desde el día 1 del mes (días 1 al 10), imputa la cuota del mes y pone estado CON_DEUDA si no pagó', () => {
   const res = calcularDeudaYEstadoCliente(
     { ...mockBaseCliente, deuda_acumulada: 0, ultimo_mes_pagado: '2026-08' },
     mockPlanes,
@@ -48,12 +48,12 @@ test('desde el día 1 del mes (días 1 al 5), imputa la cuota del mes y pone est
   assert.equal(res.pagoEsteMes, false);
 });
 
-test('a partir del día 6 (ej. día 10), imputa la cuota del mes y pone estado MOROSO si no pagó', () => {
+test('a partir del día 11 (ej. día 11), imputa la cuota del mes y pone estado MOROSO si no pagó', () => {
   const res = calcularDeudaYEstadoCliente(
     { ...mockBaseCliente, deuda_acumulada: 0, ultimo_mes_pagado: '2026-08' },
     mockPlanes,
     '2026-09',
-    10 // Día 10
+    11 // Día 11
   );
 
   assert.equal(res.deuda_acumulada, 45000);

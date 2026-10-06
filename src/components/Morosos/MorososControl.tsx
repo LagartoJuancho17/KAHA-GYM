@@ -224,22 +224,22 @@ export const MorososControl: React.FC = () => {
               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
             >
               <UserMinus className="w-3.5 h-3.5" />
-              <span>Revisar Bajas Día 10 ({candidatosBajaFijos.length})</span>
+              <span>Revisar Bajas Día 11 ({candidatosBajaFijos.length})</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* BANNER AVISO DÍA 10+ BAJAS PENDIENTES DE REVISIÓN */}
+      {/* BANNER AVISO DÍA 11+ BAJAS PENDIENTES DE REVISIÓN */}
       {candidatosBajaFijos.length > 0 && (
-        <div className="bg-gradient-to-r from-red-50 via-amber-50 to-red-50 border border-red-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in" id="morosos-dia-10-banner">
+        <div className="bg-gradient-to-r from-red-50 via-amber-50 to-red-50 border border-red-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in" id="morosos-dia-11-banner">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
               <AlertTriangle className="w-4.5 h-4.5" />
             </div>
             <div>
               <p className="text-xs font-bold text-red-950">
-                ⚠️ Bajas sugeridas de turno fijo (Día 10+): {candidatosBajaFijos.length} socio(s) sin pagar
+                ⚠️ Bajas sugeridas de turno fijo (Día 11+): {candidatosBajaFijos.length} socio(s) sin pagar
               </p>
               <p className="text-[11px] text-red-800/80 mt-0.5">
                 Las bajas de turno fijo no se ejecutan automáticamente. Requieren tu confirmación manual para liberar los cupos.

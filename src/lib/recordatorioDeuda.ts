@@ -8,13 +8,13 @@
 export const TITULO_RECORDATORIO_DEUDA = '💚 Te dejamos un pequeño recordatorio';
 
 /**
- * Calendario de cobranza acordado con Juanchi:
+ * Calendario de cobranza acordado:
  *  - día 1: la cuota del mes ya figura como deuda (ver calculoDeuda.ts)
- *  - día 5: aviso al socio, con la fecha límite explícita
- *  - día 10: se da de baja la reserva y los admins reciben el reporte
+ *  - días 1 al 10: plazo regular de pago
+ *  - día 11: se da de baja la reserva / pasa a moroso y los admins reciben el reporte
  */
-export const DIA_AVISO_VENCIMIENTO = 10;
-export const DIA_BAJA_RESERVA = 10;
+export const DIA_AVISO_VENCIMIENTO = 11;
+export const DIA_BAJA_RESERVA = 11;
 
 export const TITULO_AVISO_VENCIMIENTO = '💚 Recordatorio de tu cuota';
 
@@ -72,10 +72,10 @@ export interface SocioCheckDeudaParams {
  * Devuelve true si y solo si:
  * - Tiene estado explícito MOROSO (plazo vencido de mes actual o previo), O
  * - Ya pagó el mes actual pero aún arrastra saldo deudor previo (> 0), O
- * - No pagó el mes actual y ya llegó o pasó el día límite (día 10 en adelante), O
- * - Está dentro de los primeros días (días 1 a 9) pero no pagó el mes anterior (arrastra mora).
+ * - No pagó el mes actual y ya llegó o pasó el día límite (día 11 en adelante), O
+ * - Está dentro de los primeros días (días 1 a 10) pero no pagó el mes anterior (arrastra mora).
  * 
- * Los socios al día, los socios dentro de los días 1 a 9 con mes previo pago,
+ * Los socios al día, los socios dentro de los días 1 a 10 con mes previo pago,
  * los socios con exención sin deuda y los socios en reposo devuelven false.
  */
 export const socioEstaDebiendo = (params: SocioCheckDeudaParams): boolean => {

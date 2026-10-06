@@ -723,7 +723,7 @@ async function sociosQueDeben() {
     if (exento && deuda <= 0) return false;
     if (deuda > 0 || c.estado === 'CON_DEUDA' || c.estado === 'MOROSO') return true;
     const pagoEsteMes = c.ultimo_mes_pagado && c.ultimo_mes_pagado >= mesActual;
-    return diaDelMes >= 10 && !pagoEsteMes;
+    return diaDelMes >= 11 && !pagoEsteMes;
   });
 }
 

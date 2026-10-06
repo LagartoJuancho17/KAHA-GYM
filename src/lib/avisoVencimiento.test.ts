@@ -26,15 +26,15 @@ const socio = (over: Partial<SocioNotificable> = {}): SocioNotificable => ({
 });
 
 describe('Aviso de vencimiento', () => {
-  it('el calendario es 10 para avisar y dar de baja', () => {
-    assert.strictEqual(DIA_AVISO_VENCIMIENTO, 10);
-    assert.strictEqual(DIA_BAJA_RESERVA, 10);
+  it('el calendario es 11 para avisar y dar de baja', () => {
+    assert.strictEqual(DIA_AVISO_VENCIMIENTO, 11);
+    assert.strictEqual(DIA_BAJA_RESERVA, 11);
   });
 
   it('el aviso dice la fecha límite explícita, que es lo que pidió Juanchi', () => {
     const msg = generarAvisoVencimiento('Ana');
     assert.ok(msg.includes('Ana'), 'saluda por el nombre');
-    assert.ok(msg.includes('día 10'), 'nombra el día 10 como fecha límite');
+    assert.ok(msg.includes('día 11'), 'nombra el día 11 como fecha límite');
     assert.ok(/liberado|libera/i.test(msg), 'explica que se libera el turno');
     assert.ok(/escribinos|avises/i.test(msg), 'ofrece la salida de contactarse');
   });

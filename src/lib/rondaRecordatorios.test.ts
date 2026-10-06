@@ -42,11 +42,11 @@ const dia = (d: number) => new Date(`2026-09-${String(d).padStart(2, '0')}T12:00
 
 // --- Que mensaje corresponde ---
 
-test('hasta el 9 se avisa con la fecha limite; del 10 en adelante el turno ya se libero', () => {
+test('hasta el 10 se avisa con la fecha limite; del 11 en adelante el turno ya se libero', () => {
   assert.equal(mensajeQueCorresponde(1), 'AVISO_VENCIMIENTO');
   assert.equal(mensajeQueCorresponde(5), 'AVISO_VENCIMIENTO');
-  assert.equal(mensajeQueCorresponde(9), 'AVISO_VENCIMIENTO');
-  assert.equal(mensajeQueCorresponde(10), 'TURNO_LIBERADO');
+  assert.equal(mensajeQueCorresponde(10), 'AVISO_VENCIMIENTO');
+  assert.equal(mensajeQueCorresponde(11), 'TURNO_LIBERADO');
   assert.equal(mensajeQueCorresponde(28), 'TURNO_LIBERADO');
 });
 
@@ -55,7 +55,7 @@ test('REGRESION: un dia 3 NO manda el texto de "ya paso la fecha"', () => {
   // recibia que ya habia perdido el lugar.
   const texto = textoDelMensaje(mensajeQueCorresponde(3), 'Ana');
   assert.ok(!/Ya pasó la fecha/i.test(texto));
-  assert.ok(/día 10/.test(texto), 'avisa la fecha limite');
+  assert.ok(/día 11/.test(texto), 'avisa la fecha limite');
 });
 
 test('un dia 12 si manda el texto de turno liberado', () => {
@@ -93,7 +93,7 @@ test('arma la tanda solo con los que deben', () => {
     socio({ id: 'debe', deuda_acumulada: 65000 }),
     socio({ id: 'aldia', deuda_acumulada: 0, ultimo_mes_pagado: '2026-09' })
   ];
-  const r = armarRonda({ clientes, hoy: dia(10) });
+  const r = armarRonda({ clientes, hoy: dia(11) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['debe']);
   assert.equal(r.total, 1);
 });
@@ -102,7 +102,7 @@ test('el socio en reposo no entra en la ronda', () => {
   const clientes = [
     socio({ id: 'reposo', deuda_acumulada: 65000, reposo: { desde: '2026-08-01', hasta: '2027-02-01' } })
   ];
-  assert.equal(armarRonda({ clientes, hoy: dia(10) }).total, 0);
+  assert.equal(armarRonda({ clientes, hoy: dia(11) }).total, 0);
 });
 
 test('ordena por deuda de mayor a menor: lo que mas pesa sale primero', () => {
@@ -111,13 +111,13 @@ test('ordena por deuda de mayor a menor: lo que mas pesa sale primero', () => {
     socio({ id: 'mucho', deuda_acumulada: 130000 }),
     socio({ id: 'medio', deuda_acumulada: 65000 })
   ];
-  const r = armarRonda({ clientes, hoy: dia(10) });
+  const r = armarRonda({ clientes, hoy: dia(11) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['mucho', 'medio', 'poco']);
 });
 
 test('separa a los que ya fueron contactados este mes', () => {
   const clientes = [socio({ id: 'a' }), socio({ id: 'b' })];
-  const r = armarRonda({ clientes, logs: [log('a', '2026-09')], hoy: dia(10) });
+  const r = armarRonda({ clientes, logs: [log('a', '2026-09')], hoy: dia(11) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['b']);
   assert.deepEqual(r.yaContactados.map(i => i.cliente_id), ['a']);
   assert.equal(r.total, 2, 'siguen contando en el total');
@@ -125,7 +125,7 @@ test('separa a los que ya fueron contactados este mes', () => {
 
 test('un contacto del mes pasado no cuenta para este mes', () => {
   const clientes = [socio({ id: 'a' })];
-  const r = armarRonda({ clientes, logs: [log('a', '2026-08')], hoy: dia(10) });
+  const r = armarRonda({ clientes, logs: [log('a', '2026-08')], hoy: dia(11) });
   assert.equal(r.pendientes.length, 1);
 });
 
@@ -137,7 +137,7 @@ test('REGRESION: un socio sin telefono usable no desaparece, va a su propia list
     socio({ id: 'basura', telefono: 'no tiene', deuda_acumulada: 30000 }),
     socio({ id: 'ok', telefono: '11 7840-2722', deuda_acumulada: 10000 })
   ];
-  const r = armarRonda({ clientes, hoy: dia(10) });
+  const r = armarRonda({ clientes, hoy: dia(11) });
   assert.deepEqual(r.pendientes.map(i => i.cliente_id), ['ok']);
   assert.deepEqual(r.sinWhatsApp.map(i => i.cliente_id), ['sintel', 'basura']);
   assert.equal(r.total, 3, 'los tres siguen contados');
@@ -149,7 +149,7 @@ test('la url de WhatsApp lleva el numero normalizado y el texto', () => {
   assert.equal(item.telefonoWhatsApp, '5491178402722');
   assert.ok(item.urlWhatsApp.startsWith('https://wa.me/5491178402722?text='));
   assert.ok(decodeURIComponent(item.urlWhatsApp).includes('Ana'));
-  assert.ok(decodeURIComponent(item.urlWhatsApp).includes('día 10'));
+  assert.ok(decodeURIComponent(item.urlWhatsApp).includes('día 11'));
 });
 
 test('el motivo de la ronda cambia con el dia', () => {

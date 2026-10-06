@@ -112,7 +112,7 @@ export const INITIAL_CLIENTES: Cliente[] = [
     email: 'sofia.rod@hotmail.com',
     telefono: '11-3422-9988',
     tipo: 'FIJO',
-    estado: 'MOROSO',
+    estado: 'CON_DEUDA',
     plan_id: 'p-2d',
     activo: true,
     deuda_acumulada: 65000.00, // Debe el mes actual (julio)
