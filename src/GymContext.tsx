@@ -3,7 +3,7 @@ import {
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, PagoEnRevision,
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
   ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, OrigenGasto, Profesor, NovedadProfesor, WaitlistReserva,
-  ToastMessage, PagadorExterno
+  ToastMessage, PagadorExterno, Feriado, TipoFeriado
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -18,6 +18,7 @@ import { hoyArgentina, fechasFuturasDelTurno } from './lib/fechas';
 import { iniciarReposo } from './lib/reposo';
 import { calcularDeudaYEstadoCliente, calcularDiferenciaPlan, precioPlanSocio } from './lib/calculoDeuda';
 import { generarNotaPausa, removerNotaPausa } from './lib/pausa';
+import { generarFeriadosNacionales, generarNovedadDeFeriado } from './lib/feriados';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -151,6 +152,15 @@ interface GymContextType {
   ejecutarCronMorosidad: (simularFecha: string) => { procesados: number; nuevosMorosos: number; deudaTotal: number; suspendidosSemanaCount: number; dadosBajaCount: number; logLineas: string[] };
   borrarHistorial: () => void;
   addAuditLog: (accion: string, detalles: any, userEmail?: string) => void;
+
+  // Feriados
+  feriados: Feriado[];
+  agregarFeriado: (feriado: Omit<Feriado, 'id' | 'creado_at'>) => Promise<{ success: boolean; message: string; feriado?: Feriado }>;
+  editarFeriado: (id: string, updates: Partial<Feriado>) => Promise<{ success: boolean; message: string }>;
+  eliminarFeriado: (id: string) => Promise<{ success: boolean; message: string }>;
+  toggleFeriadoActivo: (id: string) => Promise<{ success: boolean; message: string }>;
+  cargarFeriadosNacionales: (anio?: number) => Promise<{ success: boolean; message: string; agregados: number }>;
+  publicarFeriadoComoNovedad: (feriadoId: string) => Promise<{ success: boolean; message: string }>;
 
   // Toasts / Feedback Methods
   toasts: ToastMessage[];
@@ -312,6 +322,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [recuperos, setRecuperos] = useState<RecuperoTurno[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [novedades, setNovedades] = useState<Novedad[]>([]);
+  const [feriados, setFeriados] = useState<Feriado[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_feriados');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {}
+    const anioActual = new Date().getFullYear();
+    const seed = generarFeriadosNacionales(anioActual).map((f, i) => ({
+      ...f,
+      id: `feriado-${anioActual}-${i + 1}`,
+      creado_at: new Date().toISOString()
+    }));
+    try {
+      localStorage.setItem('gym_feriados', JSON.stringify(seed));
+    } catch (e) {}
+    return seed;
+  });
   const [notificaciones, setNotificaciones] = useState<AlertaNotificacion[]>([]);
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [profesores, setProfesores] = useState<Profesor[]>([]);
@@ -485,6 +513,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .limit(500);
       if (logsErr) {
         console.warn('Nota sobre logs de auditoría en Supabase:', logsErr);
+      }
+
+      // 7.b Fetch Feriados desde Supabase
+      try {
+        const { data: feriadosDb, error: feriadosErr } = await supabase.from('feriados').select('*').order('fecha', { ascending: true });
+        if (!feriadosErr && feriadosDb && feriadosDb.length > 0) {
+          setFeriados(feriadosDb);
+          localStorage.setItem('gym_feriados', JSON.stringify(feriadosDb));
+        } else if (!feriadosErr && feriadosDb && feriadosDb.length === 0) {
+          const anioActual = new Date().getFullYear();
+          const seed = generarFeriadosNacionales(anioActual).map((f, i) => ({
+            ...f,
+            id: `feriado-${anioActual}-${i + 1}`,
+            creado_at: new Date().toISOString()
+          }));
+          await supabase.from('feriados').insert(seed);
+          setFeriados(seed);
+          localStorage.setItem('gym_feriados', JSON.stringify(seed));
+        }
+      } catch (err) {
+        // Ignorar si la tabla no existe aún en Supabase
       }
 
       // Migración: los turnos de 11:00 ya no existen en ningún día (Lunes, Martes, Miércoles, Jueves, Viernes).
@@ -1204,6 +1253,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             break;
           case 'gym_waitlist_reservas':
             setWaitlistReservas(val);
+            break;
+          case 'gym_feriados':
+            setFeriados(val);
             break;
         }
       } catch (err) {
@@ -5593,6 +5645,149 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Feriados Methods
+  const agregarFeriado = async (nuevo: Omit<Feriado, 'id' | 'creado_at'>): Promise<{ success: boolean; message: string; feriado?: Feriado }> => {
+    if (!nuevo.fecha || !nuevo.nombre?.trim()) {
+      return { success: false, message: 'La fecha y el nombre del feriado son obligatorios.' };
+    }
+    const yaExiste = feriados.some(f => f.fecha === nuevo.fecha && f.activo);
+    if (yaExiste) {
+      return { success: false, message: `Ya existe un feriado activo configurado para la fecha ${nuevo.fecha}.` };
+    }
+    const feriadoCompleto: Feriado = {
+      ...nuevo,
+      id: `feriado-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      nombre: nuevo.nombre.trim(),
+      activo: nuevo.activo !== false,
+      cerrado: nuevo.cerrado !== false,
+      creado_at: new Date().toISOString()
+    };
+    const actualizados = [...feriados, feriadoCompleto].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    setFeriados(actualizados);
+    localStorage.setItem('gym_feriados', JSON.stringify(actualizados));
+
+    if (supabase) {
+      try {
+        await supabase.from('feriados').insert(feriadoCompleto);
+      } catch (e) {
+        console.warn('[Supabase] Error insertando feriado:', e);
+      }
+    }
+
+    addAuditLog('ALTA_FERIADO', {
+      fecha: feriadoCompleto.fecha,
+      nombre: feriadoCompleto.nombre,
+      cerrado: feriadoCompleto.cerrado
+    }, googleUser?.email);
+
+    addToast('add', `Feriado "${feriadoCompleto.nombre}" registrado para el ${feriadoCompleto.fecha}.`);
+    return { success: true, message: 'Feriado agregado con éxito.', feriado: feriadoCompleto };
+  };
+
+  const editarFeriado = async (id: string, updates: Partial<Feriado>): Promise<{ success: boolean; message: string }> => {
+    const target = feriados.find(f => f.id === id);
+    if (!target) return { success: false, message: 'Feriado no encontrado.' };
+
+    const actualizados = feriados.map(f => f.id === id ? { ...f, ...updates } : f).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    setFeriados(actualizados);
+    localStorage.setItem('gym_feriados', JSON.stringify(actualizados));
+
+    if (supabase) {
+      try {
+        await supabase.from('feriados').update(updates).eq('id', id);
+      } catch (e) {
+        console.warn('[Supabase] Error actualizando feriado:', e);
+      }
+    }
+
+    addToast('success', `Feriado actualizado.`);
+    return { success: true, message: 'Feriado modificado con éxito.' };
+  };
+
+  const eliminarFeriado = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const target = feriados.find(f => f.id === id);
+    const filtrados = feriados.filter(f => f.id !== id);
+    setFeriados(filtrados);
+    localStorage.setItem('gym_feriados', JSON.stringify(filtrados));
+
+    if (supabase) {
+      try {
+        await supabase.from('feriados').delete().eq('id', id);
+      } catch (e) {
+        console.warn('[Supabase] Error eliminando feriado:', e);
+      }
+    }
+
+    if (target) {
+      addAuditLog('BAJA_FERIADO', { id, fecha: target.fecha, nombre: target.nombre }, googleUser?.email);
+      addToast('delete', `Feriado "${target.nombre}" eliminado.`);
+    }
+    return { success: true, message: 'Feriado eliminado.' };
+  };
+
+  const toggleFeriadoActivo = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const target = feriados.find(f => f.id === id);
+    if (!target) return { success: false, message: 'Feriado no encontrado.' };
+    return editarFeriado(id, { activo: !target.activo });
+  };
+
+  const cargarFeriadosNacionales = async (anio: number = new Date().getFullYear()): Promise<{ success: boolean; message: string; agregados: number }> => {
+    const nacionales = generarFeriadosNacionales(anio);
+    const fechasExistentes = new Set(feriados.map(f => f.fecha));
+    const nuevosParaAgregar: Feriado[] = [];
+
+    nacionales.forEach((nac, idx) => {
+      if (!fechasExistentes.has(nac.fecha)) {
+        nuevosParaAgregar.push({
+          ...nac,
+          id: `feriado-${anio}-${Date.now()}-${idx}`,
+          creado_at: new Date().toISOString()
+        });
+      }
+    });
+
+    if (nuevosParaAgregar.length === 0) {
+      addToast('success', `Los feriados nacionales de ${anio} ya estaban cargados.`);
+      return { success: true, message: `Los feriados de ${anio} ya están cargados.`, agregados: 0 };
+    }
+
+    const actualizados = [...feriados, ...nuevosParaAgregar].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    setFeriados(actualizados);
+    localStorage.setItem('gym_feriados', JSON.stringify(actualizados));
+
+    if (supabase) {
+      try {
+        await supabase.from('feriados').insert(nuevosParaAgregar);
+      } catch (e) {
+        console.warn('[Supabase] Error cargando feriados nacionales:', e);
+      }
+    }
+
+    addAuditLog('CARGA_FERIADOS_NACIONALES', { anio, cantidad: nuevosParaAgregar.length }, googleUser?.email);
+    addToast('add', `Se cargaron ${nuevosParaAgregar.length} feriados nacionales de ${anio}.`);
+    return { success: true, message: `Se agregaron ${nuevosParaAgregar.length} feriados oficiales.`, agregados: nuevosParaAgregar.length };
+  };
+
+  const publicarFeriadoComoNovedad = async (feriadoId: string): Promise<{ success: boolean; message: string }> => {
+    const feriado = feriados.find(f => f.id === feriadoId);
+    if (!feriado) return { success: false, message: 'Feriado no encontrado.' };
+
+    const payload = generarNovedadDeFeriado(feriado, googleUser?.name || 'Administración');
+    const res = addNovedad({
+      titulo: payload.titulo,
+      contenido: payload.contenido,
+      categoria: payload.categoria,
+      destacado: payload.destacado,
+      creado_por: googleUser?.email || 'admin@kaha.fit'
+    });
+
+    if (res.success) {
+      addToast('success', `Novedad comunicada para el feriado "${feriado.nombre}".`);
+      return { success: true, message: 'Novedad de feriado comunicada a los socios.' };
+    }
+    return { success: false, message: 'No se pudo publicar la novedad.' };
+  };
+
   const borrarHistorial = () => {
     localStorage.removeItem('gym_clientes');
     localStorage.removeItem('gym_planes');
@@ -5601,6 +5796,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('gym_pagos');
     localStorage.removeItem('gym_recuperos');
     localStorage.removeItem('gym_novedades');
+    localStorage.removeItem('gym_feriados');
     localStorage.removeItem('gym_notificaciones');
     localStorage.removeItem('gym_gastos');
     localStorage.removeItem('gym_profesores');
@@ -5643,6 +5839,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <GymContext.Provider value={{
       clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, novedades,
+      feriados, agregarFeriado, editarFeriado, eliminarFeriado, toggleFeriadoActivo, cargarFeriadosNacionales, publicarFeriadoComoNovedad,
       notificaciones, gastos, profesores, novedadesProfesores, rolActivo,
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,

@@ -220,3 +220,20 @@ export interface ToastMessage {
   message: string;
 }
 
+export type TipoFeriado = 'INAMOVIBLE' | 'TRASLADABLE' | 'PUENTE' | 'GIMNASIO';
+
+export interface Feriado {
+  id: string;
+  fecha: string; // Formato 'YYYY-MM-DD'
+  nombre: string;
+  tipo?: TipoFeriado;
+  cerrado: boolean; // true = gimnasio cerrado todo el día, false = horario especial
+  horario_especial?: string; // ej: "09:30 a 13:00"
+  horas_habilitadas?: string[]; // ej: ['09:30', '10:30', '11:30'] - turnos que abren ese feriado
+  hora_desde?: string; // ej: "09:30"
+  hora_hasta?: string; // ej: "13:00"
+  observaciones?: string;
+  activo: boolean;
+  creado_at: string;
+}
+

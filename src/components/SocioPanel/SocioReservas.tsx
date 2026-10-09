@@ -5,6 +5,7 @@ import { Cliente } from '../../types';
 import { CalendarDays, Plus, Calendar, X, Clock, CalendarClock, Info, Phone, ExternalLink, Check, User, RefreshCw } from 'lucide-react';
 import { balanceDelMes } from '../../lib/cuposMensuales';
 import { hoyArgentina } from '../../lib/fechas';
+import { esFeriado, estadoTurnoFeriado } from '../../lib/feriados';
 
 interface SocioReservasProps {
   socio: Cliente;
@@ -20,7 +21,7 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
   setErrorMessage
 }) => {
   const { 
-    turnos, clientes, planes, recuperos, waitlistReservas,
+    turnos, clientes, planes, recuperos, waitlistReservas, feriados,
     suspenderClaseFija, revertirSuspensionClaseFija, cancelarReservaIndividual, removerListaEsperaReserva,
     removerAsignacionFija, programarRecuperoPendiente
   } = useGym();
@@ -429,6 +430,24 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
                           <span>Profe: <strong>{sesion.profesor || 'Por asignar'}</strong></span>
                         </p>
                       </div>
+                      {(() => {
+                        const statusFeriado = estadoTurnoFeriado(sesion.fecha, sesion.hora, feriados);
+                        if (!statusFeriado.esFeriado) return null;
+                        return (
+                          <span 
+                            className={`text-[7.5px] font-bold px-1.5 py-0.5 rounded border self-start truncate max-w-full ${
+                              statusFeriado.cerrado 
+                                ? 'bg-rose-100 text-rose-900 border-rose-300' 
+                                : 'bg-amber-100 text-amber-900 border-amber-300'
+                            }`}
+                            title={`Feriado: ${statusFeriado.feriado?.nombre} - ${statusFeriado.cerrado ? 'Turno cerrado' : 'Turno habilitado'}`}
+                          >
+                            {statusFeriado.cerrado 
+                              ? `🛑 Feriado: ${statusFeriado.feriado?.nombre} (No se dicta)` 
+                              : `⚡ Feriado: ${statusFeriado.feriado?.nombre} (Horario Especial)`}
+                          </span>
+                        );
+                      })()}
                       <span className={`text-[7px] font-extrabold tracking-wider px-1.5 py-0.5 rounded font-mono border self-start ${
                         sesion.isSuspended
                           ? 'bg-rose-100 text-rose-900 border-rose-300'

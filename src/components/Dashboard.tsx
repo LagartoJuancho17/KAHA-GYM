@@ -5,16 +5,18 @@ import {
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
   TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2,
-  Eye, EyeOff, Mail, Send, UserMinus, PauseCircle
+  Eye, EyeOff, Mail, Send, UserMinus, PauseCircle, CalendarOff
 } from 'lucide-react';
 import { Gasto, PagoEnRevision, OrigenGasto } from '../types';
 import { EmailInicioMesModal } from './Notifications/EmailInicioMesModal';
 import { AdminBajasReviewModal } from './Morosos/AdminBajasReviewModal';
 import { AdminPausadosReviewModal } from './Morosos/AdminPausadosReviewModal';
 import { EmailReporteMorososAdminModal } from './Notifications/EmailReporteMorososAdminModal';
+import { FeriadosConfigModal } from './Turnos/FeriadosConfigModal';
 import { hoyArgentina } from '../lib/fechas';
 import { estaEmailInicioMesEnviado } from '../lib/emailInicioMes';
 import { pausadosPendientesDeRevision } from '../lib/pausa';
+import { proximosFeriados } from '../lib/feriados';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -37,7 +39,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setActiveTab, setEditingClienteId, setShowAddClienteModal, setShowAddPagoModal, setOpenTurnosModalForId, onStartAuthorization 
 }) => {
   const { 
-    clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, auditLogs,
+    clientes, planes, turnos, pagos, gastos, rolActivo, notificaciones, auditLogs, feriados,
     registrarGasto, autorizarCliente, eliminarCliente,
     pagosEnRevision, aprobarPagoTransferencia, rechazarPagoTransferencia, googleUser
   } = useGym();
@@ -47,8 +49,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   
   // Modal state
   const [showGastoModal, setShowGastoModal] = useState(false);
+  const [showFeriadosModal, setShowFeriadosModal] = useState(false);
   const [transferToApprove, setTransferToApprove] = useState<PagoEnRevision | null>(null);
   const [destinoSeleccionado, setDestinoSeleccionado] = useState<'JUANCHI' | 'RULO'>('JUANCHI');
+
+  const proximosFeriadosList = React.useMemo(() => {
+    return proximosFeriados(feriados, hoyArgentina(), 3);
+  }, [feriados]);
 
   const getTransferMonto = (p: PagoEnRevision) => {
     if (p.monto > 0) return p.monto;
@@ -572,6 +579,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* CALENDARIO DE FERIADOS / ACCESO RÁPIDO */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 sm:p-4 rounded-2xl border border-indigo-900/60 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in" id="dashboard-feriados-card">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+            <CalendarOff className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[9.5px] font-mono uppercase tracking-widest text-indigo-300 font-bold">Calendario de Feriados</span>
+              {proximosFeriadosList.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[8.5px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-bold">
+                  {proximosFeriadosList.length} próximos
+                </span>
+              )}
+            </div>
+            {proximosFeriadosList.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                {proximosFeriadosList.map(f => (
+                  <span key={f.id} className="text-[11px] font-semibold text-slate-200 flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-lg border border-white/10">
+                    <span className="text-amber-400">🎉</span>
+                    <strong className="truncate max-w-[150px]">{f.nombre}</strong>
+                    <span className="text-slate-400 font-mono text-[9.5px]">({f.fecha.slice(5).replace('-', '/')})</span>
+                    {f.cerrado ? (
+                      <span className="text-[8.5px] text-rose-300 font-bold">(Cerrado)</span>
+                    ) : (
+                      <span className="text-[8.5px] text-amber-300 font-bold">(Esp.)</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                No hay feriados próximos configurados en este período.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowFeriadosModal(true)}
+          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer shadow-xs border-none shrink-0"
+          id="btn-dashboard-configurar-feriados"
+        >
+          Configurar Feriados
+        </button>
+      </div>
 
       {/* BENTO DE INDICADORES (jerarquía por tamaño de tile) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[150px] gap-4">
@@ -1346,6 +1400,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <AdminPausadosReviewModal
         isOpen={showPausadosModal}
         onClose={() => setShowPausadosModal(false)}
+      />
+
+      {/* MODAL CONFIGURACIÓN DE FERIADOS */}
+      <FeriadosConfigModal
+        isOpen={showFeriadosModal}
+        onClose={() => setShowFeriadosModal(false)}
       />
     </div>
   );

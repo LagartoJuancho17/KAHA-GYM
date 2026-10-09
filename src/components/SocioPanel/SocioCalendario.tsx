@@ -2,8 +2,9 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { ChevronLeft, ChevronRight, Info, Calendar, RefreshCw, X, Clock, MessageCircle, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Calendar, RefreshCw, X, Clock, MessageCircle, Check, CalendarOff } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
+import { esFeriado, estaCerradoPorFeriado, estadoTurnoFeriado } from '../../lib/feriados';
 
 interface SocioCalendarioProps {
   socio: Cliente;
@@ -29,7 +30,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
   setErrorMessage
 }) => {
   const {
-    turnos, clientes, planes, waitlistReservas, recuperos,
+    turnos, clientes, planes, waitlistReservas, recuperos, feriados,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija, agregarListaEsperaReserva, removerListaEsperaReserva
   } = useGym();
 
@@ -279,6 +280,7 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
             const dateStr = datesInSelectedWeek[0] || '';
             const dayNumber = dateStr ? new Date(dateStr + 'T00:00:00').getDate() : null;
             const isToday = dateStr === hoyArgentina();
+            const feriadoDelDia = esFeriado(dateStr, feriados);
 
             return (
               <button
@@ -305,7 +307,13 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                       </span>
                     )}
                   </div>
-                  {isToday ? (
+                  {feriadoDelDia ? (
+                    <span className={`text-[7px] font-black uppercase px-1 rounded-full tracking-wider mt-0.5 truncate max-w-[55px] ${
+                      isActive ? 'bg-amber-300 text-amber-950' : 'bg-amber-100 text-amber-800'
+                    }`} title={`Feriado: ${feriadoDelDia.nombre}`}>
+                      🎉 Feriado
+                    </span>
+                  ) : isToday ? (
                     <span className={`text-[7.5px] font-extrabold uppercase px-1.5 py-0.2 rounded-full tracking-wider mt-0.5 ${
                       isActive ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-800'
                     }`}>
@@ -322,6 +330,50 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
           })}
         </div>
       </div>
+
+      {/* BANNER DE FERIADO EN DÍA ACTIVO */}
+      {(() => {
+        const datesInSelectedWeek = getAvailableDatesForTurn(activeDay).filter(isDateInSelectedWeek);
+        const activeDateStr = datesInSelectedWeek[0] || '';
+        const feriadoActivo = esFeriado(activeDateStr, feriados);
+        if (!feriadoActivo) return null;
+
+        return (
+          <div className={`p-4 rounded-2xl border flex items-start gap-3 animate-fade-in ${
+            feriadoActivo.cerrado 
+              ? 'bg-rose-50 border-rose-200 text-rose-950 shadow-xs' 
+              : 'bg-amber-50 border-amber-200 text-amber-950 shadow-xs'
+          }`}>
+            <div className={`p-2 rounded-xl shrink-0 ${
+              feriadoActivo.cerrado ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+              <CalendarOff className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-extrabold text-xs sm:text-sm">
+                  🎉 Feriado: {feriadoActivo.nombre}
+                </h4>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                  feriadoActivo.cerrado ? 'bg-rose-200 text-rose-900' : 'bg-amber-200 text-amber-900'
+                }`}>
+                  {feriadoActivo.cerrado ? 'Gimnasio Cerrado' : `Horario Especial: ${feriadoActivo.horario_especial || 'Consulte'}`}
+                </span>
+              </div>
+              <p className="text-[11px] mt-1 leading-relaxed opacity-90">
+                {feriadoActivo.cerrado 
+                  ? 'El gimnasio permanecerá cerrado durante este feriado. No se dictan clases y no se computarán faltas en tu membresía.' 
+                  : `Horario especial programado: ${feriadoActivo.horario_especial || 'Consulte turnos habilitados'}. A continuación podés ver los turnos habilitados para entrenar y reservar tu lugar.`}
+              </p>
+              {feriadoActivo.observaciones && (
+                <p className="text-[10px] mt-1 italic opacity-80">
+                  Nota: {feriadoActivo.observaciones}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* CONTENEDOR DE SLOTS */}
       <div className="space-y-8" id="socio-agenda-slots">
@@ -415,33 +467,49 @@ export const SocioCalendario: React.FC<SocioCalendarioProps> = ({
                             </div>
 
                             <div className="flex-1 text-right">
-                              {holdsMyFijo ? (
-                                <button
-                                  onClick={() => {
-                                    setReprogramTurnId(turno.id);
-                                    setBookingTurnId(null);
-                                  }}
-                                  className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 font-sans w-full"
-                                >
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                  <span className="truncate">Reprogramar</span>
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setBookingTurnId(turno.id);
-                                    setReprogramTurnId(null);
-                                  }}
-                                  className={`px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer font-sans border w-full text-center shadow-xs ${
-                                    isFull
-                                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
-                                  }`}
-                                  title={isFull ? 'Turno completo — anotate en la lista de espera' : 'Reservar este cupo'}
-                                >
-                                  <span className="truncate">{isFull ? 'Completo · Lista de espera' : 'RESERVAR'}</span>
-                                </button>
-                              )}
+                              {(() => {
+                                const statusFeriado = estadoTurnoFeriado(slotDateStr, turno.hora, feriados);
+                                if (statusFeriado.cerrado) {
+                                  return (
+                                    <span 
+                                      className="block w-full py-1.5 px-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[9px] sm:text-[10px] font-bold text-center"
+                                      title={statusFeriado.motivo || 'Cerrado por feriado'}
+                                    >
+                                      {statusFeriado.feriado?.cerrado ? 'Cerrado por Feriado' : 'No Abre en Feriado'}
+                                    </span>
+                                  );
+                                }
+                                if (holdsMyFijo) {
+                                  return (
+                                    <button
+                                      onClick={() => {
+                                        setReprogramTurnId(turno.id);
+                                        setBookingTurnId(null);
+                                      }}
+                                      className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-100 px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 font-sans w-full"
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5" />
+                                      <span className="truncate">Reprogramar</span>
+                                    </button>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    onClick={() => {
+                                      setBookingTurnId(turno.id);
+                                      setReprogramTurnId(null);
+                                    }}
+                                    className={`px-2 sm:px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer font-sans border w-full text-center shadow-xs ${
+                                      isFull
+                                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
+                                    }`}
+                                    title={isFull ? 'Turno completo — anotate en la lista de espera' : 'Reservar este cupo'}
+                                  >
+                                    <span className="truncate">{isFull ? 'Completo · Lista de espera' : 'RESERVAR'}</span>
+                                  </button>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>

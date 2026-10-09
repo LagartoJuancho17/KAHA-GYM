@@ -2,12 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle, Mail } from 'lucide-react';
+import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle, Mail, CalendarOff } from 'lucide-react';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { TurnoClassEmailModal } from './TurnoClassEmailModal';
 import { esperaDelTurno, esPrioritario } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
 import { esEmailValido, AlumnoClaseEmail } from '../../lib/emailClase';
+import { esFeriado, estadoTurnoFeriado } from '../../lib/feriados';
 
 interface TurnoRealtimeModalProps {
   selectedSlot: { id: string; date: string };
@@ -26,7 +27,7 @@ const formatWspPhone = (phone?: string) => {
 
 export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selectedSlot, onClose }) => {
   const {
-    turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva, removerAsignacionFija, sociosPrioritarios,
+    turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva, removerAsignacionFija, sociosPrioritarios, feriados,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
     actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo
   } = useGym();
@@ -74,6 +75,11 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   const rtData = getCellRealtimeData(selectedSlot.id, selectedSlot.date);
   const isFull = rtData.total >= rtData.cupo;
+  const turnoHora = selectedSlot.id.split('-')[1] || '';
+  const statusFeriado = useMemo(() => {
+    return estadoTurnoFeriado(selectedSlot.date, turnoHora, feriados);
+  }, [selectedSlot.date, turnoHora, feriados]);
+  const feriadoDia = statusFeriado.feriado;
 
   // Lista de espera para este turno y fecha
   const waitlistItems = useMemo(() => {
@@ -371,6 +377,47 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
         {/* Body */}
         <div className="p-5 space-y-5">
+          {/* Feriado Alert Banner */}
+          {statusFeriado.esFeriado && (
+            <div className={`p-3.5 rounded-xl border flex items-start gap-3 ${
+              statusFeriado.cerrado 
+                ? 'bg-rose-50 border-rose-200 text-rose-950' 
+                : 'bg-amber-50 border-amber-200 text-amber-950'
+            }`}>
+              <div className={`p-2 rounded-lg shrink-0 ${
+                statusFeriado.cerrado ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+              }`}>
+                <CalendarOff className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-extrabold text-xs">
+                    🎉 Feriado: {feriadoDia?.nombre}
+                  </h4>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                    statusFeriado.cerrado ? 'bg-rose-200 text-rose-900' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                  }`}>
+                    {statusFeriado.cerrado 
+                      ? (feriadoDia?.cerrado ? 'Gimnasio Cerrado' : 'Turno No Habilitado') 
+                      : 'Turno Habilitado (Horario Especial)'}
+                  </span>
+                </div>
+                <p className="text-[11px] mt-0.5 leading-snug opacity-90">
+                  {statusFeriado.cerrado 
+                    ? (feriadoDia?.cerrado 
+                        ? 'El gimnasio permanece completamente cerrado durante todo el día. No se computa asistencia ni faltas.' 
+                        : `Este turno de las ${turnoHora} hs no se dicta hoy. Rige cronograma especial: ${feriadoDia?.horario_especial || 'Consulte turnos habilitados'}.`) 
+                    : `Este turno de las ${turnoHora} hs está operativo normalmente dentro del cronograma especial del feriado (${feriadoDia?.horario_especial || 'Horario especial'}).`}
+                </p>
+                {feriadoDia?.observaciones && (
+                  <p className="text-[10px] mt-1 italic opacity-80">
+                    Nota: {feriadoDia.observaciones}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Status Overview */}
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-center">
             <div>

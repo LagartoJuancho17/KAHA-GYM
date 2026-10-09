@@ -13,25 +13,33 @@ import { TurnoRealtimeModal } from './TurnoRealtimeModal';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { SociosPrioritariosModal } from './SociosPrioritariosModal';
 import { TurnoExportModal } from './TurnoExportModal';
+import { FeriadosConfigModal } from './FeriadosConfigModal';
 import { SearchableSelect } from '../Common/SearchableSelect';
-import { History, Crown, Download } from 'lucide-react';
+import { History, Crown, Download, CalendarOff } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 import { esperaDelTurno } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
+import { esFeriado, estaCerradoPorFeriado, estadoTurnoFeriado } from '../../lib/feriados';
 
 export const TurnosGrid: React.FC = () => {
   const { 
-    turnos, clientes, recuperos, waitlistReservas, sociosPrioritarios,
+    turnos, clientes, recuperos, waitlistReservas, sociosPrioritarios, feriados,
     agregarRecupero, actualizarEstadoRecupero, checkInFlexible, 
     crearReservaIndividual, registrarVacaciones,
     suspenderClaseFija, programarRecuperoPendiente
   } = useGym();
 
   const [showPrioritariosModal, setShowPrioritariosModal] = useState(false);
+  const [showFeriadosModal, setShowFeriadosModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportInitialMode, setExportInitialMode] = useState<'SEMANAL' | 'FIJA'>('SEMANAL');
   const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('TIEMPO_REAL');
   const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(() => semanaOffsetInicial());
+
+  const mesActual = hoyArgentina().slice(0, 7);
+  const feriadosEsteMesCount = useMemo(() => {
+    return (feriados || []).filter(f => f.activo && f.fecha.startsWith(mesActual)).length;
+  }, [feriados, mesActual]);
   
   // Real-time week helper notifications
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
@@ -294,6 +302,21 @@ export const TurnosGrid: React.FC = () => {
           >
             <Crown className="w-3.5 h-3.5 text-violet-200" />
             <span>Socios con Prioridad</span>
+          </button>
+
+          <button
+            onClick={() => setShowFeriadosModal(true)}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
+            id="btn-configurar-feriados"
+            title="Configurar feriados y días no laborables del gimnasio"
+          >
+            <CalendarOff className="w-3.5 h-3.5 text-indigo-200" />
+            <span>Feriados</span>
+            {feriadosEsteMesCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-indigo-500 text-white text-[9px] font-bold">
+                {feriadosEsteMesCount}
+              </span>
+            )}
           </button>
 
           <button
@@ -583,9 +606,24 @@ export const TurnosGrid: React.FC = () => {
                     {DIAS.map(d => {
                       const dateStr = weekDates[d];
                       const displayDate = dateStr ? `${dateStr.split('-')[2]}/${dateStr.split('-')[1]}/${dateStr.split('-')[0]}` : '';
+                      const feriadoDia = esFeriado(dateStr, feriados);
                       return (
                         <th key={d} className="p-3 border-r border-b border-slate-800 bg-slate-900" style={{boxShadow: '0 2px 5px rgba(0,0,0,0.2)'}}>
-                          <div>{d === 'MIERCOLES' ? 'MIÉRCOLES' : d}</div>
+                          <div className="flex flex-col items-center gap-1">
+                            <div>{d === 'MIERCOLES' ? 'MIÉRCOLES' : d}</div>
+                            {feriadoDia && (
+                              <span 
+                                className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold border truncate max-w-[130px] inline-block ${
+                                  feriadoDia.cerrado 
+                                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
+                                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                }`}
+                                title={`Feriado: ${feriadoDia.nombre}${feriadoDia.cerrado ? ' (Gimnasio Cerrado)' : ` (Horario Especial: ${feriadoDia.horario_especial})`}`}
+                              >
+                                🎉 {feriadoDia.nombre}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[9px] text-slate-400 font-mono font-normal mt-0.5">{displayDate}</div>
                         </th>
                       );
@@ -621,10 +659,16 @@ export const TurnosGrid: React.FC = () => {
                           return <td key={dia} className="p-2 border-r border-zinc-200 text-zinc-300">-</td>;
                         }
 
+                        const feriadoDia = esFeriado(fechaStr, feriados);
+                        const statusFeriado = estadoTurnoFeriado(fechaStr, hora, feriados);
                         const ratio = rtData.cupo > 0 ? (rtData.total / rtData.cupo) * 100 : 0;
 
                         let blockColorClass = 'bg-emerald-50 hover:bg-emerald-100/50 text-emerald-800 border-emerald-100 hover:border-emerald-300';
-                        if (ratio >= 70 && ratio < 90) {
+                        if (statusFeriado.esFeriado && statusFeriado.cerrado) {
+                          blockColorClass = 'bg-rose-50/70 hover:bg-rose-100/60 text-rose-900 border-rose-200 hover:border-rose-300';
+                        } else if (statusFeriado.esFeriado && !statusFeriado.cerrado) {
+                          blockColorClass = 'bg-amber-50/80 hover:bg-amber-100/70 text-amber-950 border-amber-300 hover:border-amber-400 ring-1 ring-amber-400/20';
+                        } else if (ratio >= 70 && ratio < 90) {
                           blockColorClass = 'bg-amber-50 hover:bg-amber-100/50 text-amber-800 border-amber-100 hover:border-amber-300';
                         } else if (ratio >= 90) {
                           blockColorClass = 'bg-red-50 hover:bg-red-100/50 text-red-800 border-red-100 hover:border-red-300';
@@ -643,9 +687,19 @@ export const TurnosGrid: React.FC = () => {
                             className={`p-2.5 border-r border-zinc-200 cursor-pointer transition-all border-2 ${blockColorClass} ${
                               isSelected ? 'ring-2 ring-black border-transparent relative z-10 shadow-lg' : ''
                             }`}
-                            title={`Hacer clic para gestionar tiempo real: ${idTurno} (${fechaStr})${rtData.waitlist.length > 0 ? ` - ${rtData.waitlist.length} en lista de espera` : ''}`}
+                            title={`Hacer clic para gestionar tiempo real: ${idTurno} (${fechaStr})${statusFeriado.esFeriado ? ` [Feriado: ${statusFeriado.feriado?.nombre}${statusFeriado.cerrado ? ' - Turno Cerrado' : ' - Turno Habilitado'}]` : ''}${rtData.waitlist.length > 0 ? ` - ${rtData.waitlist.length} en lista de espera` : ''}`}
                           >
                             <div className="flex flex-col items-center justify-center gap-0.5">
+                              {statusFeriado.esFeriado && statusFeriado.cerrado && (
+                                <span className="text-[7.5px] font-extrabold px-1.5 py-0.2 rounded bg-rose-200/80 text-rose-900 uppercase tracking-wider mb-0.5">
+                                  {feriadoDia?.cerrado ? 'Cerrado Feriado' : 'No Abre Hoy'}
+                                </span>
+                              )}
+                              {statusFeriado.esFeriado && !statusFeriado.cerrado && (
+                                <span className="text-[7.5px] font-extrabold px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 uppercase tracking-wider mb-0.5">
+                                  ⚡ H. Especial
+                                </span>
+                              )}
                               <span className="font-bold text-xs font-mono">{rtData.total} ocupados</span>
                               
                               <div className="flex flex-wrap gap-0.5 justify-center mt-1">
@@ -1152,6 +1206,11 @@ export const TurnosGrid: React.FC = () => {
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
         initialMode={exportInitialMode}
+      />
+
+      <FeriadosConfigModal
+        isOpen={showFeriadosModal}
+        onClose={() => setShowFeriadosModal(false)}
       />
     </div>
   );
