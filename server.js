@@ -8,6 +8,7 @@ import { normalizeArgPhone, isSendablePhone } from './services/notify/phone.js';
 import { createPaymentReceiptHandler } from './services/notify/paymentReceipt.js';
 import { createReceiptAuth } from './services/notify/receiptAuth.js';
 import { normalizarSupabaseUrl } from './services/supabase/baseUrl.js';
+import { verifyWebhookChallenge } from './services/notify/webhook.js';
 
 // Load environment variables from .env
 dotenv.config();
@@ -262,6 +263,56 @@ app.post('/api/webhooks/mercadopago', async (req, res) => {
     return res.status(500).json({ error: err.message || 'Error processing webhook' });
   }
 });
+
+// -----------------------------------------------------------------------------
+// Webhooks para Meta / WhatsApp Cloud API
+// GET: Verificación del endpoint requerida por Meta for Developers
+// POST: Recepción de eventos de mensajes y cambios de estado (sent, delivered, read)
+// -----------------------------------------------------------------------------
+app.get('/api/webhooks/whatsapp', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const expectedToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'kaha_gym_meta_webhook_2026';
+
+  const verification = verifyWebhookChallenge({ mode, token, challenge, expectedToken });
+  if (verification.ok) {
+    console.log('>> [Webhook WhatsApp] Verificación exitosa de Meta.');
+    return res.status(200).send(verification.challenge);
+  }
+
+  console.warn('>> [Webhook WhatsApp] Verificación rechazada: token incorrecto o modo inválido.');
+  return res.sendStatus(403);
+});
+
+app.post('/api/webhooks/whatsapp', (req, res) => {
+  // Meta exige respuesta 200 OK inmediata
+  res.status(200).send('EVENT_RECEIVED');
+
+  try {
+    const body = req.body;
+    if (body?.object === 'whatsapp_business_account') {
+      for (const entry of body.entry || []) {
+        for (const change of entry.changes || []) {
+          const value = change.value;
+          if (value?.statuses) {
+            for (const s of value.statuses) {
+              console.log(`>> [Webhook WhatsApp] Estado de mensaje ${s.id}: ${s.status} (destinatario: ${s.recipient_id})`);
+            }
+          }
+          if (value?.messages) {
+            for (const msg of value.messages) {
+              console.log(`>> [Webhook WhatsApp] Mensaje recibido de ${msg.from}:`, msg.type === 'text' ? msg.text?.body : `[tipo: ${msg.type}]`);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('>> [Webhook WhatsApp] Error procesando payload:', err);
+  }
+});
+
 
 // -----------------------------------------------------------------------------
 // Aviso al socio cuando lo dan de baja de una clase.
