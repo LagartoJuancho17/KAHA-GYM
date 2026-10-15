@@ -3477,7 +3477,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 putInWaitlist: true
               };
             }
-            return wlRes;
+            // Si ya estaba en lista de espera, no retornar el mensaje de error confuso sino avisar que sigue en espera
+            return {
+              success: false,
+              message: `El turno está completo (${totalOccupied}/${data.cupo}). ${cliente.nombre} ya permanece en la lista de espera.`,
+              putInWaitlist: true
+            };
           }
 
           return { success: false, message: `No se pudo reservar (${data.motivo || 'error'}).` };
@@ -3501,7 +3506,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           putInWaitlist: true
         };
       }
-      return wlRes;
+      return {
+        success: false,
+        message: `El turno está completo (${totalOccupied}/${turno.cupo_maximo}). ${cliente.nombre} ya permanece en la lista de espera.`,
+        putInWaitlist: true
+      };
     }
 
     const nuevaReserva: ReservaIndividual = {

@@ -610,8 +610,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                               if (res.success && !res.putInWaitlist) {
                                 removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
                                 setRealtimeSuccess(`✅ ¡${wl.nombre} asignado a la clase exitosamente!`);
-                              } else if (res.success && res.putInWaitlist) {
-                                setRealtimeError('El turno sigue completo. El alumno permanece en lista de espera.');
+                              } else if (res.putInWaitlist) {
+                                setRealtimeError(res.message || 'El turno sigue completo. El alumno permanece en lista de espera.');
                               } else {
                                 setRealtimeError(res.message);
                               }
