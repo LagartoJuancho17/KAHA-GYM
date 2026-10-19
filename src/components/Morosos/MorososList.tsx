@@ -121,7 +121,7 @@ export const MorososList: React.FC<MorososListProps> = ({
                             ({formatearDeudaVisual(c, pl?.precio).textoTachado})
                           </span>
                           <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase">
-                            Becado
+                            Perdonado
                           </span>
                         </div>
                       ) : (
@@ -154,7 +154,7 @@ export const MorososList: React.FC<MorososListProps> = ({
                           onClick={() => perdonarDeudaSocio(c.id, googleUser?.email)}
                           className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                           id={`btn-perdonar-moroso-${c.id}`}
-                          title="Perdonar Deuda (Becar socio y saldar deuda en $0)"
+                          title="Perdonar deuda del mes actual"
                         >
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
                           <span>Perdonar Deuda</span>

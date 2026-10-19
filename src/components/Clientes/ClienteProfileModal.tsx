@@ -129,11 +129,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
           )}
 
           {/* Información Personal */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-              <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Código / ID de Socio</span>
-              <span className="font-mono font-bold text-zinc-900 block">{selectedCliente.codigo_socio || selectedCliente.id}</span>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 flex justify-between items-center">
               <div>
                 <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Celular</span>
@@ -154,15 +150,15 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
               )}
             </div>
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-              <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Tipo de Membresía</span>
-              <span className="font-bold text-zinc-900 block">{selectedCliente.tipo}</span>
+              <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Email</span>
+              <span className="font-semibold text-zinc-900 block truncate" title={selectedCliente.email}>{selectedCliente.email || '-'}</span>
             </div>
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 flex flex-col justify-between">
               <div>
                 <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Deuda Acumulada</span>
-                {esBecado ? (
+                {selectedCliente.deuda_acumulada <= 0 && selectedCliente.deuda_perdonada ? (
                   <span className="font-mono font-bold block text-emerald-700">
-                    $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through decoration-rose-500 decoration-2">{formatoDeuda.textoTachado}</span> - Becado)</span>
+                    $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through decoration-rose-500 decoration-2">{formatoDeuda.textoTachado}</span> - Perdonado)</span>
                   </span>
                 ) : (
                   <span className={`font-mono font-bold block ${selectedCliente.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
@@ -171,19 +167,29 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                 )}
               </div>
               <div className="mt-2 pt-1.5 border-t border-zinc-200/60 flex flex-col gap-1">
-                {!esBecado ? (
+                {selectedCliente.deuda_acumulada > 0 ? (
                   <button
                     onClick={() => perdonarDeudaSocio(selectedCliente.id, googleUser?.email)}
                     className="w-full text-center px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[9px] font-bold border border-emerald-300 transition-colors cursor-pointer"
+                    title="Perdonar deuda del mes actual"
                   >
-                    Perdonar Deuda (Becar $0)
+                    Perdonar Deuda ($0)
+                  </button>
+                ) : selectedCliente.deuda_perdonada ? (
+                  <button
+                    onClick={() => revertirPerdonDeuda(selectedCliente.id, googleUser?.email)}
+                    className="w-full text-center px-2 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded text-[9px] font-bold border border-zinc-300 transition-colors cursor-pointer"
+                    title="Restablecer deuda"
+                  >
+                    Restablecer Deuda
                   </button>
                 ) : (
                   <button
-                    onClick={() => revertirPerdonDeuda(selectedCliente.id, googleUser?.email)}
-                    className="w-full text-center px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded text-[9px] font-bold border border-amber-300 transition-colors cursor-pointer"
+                    onClick={() => perdonarDeudaSocio(selectedCliente.id, googleUser?.email)}
+                    className="w-full text-center px-2 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded text-[9px] font-bold border border-zinc-200 transition-colors cursor-pointer"
+                    title="Perdonar cuota del mes"
                   >
-                    Quitar Beca / Restablecer
+                    Perdonar Cuota Mes
                   </button>
                 )}
                 {selectedCliente.exencion_cobro !== 'POSTERGADO' && (
@@ -204,22 +210,16 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                 )}
               </div>
             </div>
-            <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 col-span-2">
-              <span className="text-zinc-400 block uppercase font-medium text-[9px] mb-1">Exención / Excepción de Cobro</span>
-              <span className="font-bold text-zinc-900 block mt-1">
-                {selectedCliente.exencion_cobro === 'NINGUNA' || !selectedCliente.exencion_cobro ? (
-                  <span className="text-zinc-500 font-sans text-xs">Ninguna (Estándar)</span>
-                ) : selectedCliente.exencion_cobro === 'BECADO' ? (
-                  <span className="text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded border border-emerald-300 uppercase text-[9px] font-bold">Becado (Deuda $0)</span>
-                ) : selectedCliente.exencion_cobro === 'SUSPENDIDO' ? (
-                  <span className="text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200 uppercase text-[9px] font-bold">Suspensión momentánea</span>
-                ) : selectedCliente.exencion_cobro === 'POSTERGADO' ? (
-                  <span className="text-cyan-600 bg-cyan-50 px-2.5 py-0.5 rounded border border-cyan-200 uppercase text-[9px] font-bold">Postergación autorizada</span>
-                ) : (
-                  <span className="text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 uppercase text-[9px] font-bold">Perdonado / Exento</span>
-                )}
-              </span>
-            </div>
+            {selectedCliente.exencion_cobro === 'SUSPENDIDO' && (
+              <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 col-span-1 sm:col-span-3 flex items-center justify-between">
+                <span className="text-amber-800 font-bold text-xs">Socio en pausa (Cobro suspendido este mes)</span>
+              </div>
+            )}
+            {selectedCliente.exencion_cobro === 'POSTERGADO' && (
+              <div className="bg-cyan-50 p-2.5 rounded-lg border border-cyan-200 col-span-1 sm:col-span-3 flex items-center justify-between">
+                <span className="text-cyan-800 font-bold text-xs">Prórroga de pago autorizada (1 semana)</span>
+              </div>
+            )}
           </div>
 
           {/* Plan contratado */}

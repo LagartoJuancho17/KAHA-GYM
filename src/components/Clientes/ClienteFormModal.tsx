@@ -394,10 +394,8 @@ export const ClienteFormModal: React.FC<ClienteFormModalProps> = ({
                 id="form-exencion-cobro"
               >
                 <option value="NINGUNA">Ninguna (Control estándar)</option>
-                <option value="BECADO">Becado (Deuda $0)</option>
-                <option value="SUSPENDIDO">Suspensión momentánea</option>
-                <option value="POSTERGADO">Postergación autorizada</option>
-                <option value="PERDONADO">Exento este mes</option>
+                <option value="SUSPENDIDO">Suspensión momentánea (Pausa)</option>
+                <option value="POSTERGADO">Postergación autorizada (Prórroga)</option>
               </select>
             </div>
 

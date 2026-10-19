@@ -139,7 +139,7 @@ export const AdminBajasReviewModal: React.FC<AdminBajasReviewModalProps> = ({
   const handlePerdonarMultiple = () => {
     if (selectedIds.length === 0) return;
     selectedIds.forEach(id => perdonarDeudaSocio(id, googleUser?.email));
-    addToast('success', `Se perdonó la deuda a ${selectedIds.length} socio(s) (Estado: Becado).`);
+    addToast('success', `Se perdonó la deuda a ${selectedIds.length} socio(s).`);
     setSelectedIds([]);
   };
 
@@ -255,7 +255,7 @@ Equipo KAHA 💚`;
                 </span>
               </div>
               <p className="text-zinc-300 text-xs mt-1">
-                Alumnos con turnos fijos asignados sin abonar la cuota de <span className="font-semibold text-white capitalize">{mesNombre}</span>. Podés perdonar la deuda (becar), prorrogar la deuda 1 semana, pausar al socio o eliminar el usuario. Al finalizar, quienes no hayan sido perdonados, prorrogados ni pausados recibirán un aviso automático por correo.
+                Alumnos con turnos fijos asignados sin abonar la cuota de <span className="font-semibold text-white capitalize">{mesNombre}</span>. Podés perdonar la deuda del mes, prorrogar la deuda 1 semana, pausar al socio o eliminar el usuario. Al finalizar, quienes no hayan sido perdonados, prorrogados ni pausados recibirán un aviso automático por correo.
               </p>
             </div>
           </div>
@@ -450,7 +450,7 @@ Equipo KAHA 💚`;
                         )}
                         {esBecado && (
                           <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase">
-                            Becado (Deuda $0)
+                            Deuda Perdonada
                           </span>
                         )}
                         {esPostergado && (
@@ -474,7 +474,7 @@ Equipo KAHA 💚`;
                           <span className="font-mono text-emerald-700 font-bold flex items-center gap-1.5">
                             Deuda actual: <span className="bg-emerald-100 text-emerald-900 font-extrabold px-1.5 py-0.5 rounded">$0</span>
                             <span className="text-zinc-400 font-normal line-through decoration-rose-500 decoration-2 text-xs">({formatoDeuda.textoTachado})</span>
-                            <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">Becado</span>
+                            <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">Perdonado</span>
                           </span>
                         ) : esPostergado ? (
                           <span className="font-mono text-cyan-800 font-bold flex items-center gap-1.5">
@@ -533,7 +533,7 @@ Equipo KAHA 💚`;
                         <button
                           onClick={() => handlePerdonarDeuda(c.id)}
                           className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs border-none"
-                          title="Perdonar deuda (pone deuda en $0 y asigna condición de Becado)"
+                          title="Perdonar deuda del mes actual"
                         >
                           <Check className="w-3.5 h-3.5 text-white" />
                           <span>Perdonar deuda</span>
@@ -595,7 +595,7 @@ Equipo KAHA 💚`;
               Deuda total adeudada: <strong className="text-red-700 font-mono font-bold">${totalDeudaCandidatos.toLocaleString('es-AR')}</strong>
             </p>
             <p className="text-[11px] text-zinc-400">
-              {sociosExentos.length > 0 && `${sociosExentos.length} socio(s) protegidos/exentos (becados, prórrogas o pausados) fuera de revisión de baja.`}
+              {sociosExentos.length > 0 && `${sociosExentos.length} socio(s) protegidos/exentos (prórrogas, pausados o perdonados) fuera de revisión de baja.`}
             </p>
           </div>
 

@@ -34,7 +34,7 @@ const getEstadoBadge = (c: Cliente): { badgeClass: string; estadoLabel: string }
     return { badgeClass: 'bg-amber-100 text-amber-900 border-amber-200 animate-pulse', estadoLabel: 'Pendiente' };
   }
   if (c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO') {
-    return { badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold', estadoLabel: 'Al Día (Becado)' };
+    return { badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold', estadoLabel: 'Al Día (Perdonado)' };
   }
   if (c.estado === 'MOROSO' || (!c.activo && c.deuda_acumulada > 0)) {
     return { badgeClass: 'bg-rose-100 text-rose-800 border-rose-200 font-bold', estadoLabel: 'Moroso (Baja)' };
@@ -154,7 +154,7 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
                 className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 text-emerald-800 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
               >
                 <Check className="w-3.5 h-3.5 text-emerald-600" />
-                Perdonar Deuda (Becar $0)
+                Perdonar Deuda
               </button>
             ) : (
               <button
@@ -162,7 +162,7 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
                 className="w-full text-left px-4 py-2.5 hover:bg-amber-50 text-amber-900 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-                Quitar Beca / Restablecer
+                Restablecer Deuda
               </button>
             )}
             {c.exencion_cobro !== 'POSTERGADO' && (
@@ -389,7 +389,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                     <div className="text-[9px] uppercase tracking-wider text-zinc-400 font-bold font-mono">Deuda</div>
                     {esBecado ? (
                       <div className="font-mono font-bold text-xs text-emerald-700">
-                        $0 <span className="text-zinc-400 font-normal text-[10px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Becado)</span>
+                        $0 <span className="text-zinc-400 font-normal text-[10px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Perdonado)</span>
                       </div>
                     ) : (
                       <div className={`font-mono font-bold text-sm ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
@@ -536,7 +536,7 @@ export const ClientesTable: React.FC<ClientesTableProps> = ({
                       <td className="p-4 cursor-pointer" onClick={() => onSelectCliente(c)}>
                         {esBecado ? (
                           <div className="font-mono font-bold text-xs text-emerald-700">
-                            $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Becado)</span>
+                            $0 <span className="text-zinc-400 font-normal text-[11px]">(<span className="line-through">{formatoDeuda.textoTachado}</span> - Perdonado)</span>
                           </div>
                         ) : (
                           <span className={`font-mono font-bold ${c.deuda_acumulada > 0 ? 'text-red-600' : 'text-zinc-400'}`}>

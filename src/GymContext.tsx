@@ -2323,24 +2323,24 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     updateCliente(clienteId, {
       deuda_acumulada: 0,
-      exencion_cobro: 'BECADO',
+      exencion_cobro: 'NINGUNA',
       deuda_perdonada: montoPerdonado,
       ultimo_mes_pagado: mesActual,
       estado: 'ACTIVO'
-    }, `Deuda perdonada ($${montoPerdonado.toLocaleString('es-AR')}) - Asignada condición de Becado`);
+    }, `Deuda perdonada para ${mesActual} ($${montoPerdonado.toLocaleString('es-AR')})`);
 
     if (supabase) {
       supabase.from('clientes').update({
         deuda_acumulada: 0,
-        exencion_cobro: 'BECADO',
+        exencion_cobro: 'NINGUNA',
         ultimo_mes_pagado: mesActual,
         estado: 'ACTIVO'
       }).eq('id', clienteId).then(({ error }) => {
-        if (error) console.error("Error al persistir condición de becado en Supabase:", error);
+        if (error) console.error("Error al persistir perdón de deuda en Supabase:", error);
       });
     }
 
-    addAuditLog('DEUDA_PERDONADA_BECADO', {
+    addAuditLog('DEUDA_PERDONADA', {
       cliente_id: clienteId,
       cliente_nombre: `${cli.nombre} ${cli.apellido}`,
       monto_perdonado: montoPerdonado,
@@ -2348,7 +2348,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fecha: new Date().toISOString()
     }, userEmail);
 
-    addToast('success', `Se perdonó la deuda de ${cli.nombre} ${cli.apellido} (Estado: Becado).`);
+    addToast('success', `Se perdonó la deuda de ${cli.nombre} ${cli.apellido}.`);
     return { success: true, message: `Deuda perdonada a ${cli.nombre} ${cli.apellido}.` };
   };
 
