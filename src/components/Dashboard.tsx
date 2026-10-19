@@ -53,8 +53,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [transferToApprove, setTransferToApprove] = useState<PagoEnRevision | null>(null);
   const [destinoSeleccionado, setDestinoSeleccionado] = useState<'JUANCHI' | 'RULO'>('JUANCHI');
 
-  const proximosFeriadosList = React.useMemo(() => {
-    return proximosFeriados(feriados, hoyArgentina(), 3);
+  const { feriadosProximos10Dias, diasHastaProximoFeriado } = React.useMemo(() => {
+    const list = proximosFeriados(feriados, hoyArgentina(), 3);
+    if (!list || list.length === 0) return { feriadosProximos10Dias: [], diasHastaProximoFeriado: null };
+    const hoyStr = hoyArgentina();
+    const [y1, m1, d1] = hoyStr.split('-').map(Number);
+    const [y2, m2, d2] = list[0].fecha.split('-').map(Number);
+    const t1 = Date.UTC(y1, m1 - 1, d1);
+    const t2 = Date.UTC(y2, m2 - 1, d2);
+    const diffDias = Math.round((t2 - t1) / (1000 * 60 * 60 * 24));
+    if (diffDias >= 0 && diffDias <= 10) {
+      return { feriadosProximos10Dias: list, diasHastaProximoFeriado: diffDias };
+    }
+    return { feriadosProximos10Dias: [], diasHastaProximoFeriado: null };
   }, [feriados]);
 
   const getTransferMonto = (p: PagoEnRevision) => {
@@ -109,11 +120,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ? Math.round((morososCount / totalActivosCount) * 100) 
     : 0;
 
-  // Candidatos a baja de turno fijo (Día 10 en adelante): socios activos con turnos fijos asignados y sin pagar este mes (excluye becados/exentos/suspendidos)
+  // Candidatos a baja de turno fijo (Día 10 en adelante): socios activos con turnos fijos asignados y sin pagar este mes (excluye pausados/prórroga/reposo)
   const candidatosBajaFijos = clientesActivosFicha.filter(c => {
     if (!c.turnos_fijos || c.turnos_fijos.length === 0) return false;
-    const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual;
-    const estaExento = c.exencion_cobro === 'BECADO' || c.exencion_cobro === 'PERDONADO' || c.exencion_cobro === 'POSTERGADO' || c.exencion_cobro === 'SUSPENDIDO';
+    if (c.reposo) return false;
+    const noPago = !c.ultimo_mes_pagado || c.ultimo_mes_pagado < mesActual || (c.deuda_acumulada && c.deuda_acumulada > 0);
+    const estaExento = c.exencion_cobro === 'POSTERGADO' || c.exencion_cobro === 'SUSPENDIDO';
     return noPago && !estaExento;
   });
 
@@ -353,69 +365,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* BANNER REVISIÓN DE BAJAS DE TURNO FIJO (DÍA 10 EN ADELANTE) */}
-      {diaHoy >= 10 && candidatosBajaFijos.length > 0 && (
-        <div className="bg-gradient-to-r from-red-50 via-amber-50 to-red-50 border border-red-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in mb-2" id="day-10-bajas-reminder-banner">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <AlertTriangle className="w-4.5 h-4.5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-red-950">
-                ⚠️ Revisión de Bajas (Día 10+): {candidatosBajaFijos.length} socio(s) con turno fijo sin abonar
-              </p>
-              <p className="text-[11px] text-red-800/80 mt-0.5">
-                Los turnos no se dan de baja automáticamente. Revisá cada caso para confirmar la liberación del cupo o mantener la vacante.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowEmailReporteModal(true)}
-              className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-            >
-              <Mail className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Enviar Reporte</span>
-            </button>
-            <button
-              onClick={() => setShowBajasModal(true)}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all border-none"
-            >
-              <UserMinus className="w-3.5 h-3.5" />
-              <span>Revisar Bajas</span>
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* BANNER REVISIÓN DE SOCIOS PAUSADOS (MES SIGUIENTE) */}
-      {pausadosPorRevisar.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in mb-2" id="pausados-review-reminder-banner">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <PauseCircle className="w-4.5 h-4.5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-amber-950">
-                ⚠️ Revisión de Socios en Pausa: {pausadosPorRevisar.length} socio(s) finalizaron su mes de pausa
-              </p>
-              <p className="text-[11px] text-amber-800/80 mt-0.5">
-                Definí si retoman sus clases este mes, se posterga la pausa un mes más, o se les da de baja liberando el cupo de la Matriz.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowPausadosModal(true)}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all border-none"
-              id="btn-revisar-pausados-banner"
-            >
-              <PauseCircle className="w-3.5 h-3.5" />
-              <span>Revisar Pausados</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* BANNER AVISO INICIO DE MES (DÍAS 1 A 5 SI NO SE ENVIÓ AÚN) */}
       {diaHoy <= 5 && !mailEnviadoEsteMes && (
@@ -580,24 +530,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* CALENDARIO DE FERIADOS / ACCESO RÁPIDO */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 sm:p-4 rounded-2xl border border-indigo-900/60 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in" id="dashboard-feriados-card">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
-            <CalendarOff className="w-4 h-4" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-[9.5px] font-mono uppercase tracking-widest text-indigo-300 font-bold">Calendario de Feriados</span>
-              {proximosFeriadosList.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[8.5px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-bold">
-                  {proximosFeriadosList.length} próximos
-                </span>
-              )}
+      {/* CALENDARIO DE FERIADOS / ACCESO RÁPIDO (Aparece únicamente cuando faltan 10 días o menos para el feriado) */}
+      {feriadosProximos10Dias.length > 0 && diasHastaProximoFeriado !== null && (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 sm:p-4 rounded-2xl border border-indigo-900/60 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in" id="dashboard-feriados-card">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+              <CalendarOff className="w-4 h-4" />
             </div>
-            {proximosFeriadosList.length > 0 ? (
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[9.5px] font-mono uppercase tracking-widest text-indigo-300 font-bold">Próximo Feriado</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] bg-amber-500/20 text-amber-300 border border-amber-400/30 font-bold animate-pulse">
+                  {diasHastaProximoFeriado === 0 ? '¡Es hoy!' : `Faltan ${diasHastaProximoFeriado} día${diasHastaProximoFeriado > 1 ? 's' : ''}`}
+                </span>
+              </div>
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                {proximosFeriadosList.map(f => (
+                {feriadosProximos10Dias.map(f => (
                   <span key={f.id} className="text-[11px] font-semibold text-slate-200 flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-lg border border-white/10">
                     <span className="text-amber-400">🎉</span>
                     <strong className="truncate max-w-[150px]">{f.nombre}</strong>
@@ -610,22 +558,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </span>
                 ))}
               </div>
-            ) : (
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                No hay feriados próximos configurados en este período.
-              </p>
-            )}
+            </div>
           </div>
-        </div>
 
-        <button
-          onClick={() => setShowFeriadosModal(true)}
-          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer shadow-xs border-none shrink-0"
-          id="btn-dashboard-configurar-feriados"
-        >
-          Configurar Feriados
-        </button>
-      </div>
+          <button
+            onClick={() => setShowFeriadosModal(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer shadow-xs border-none shrink-0"
+            id="btn-dashboard-configurar-feriados"
+          >
+            Organizar Feriado
+          </button>
+        </div>
+      )}
 
       {/* BENTO DE INDICADORES (jerarquía por tamaño de tile) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[150px] gap-4">
