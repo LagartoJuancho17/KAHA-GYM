@@ -324,20 +324,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Grilla Horarios
           </button>
 
-          {!mailEnviadoEsteMes && (
-            <button
-              onClick={() => setShowEmailMesModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-              id="quick-email-mes-btn"
-              title="Enviar email de inicio de mes a todos los socios"
-            >
-              <Mail className="w-3.5 h-3.5 text-emerald-200" />
-              Mail de Mes
-              {diaHoy <= 5 && (
-                <span className="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span>
-              )}
-            </button>
-          )}
+          {/* COMUNICADOS POR EMAIL CON APROBACIÓN PREVIA */}
+          <button
+            onClick={() => setShowEmailMesModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 sm:px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            id="quick-email-mes-btn"
+            title="Enviar comunicado por email a los socios (requiere aprobación previa)"
+          >
+            <Mail className="w-3.5 h-3.5 text-emerald-200" />
+            <span>
+              {diaHoy >= (new Date(Number(mesActual.split('-')[0]), Number(mesActual.split('-')[1]), 0).getDate() - 2)
+                ? 'Mail Mes Siguiente'
+                : diaHoy >= 8 && diaHoy <= 10
+                ? 'Recordatorio Día 8'
+                : diaHoy >= 11
+                ? 'Avisos Día 11'
+                : 'Mail de Mes'}
+            </span>
+            {(diaHoy >= (new Date(Number(mesActual.split('-')[0]), Number(mesActual.split('-')[1]), 0).getDate() - 2) || diaHoy <= 5 || (diaHoy >= 8 && diaHoy <= 10) || diaHoy === 11) && (
+              <span className="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span>
+            )}
+          </button>
 
           {diaHoy >= 10 && candidatosBajaFijos.length > 0 && (
             <button

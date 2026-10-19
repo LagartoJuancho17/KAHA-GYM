@@ -18,6 +18,21 @@ export const DIA_BAJA_RESERVA = 11;
 
 export const TITULO_AVISO_VENCIMIENTO = '💚 Recordatorio de tu cuota';
 
+export const TITULO_AVISO_DIA_8 = '💚 Recordatorio de pago de cuota';
+export const MENSAJE_AVISO_DIA_8 =
+  `Todavía no nos figura el pago de la cuota de este mes.\n\n` +
+  `Te recordamos que hasta el día 10 del corriente mes hay tiempo para pagar. ` +
+  `Luego de esa fecha, la app les quita el bloqueo de sus días fijos.\n\n` +
+  `Si tuviste alguna dificultad o necesitás unos días más, escribinos para avisarnos y coordinarlo. 🤝\n\n` +
+  `¡Gracias por ser parte de KAHA! 💚`;
+
+export const TITULO_AVISO_DIA_11 = '⚠️ Aviso de liberación de cupos reservados';
+export const MENSAJE_AVISO_DIA_11 =
+  `Ya pasó la fecha límite de pago (día 10) y la app a partir de hoy libera los cupos que tenías reservados para que los pueda tomar otro socio.\n\n` +
+  `Si querés regularizar tu situación o reincorporarte a tus clases, escribinos cuando puedas para coordinarlo. 🤝\n\n` +
+  `¡Queremos que sigas entrenando con nosotros!\n` +
+  `Equipo KAHA 💚`;
+
 /**
  * Este mensaje va ANTES de la baja, no después. El otro mensaje de este archivo
  * (MENSAJE_RECORDATORIO_DEUDA) avisa que el turno YA quedó liberado, que es una
@@ -32,7 +47,22 @@ export const MENSAJE_AVISO_VENCIMIENTO =
   `¡Gracias por ser parte de KAHA! 💚`;
 
 /**
- * Aviso del día 5 (WhatsApp o email), con la fecha límite bien clara.
+ * Aviso del día 8 (WhatsApp o email), con la fecha límite bien clara.
+ */
+export const generarAvisoDia8 = (nombre: string): string => {
+  return `Hola ${nombre}! 👋\n` +
+    `${TITULO_AVISO_DIA_8}\n\n` +
+    `${MENSAJE_AVISO_DIA_8}`;
+};
+
+export const generarAvisoDia11 = (nombre: string): string => {
+  return `Hola ${nombre}! 👋\n` +
+    `${TITULO_AVISO_DIA_11}\n\n` +
+    `${MENSAJE_AVISO_DIA_11}`;
+};
+
+/**
+ * Aviso con la fecha límite bien clara.
  */
 export const generarAvisoVencimiento = (nombre: string): string => {
   return `Hola ${nombre}! 👋\n` +
