@@ -925,32 +925,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             creado_at: g.creado_at
           }));
 
-          // Merge: si hay gastos locales que no están en la DB, subirlos
-          const localG = localStorage.getItem('gym_gastos');
-          const localGastos: Gasto[] = localG ? JSON.parse(localG) : [];
-          const dbIds = new Set(mappedGastos.map(g => g.id));
-          const localFaltantes = localGastos.filter(g => !dbIds.has(g.id));
-
-          if (localFaltantes.length > 0) {
-            const toUpsert = localFaltantes.map(g => ({
-              id: g.id,
-              concepto: g.concepto,
-              monto: g.monto,
-              categoria: g.categoria,
-              efectuado_por: g.efectuado_por || 'EFECTIVO_CAJA',
-              fecha: g.fecha,
-              registrado_por: g.registrado_por || 'admin@gimnasio.com.ar',
-              creado_at: g.creado_at || new Date().toISOString()
-            }));
-            supabase.from('gastos').upsert(toUpsert, { onConflict: 'id' }).then(({ error }) => {
-              if (error) console.warn('[KAHA] No se pudieron sincronizar gastos locales a Supabase:', error.message);
-              else console.log(`✅ Gastos: ${toUpsert.length} gasto(s) local(es) sincronizados a Supabase`);
-            });
-          }
-
-          const merged = [...localFaltantes, ...mappedGastos];
-          setGastos(merged);
-          localStorage.setItem('gym_gastos', JSON.stringify(merged));
+          // Supabase es la fuente de verdad única para gastos: no resucitar gastos eliminados desde localStorage
+          setGastos(mappedGastos);
+          localStorage.setItem('gym_gastos', JSON.stringify(mappedGastos));
         }
       } catch (gErr) {
         console.warn('[KAHA] Error al cargar gastos de Supabase:', gErr);
@@ -4732,18 +4709,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Sincronización con Supabase en lote
     if (supabase) {
-      const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-      const payloads = nuevosPagos.map(np => ({
-        id: np.id,
-        cliente_id: (np.es_externo || !isUuid(np.cliente_id)) ? null : np.cliente_id,
-        monto: np.monto,
-        medio_pago: np.medio_pago,
-        mes_correspondiente: np.mes_correspondiente,
-        hash_transaccion: np.hash_transaccion,
-        destino_transferencia: np.destino_transferencia || null,
-        fecha_pago: np.fecha_pago,
-        creado_at: np.creado_at
-      }));
+      const payloads = nuevosPagos.map(np => {
+        const item: any = {
+          id: np.id,
+          cliente_id: (np.es_externo || !isUuid(np.cliente_id)) ? null : np.cliente_id,
+          monto: np.monto,
+          medio_pago: np.medio_pago,
+          mes_correspondiente: np.mes_correspondiente,
+          hash_transaccion: np.hash_transaccion,
+          destino_transferencia: np.destino_transferencia || null,
+          fecha_pago: np.fecha_pago,
+          creado_at: np.creado_at
+        };
+        if (np.es_externo) item.es_externo = true;
+        if (np.concepto) item.concepto = np.concepto;
+        if (np.cliente_nombre_completo) item.cliente_nombre_completo = np.cliente_nombre_completo;
+        return item;
+      });
 
       supabase.from('pagos').insert(payloads).then(({ error }) => {
         if (error) {

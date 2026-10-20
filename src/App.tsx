@@ -313,7 +313,7 @@ function InnerApp() {
     { id: 'CLIENTES' as TabID, label: 'Socios', icon: Users, desc: 'Gestión Integral de Socios', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'PLANES' as TabID, label: 'Planes', icon: Dribbble, desc: 'Control de Membresías y Planes', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'TURNOS' as TabID, label: 'Cupos y Turnos', icon: CalendarRange, desc: 'Grilla de Horarios y Reservas', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
-    { id: 'PAGOS' as TabID, label: 'Pagos e Ingresos', icon: Landmark, desc: 'Libro Contable y Facturación', roles: ['ADMIN'] },
+    { id: 'PAGOS' as TabID, label: 'Economía', icon: Landmark, desc: 'Libro Contable, Egresos y Liquidación', roles: ['ADMIN'] },
     { id: 'NOVEDADES' as TabID, label: 'Novedades', icon: Megaphone, desc: 'Gestión de Comunicados y Novedades', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'MOROSIDAD' as TabID, label: 'Control de Mora', icon: ShieldAlert, desc: 'Seguimiento de Deudas', roles: ['ADMIN'] },
     { id: 'PROYECCIONES' as TabID, label: 'Previsiones', icon: LineChart, desc: 'Proyecciones Financieras', roles: ['ADMIN'] },
@@ -724,7 +724,7 @@ function InnerApp() {
           <span className="text-[9px] uppercase tracking-wider font-sans">Turnos</span>
         </button>
 
-        {/* PAGOS */}
+        {/* PAGOS / ECONOMIA */}
         <button
           onClick={() => setActiveTab('PAGOS')}
           className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
@@ -732,7 +732,7 @@ function InnerApp() {
           }`}
         >
           <CreditCard className={`w-5 h-5 ${activeTab === 'PAGOS' ? 'text-zinc-950' : 'text-zinc-400'}`} />
-          <span className="text-[9px] uppercase tracking-wider font-sans">Pagos</span>
+          <span className="text-[9px] uppercase tracking-wider font-sans">Economía</span>
         </button>
 
         {/* MENÚ MÁS */}

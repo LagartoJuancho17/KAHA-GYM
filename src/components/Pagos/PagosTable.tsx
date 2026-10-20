@@ -15,7 +15,7 @@ function generarUltimosMeses(n = 18) {
     const label = `${MESES_ES[d.getMonth()]} ${d.getFullYear()}`;
     meses.push({ value, label });
   }
-  return meses;
+  return [{ value: 'TODOS', label: 'Todos los meses' }, ...meses];
 }
 const MESES_OPCIONES = generarUltimosMeses(18);
 

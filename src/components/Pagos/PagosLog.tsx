@@ -72,7 +72,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
     pagos, clientes, planes, 
     gastos, registrarGasto, actualizarGasto, eliminarGasto,
     profesores, turnos, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
-    actualizarDestinoPago, eliminarPago
+    actualizarDestinoPago, eliminarPago, feriados
   } = useGym();
 
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('INGRESOS');
@@ -159,9 +159,9 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
   // ─── COMPARATIVE ────────────────────────────────────────────────
   const comparativaFinanciera = useMemo(() => {
-    const mesCorriente = filtroMes;
-    const year = parseInt(mesCorriente.split('-')[0]);
-    const month = parseInt(mesCorriente.split('-')[1]);
+    const mesCorriente = filtroMes === 'TODOS' ? hoyArgentina().slice(0, 7) : filtroMes;
+    const year = parseInt(mesCorriente.split('-')[0]) || 2026;
+    const month = parseInt(mesCorriente.split('-')[1]) || 10;
     const prevMonthStr = month === 1 ? `${year - 1}-12` : `${year}-${(month - 1).toString().padStart(2, '0')}`;
     const ingresosEsteMes = pagos.filter(p => p.mes_correspondiente === mesCorriente).reduce((s, p) => s + p.monto, 0);
     const ingresosMesAnterior = pagos.filter(p => p.mes_correspondiente === prevMonthStr).reduce((s, p) => s + p.monto, 0);
@@ -172,14 +172,16 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
   const pagosFiltrados = useMemo(() => {
     return pagos.filter(p => {
-      if (p.mes_correspondiente !== filtroMes) return false;
+      if (filtroMes !== 'TODOS' && !buscarCliente.trim() && p.mes_correspondiente !== filtroMes) return false;
       if (filtroMedio !== 'TODOS' && p.medio_pago !== filtroMedio) return false;
       if (buscarCliente.trim()) {
-        const query = buscarCliente.toLowerCase();
+        const query = buscarCliente.toLowerCase().trim();
         const cl = clientes.find(c => c.id === p.cliente_id);
         const nameText = cl ? `${cl.nombre} ${cl.apellido}`.toLowerCase() : (p.cliente_nombre_completo || '').toLowerCase();
         const conceptoText = (p.concepto || '').toLowerCase();
-        if (!nameText.includes(query) && !conceptoText.includes(query)) return false;
+        const comprobanteText = (p.comprobante_nro || '').toLowerCase();
+        const mesText = (p.mes_correspondiente || '').toLowerCase();
+        if (!nameText.includes(query) && !conceptoText.includes(query) && !comprobanteText.includes(query) && !mesText.includes(query)) return false;
       }
       return true;
     });
@@ -328,6 +330,9 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
   // ─── LIQUIDACION LOGIC ──────────────────────────────────────────
   const liquidaciones = useMemo(() => {
+    const [y, m] = (filtroMesLiq || hoyArgentina().slice(0, 7)).split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+
     return profesores.filter(p => p.activo).map(prof => {
       const turnosProf = turnos.filter(t => t.profesor === prof.nombre || t.profesor === prof.id);
 
@@ -335,16 +340,28 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       turnosProf.forEach(t => {
         const diaIdx = DIA_IDX[t.dia] || 0;
         if (diaIdx > 0) {
-          clasesTeoricasTotal += diasEnMes(diaIdx, filtroMesLiq);
+          const jsDia = diaIdx === 7 ? 0 : diaIdx;
+          for (let d = 1; d <= lastDay; d++) {
+            const dateObj = new Date(y, m - 1, d);
+            if (dateObj.getDay() === jsDia) {
+              const dateStr = `${filtroMesLiq}-${String(d).padStart(2, '0')}`;
+              const feriadoCerrado = (feriados || []).some(f => f.activo && f.cerrado && f.fecha === dateStr);
+              if (!feriadoCerrado) {
+                clasesTeoricasTotal++;
+              }
+            }
+          }
         }
       });
 
+      // Ausencias o suplencias cedidas donde este profesor no dictó la clase
       const ausencias = novedadesProfesores.filter(n =>
         n.profesor_id === prof.id &&
-        n.tipo === 'AUSENCIA' &&
+        (n.tipo === 'AUSENCIA' || n.tipo === 'REEMPLAZO') &&
         n.fecha.startsWith(filtroMesLiq)
       ).length;
 
+      // Suplencias realizadas por este profesor en reemplazo de otro
       const reemplazos = novedadesProfesores.filter(n =>
         n.reemplazo_profesor_id === prof.id &&
         n.tipo === 'REEMPLAZO' &&
@@ -362,7 +379,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
 
       return { prof, turnosProf, clasesTeoricasTotal, ausencias, reemplazos, clasesNetas, montoTotal, yaLiquidado };
     });
-  }, [profesores, turnos, novedadesProfesores, gastos, filtroMesLiq]);
+  }, [profesores, turnos, novedadesProfesores, gastos, filtroMesLiq, feriados]);
 
   const handleLiquidar = (profId: string, profNombre: string, monto: number) => {
     setLiquidandoId(profId);
@@ -414,7 +431,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
       <div className="flex flex-col gap-3" id="pagos-header">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="min-w-0">
-            <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Finanzas &amp; Pagos</h2>
+            <h2 className="text-2xl font-sans font-bold tracking-tight text-zinc-950">Economía</h2>
             <p className="text-zinc-500 font-sans text-sm font-medium">Ingresos, egresos, liquidación y balance general</p>
           </div>
 

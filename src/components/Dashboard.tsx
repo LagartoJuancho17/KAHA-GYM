@@ -1054,7 +1054,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={() => setActiveTab('PAGOS')}
               className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors underline underline-offset-2"
             >
-              Ver todos en Pagos →
+              Ver todos en Economía →
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
