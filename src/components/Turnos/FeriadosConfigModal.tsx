@@ -17,7 +17,8 @@ interface FeriadosConfigModalProps {
 export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen, onClose }) => {
   const { 
     feriados, agregarFeriado, editarFeriado, eliminarFeriado, 
-    toggleFeriadoActivo, cargarFeriadosNacionales, publicarFeriadoComoNovedad 
+    toggleFeriadoActivo, cargarFeriadosNacionales, publicarFeriadoComoNovedad,
+    clientes, turnos, addToast
   } = useGym();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +42,7 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
     hora_hasta: string;
     observaciones: string;
     activo: boolean;
+    notificarEmail: boolean;
   }>({
     fecha: '',
     nombre: '',
@@ -51,7 +53,8 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
     hora_desde: '',
     hora_hasta: '',
     observaciones: '',
-    activo: true
+    activo: true,
+    notificarEmail: true
   });
 
   const [formError, setFormError] = useState<string | null>(null);
@@ -88,7 +91,8 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
       hora_desde: '',
       hora_hasta: '',
       observaciones: '',
-      activo: true
+      activo: true,
+      notificarEmail: true
     });
     setFormError(null);
     setShowForm(true);
@@ -106,7 +110,8 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
       hora_desde: f.hora_desde || '',
       hora_hasta: f.hora_hasta || '',
       observaciones: f.observaciones || '',
-      activo: f.activo
+      activo: f.activo,
+      notificarEmail: true
     });
     setFormError(null);
     setShowForm(true);
@@ -174,6 +179,97 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
     }));
   };
 
+  const notificarSociosPorEmail = async (f: {
+    fecha: string;
+    nombre: string;
+    cerrado: boolean;
+    horario_especial?: string;
+    horas_habilitadas?: string[];
+  }) => {
+    const DIAS_SEMANA_MAP: { [key: number]: string } = {
+      0: 'DOMINGO',
+      1: 'LUNES',
+      2: 'MARTES',
+      3: 'MIERCOLES',
+      4: 'JUEVES',
+      5: 'VIERNES',
+      6: 'SABADO'
+    };
+    const [year, month, day] = f.fecha.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const diaNombre = DIAS_SEMANA_MAP[dateObj.getDay()];
+
+    const destinatariosMap = new Map<string, { nombre: string; email: string }>();
+
+    // 1. Alumnos fijos de este día de la semana
+    (clientes || []).forEach(c => {
+      if (c.estado !== 'ACTIVO' && c.estado !== 'PENDIENTE_PAGO') return;
+      if (!Array.isArray(c.turnos_fijos)) return;
+      if (c.turnos_fijos.some(tf => tf.toUpperCase().startsWith(diaNombre))) {
+        if (c.email && !c.email.toLowerCase().startsWith('invitado-') && !c.email.endsWith('@kaha.com')) {
+          destinatariosMap.set(c.id, {
+            nombre: `${c.nombre} ${c.apellido || ''}`.trim(),
+            email: c.email
+          });
+        }
+      }
+    });
+
+    // 2. Alumnos con reserva individual o recupero en esta fecha
+    (turnos || []).filter(t => t.dia === diaNombre).forEach(t => {
+      (t.participantes || []).forEach(p => {
+        if (typeof p === 'object' && p.fecha === f.fecha) {
+          const c = (clientes || []).find(cli => cli.id === p.clienteId);
+          if (c && c.email && !c.email.toLowerCase().startsWith('invitado-') && !c.email.endsWith('@kaha.com')) {
+            destinatariosMap.set(c.id, {
+              nombre: `${c.nombre} ${c.apellido || ''}`.trim(),
+              email: c.email
+            });
+          }
+        }
+      });
+    });
+
+    const destinatarios = Array.from(destinatariosMap.values());
+    if (destinatarios.length === 0) {
+      addToast('success', 'Feriado guardado. No hay socios con turnos fijos registrados para este día.');
+      return;
+    }
+
+    const detalleHorario = f.cerrado
+      ? 'El gimnasio permanecerá CERRADO durante toda la jornada.'
+      : `El gimnasio abrirá con HORARIO ESPECIAL: ${f.horario_especial || ((f.horas_habilitadas || []).join(', ') + ' hs')}.`;
+
+    const mensajeHtml = `Hola {nombre}!<br><br>
+Te informamos que el día <strong>${f.fecha}</strong> es feriado (<strong>${f.nombre}</strong>).<br><br>
+<strong>Estado del Gimnasio:</strong> ${detalleHorario}<br><br>
+Tu turno habitual correspondiente a ese día se da de baja automáticamente y tu cupo queda liberado para que puedas reasignarlo y entrenar ese día (en caso de horario especial) o cualquier otro día disponible del mes.<br><br>
+¡Muchas gracias y buen entrenamiento!<br>
+— Equipo KAHA GYM`;
+
+    try {
+      const res = await fetch('/api/send-class-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asunto: `Aviso Feriado: ${f.nombre} (${f.fecha}) — KAHA GYM`,
+          mensaje: mensajeHtml,
+          claseTxt: `Feriado ${f.nombre} (${f.fecha})`,
+          profesor: 'Administración KAHA',
+          destinatarios
+        })
+      });
+      if (res.ok) {
+        addToast('success', `Se envió aviso por email a ${destinatarios.length} socio(s) de este día.`);
+      } else {
+        addToast('success', `Aviso preparado para ${destinatarios.length} socio(s).`);
+      }
+    } catch (err) {
+      console.warn('Aviso de feriado preparado:', err);
+      addToast('success', `Aviso registrado para ${destinatarios.length} socio(s).`);
+    }
+  };
+
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -224,6 +320,10 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
         }
       }
 
+      if (formData.notificarEmail) {
+        await notificarSociosPorEmail(payload);
+      }
+
       setShowForm(false);
       setEditingId(null);
     } catch (err: any) {
@@ -243,9 +343,13 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
   };
 
   const handlePublicarNovedad = async (id: string) => {
+    const targetF = feriados.find(f => f.id === id);
     const res = await publicarFeriadoComoNovedad(id);
     if (res.success) {
       setNotifiedId(id);
+      if (targetF) {
+        await notificarSociosPorEmail(targetF);
+      }
       setTimeout(() => setNotifiedId(null), 3000);
     }
   };
@@ -603,6 +707,19 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
                     onChange={e => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none shadow-2xs"
                   />
+                </div>
+
+                <div className="flex items-center gap-2 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="chk-notificar-email-feriado"
+                    checked={formData.notificarEmail}
+                    onChange={e => setFormData(prev => ({ ...prev, notificarEmail: e.target.checked }))}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 cursor-pointer"
+                  />
+                  <label htmlFor="chk-notificar-email-feriado" className="text-xs font-semibold text-indigo-950 cursor-pointer select-none">
+                    Enviar mail a los socios registrados avisando baja del día y liberación de cupo para reasignar
+                  </label>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">

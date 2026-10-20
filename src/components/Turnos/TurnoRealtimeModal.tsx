@@ -30,7 +30,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva, removerAsignacionFija, sociosPrioritarios, feriados,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
     actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo,
-    profesores, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor
+    profesores, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
+    reordenarEsperaTurno
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
@@ -143,6 +144,20 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     eliminarNovedadProfesor(novedadSuplencia.id);
     setRealtimeSuccess('✅ Suplencia eliminada. Se restableció el profesor titular.');
     setTimeout(() => setRealtimeSuccess(null), 4000);
+  };
+
+  const handleMoveWaitlist = (currentIndex: number, direction: 'UP' | 'DOWN') => {
+    const targetIndex = direction === 'UP' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= waitlistItems.length) return;
+    if (direction === 'UP' && waitlistItems[targetIndex].esMatrizFija) {
+      return; // Bloqueado: no se puede pasar por arriba al que viene de Matriz con prioridad
+    }
+    const newItems = [...waitlistItems];
+    const temp = newItems[currentIndex];
+    newItems[currentIndex] = newItems[targetIndex];
+    newItems[targetIndex] = temp;
+    const turneraIds = newItems.filter(w => !w.esMatrizFija).map(w => w.clienteId);
+    reordenarEsperaTurno(selectedSlot.id, selectedSlot.date, turneraIds);
   };
 
   // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date. Exclude guests.
@@ -570,39 +585,49 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                   <div key={wl.id} className={`flex justify-between items-center p-2 rounded-lg text-xs shadow-2xs ${
                     wl.esMatrizFija
                       ? 'bg-indigo-50 border border-indigo-300'
-                      : wl.prioritario 
-                        ? 'bg-violet-50 border border-violet-300' 
-                        : 'bg-white border border-amber-200/80'
+                      : 'bg-white border border-amber-200/80'
                   }`}>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded font-bold ${
                         wl.esMatrizFija
                           ? 'bg-indigo-200 text-indigo-900'
-                          : wl.prioritario 
-                            ? 'bg-violet-200 text-violet-900' 
-                            : 'bg-amber-100 text-amber-800'
+                          : 'bg-amber-100 text-amber-800'
                       }`}>
                         P{idx + 1}
                       </span>
                       <span className="font-semibold text-zinc-900">{wl.nombre}</span>
-                      {/* Marca visible para que el admin entienda por que este socio esta arriba. */}
-                      {wl.esMatrizFija ? (
+                      {wl.esMatrizFija && (
                         <span
-                          className="text-[9px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded-full tracking-wide flex items-center gap-1"
-                          title="Espera en Matriz Fija: máxima prioridad en todas las semanas si se libera un lugar"
+                          className="text-[9px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full tracking-wide flex items-center gap-1 shadow-2xs"
+                          title="Espera de Matriz Fija: prioridad absoluta ante cualquier baja"
                         >
-                          MATRIZ FIJA (PRIORIDAD)
+                          MATRIZ (PRIORIDAD ABSOLUTA)
                         </span>
-                      ) : wl.prioritario ? (
-                        <span
-                          className="text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full tracking-wide"
-                          title="Prioridad máxima en este turno: entra primero en todas las semanas si se libera un lugar"
-                        >
-                          PRIORIDAD
-                        </span>
-                      ) : null}
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {!wl.esMatrizFija && waitlistItems.filter(w => !w.esMatrizFija).length >= 2 && (
+                        <div className="flex items-center gap-0.5 bg-zinc-100 p-0.5 rounded-md border border-zinc-200">
+                          <button
+                            type="button"
+                            disabled={idx === 0 || waitlistItems[idx - 1].esMatrizFija}
+                            onClick={() => handleMoveWaitlist(idx, 'UP')}
+                            className="px-1.5 py-0.5 text-zinc-600 hover:text-zinc-950 disabled:opacity-25 disabled:cursor-not-allowed hover:bg-zinc-200 rounded text-[10px] font-bold border-none bg-transparent cursor-pointer"
+                            title={idx > 0 && waitlistItems[idx - 1].esMatrizFija ? 'No se puede superar la prioridad absoluta de Matriz' : 'Subir orden de espera'}
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === waitlistItems.length - 1}
+                            onClick={() => handleMoveWaitlist(idx, 'DOWN')}
+                            className="px-1.5 py-0.5 text-zinc-600 hover:text-zinc-950 disabled:opacity-25 disabled:cursor-not-allowed hover:bg-zinc-200 rounded text-[10px] font-bold border-none bg-transparent cursor-pointer"
+                            title="Bajar orden de espera"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                      )}
                       {!isFull && (
                         <button
                           type="button"

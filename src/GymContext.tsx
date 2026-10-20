@@ -67,6 +67,7 @@ interface GymContextType {
   quitarSocioPrioritario: (clienteId: string, turnoId: string) => Promise<{ success: boolean; message: string }>;
   agregarListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
   removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
+  reordenarEsperaTurno: (turnoId: string, fecha: string, nuevoOrdenClienteIds: string[]) => void;
 
   // Clientes Methods
   addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean; initialReservaIndividual?: { turno_id: string; fecha: string }; initialWaitlistReserva?: { turno_id: string; fecha: string } }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
@@ -3816,6 +3817,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Te has retirado de la lista de espera.' };
   };
 
+  const reordenarEsperaTurno = (turnoId: string, fecha: string, nuevoOrdenClienteIds: string[]) => {
+    setWaitlistReservas(prev => {
+      const baseTime = Date.now();
+      const updated = prev.map(w => {
+        if (w.turno_id === turnoId && w.fecha === fecha) {
+          const idx = nuevoOrdenClienteIds.indexOf(w.cliente_id);
+          if (idx !== -1) {
+            return {
+              ...w,
+              creado_at: new Date(baseTime + idx * 1000).toISOString()
+            };
+          }
+        }
+        return w;
+      });
+      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updated));
+      return updated;
+    });
+    addToast('success', 'Orden de lista de espera actualizado.');
+  };
+
   const procesarPromocionListaEspera = (
     turnoId: string, 
     fecha: string, 
@@ -5854,7 +5876,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedSocioId, setSelectedSocioId,
       googleUser, signInWithGoogle, signInWithEmailAndPassword, signOutGoogle,
       pendingRegistrationUser, completeSocioRegistration,
-      waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva,
+      waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva, reordenarEsperaTurno,
       sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, ponerEnReposo, sacarDeReposo, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, retomarSocioPausado, postergarPausaSocio, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,
