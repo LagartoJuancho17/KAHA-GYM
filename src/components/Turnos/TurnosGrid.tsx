@@ -26,7 +26,8 @@ export const TurnosGrid: React.FC = () => {
     turnos, clientes, recuperos, waitlistReservas, sociosPrioritarios, feriados,
     agregarRecupero, actualizarEstadoRecupero, checkInFlexible, 
     crearReservaIndividual, registrarVacaciones,
-    suspenderClaseFija, programarRecuperoPendiente
+    suspenderClaseFija, programarRecuperoPendiente,
+    profesores, novedadesProfesores
   } = useGym();
 
   const [showPrioritariosModal, setShowPrioritariosModal] = useState(false);
@@ -60,8 +61,6 @@ export const TurnosGrid: React.FC = () => {
     turno_recupero_id: '',
     fecha_recupero: ''
   });
-  const [recIndexError, setRecIndexError] = useState('');
-  const [recIndexSuccess, setRecIndexSuccess] = useState('');
 
   // Form vacaciones state
   const [vacacionesForm, setVacacionesForm] = useState({
@@ -72,13 +71,6 @@ export const TurnosGrid: React.FC = () => {
   const [vacacionesSuccess, setVacacionesSuccess] = useState('');
   const [vacacionesError, setVacacionesError] = useState('');
 
-  // Calendar states
-  const [calMonth, setCalMonth] = useState(new Date().getMonth());
-  const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const [multipleTurnosWarning, setMultipleTurnosWarning] = useState<string[]>([]);
-
-  // Selection of multiple dates for cancellation
-  const [selectedInasistenciaDates, setSelectedInasistenciaDates] = useState<string[]>([]);
   // Selected pending ticket for rescheduling
   const [selectedPendingRecuperoId, setSelectedPendingRecuperoId] = useState<string | null>(null);
   // Reprogram form fields
@@ -131,67 +123,6 @@ export const TurnosGrid: React.FC = () => {
       searchString: `${cl.nombre} ${cl.apellido}`
     }));
   }, [clientesActivos]);
-
-  // Bulk Dar de Baja (Absence registration and cupos release)
-  const handleBulkDarDeBaja = (e: React.FormEvent) => {
-    e.preventDefault();
-    setRecIndexError('');
-    setRecIndexSuccess('');
-
-    const cliente_id = recuperoForm.cliente_id;
-    if (!cliente_id) {
-      setRecIndexError('Por favor seleccione un alumno.');
-      return;
-    }
-
-    if (selectedInasistenciaDates.length === 0) {
-      setRecIndexError('Por favor seleccione al menos una fecha en el calendario.');
-      return;
-    }
-
-    const clientObj = clientes.find(c => c.id === cliente_id);
-    if (!clientObj) return;
-
-    let successCount = 0;
-    let errorMsg = '';
-
-    const DAYS_NAMES = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-
-    selectedInasistenciaDates.forEach(dateStr => {
-      const dateObj = new Date(dateStr + 'T00:00:00');
-      const dayName = DAYS_NAMES[dateObj.getDay()];
-      const clientFijosOnDay = clientObj.turnos_fijos.filter(tf => tf.startsWith(dayName));
-
-      clientFijosOnDay.forEach(tfId => {
-        // 1. Suspend fixed class to free slot
-        const suspRes = suspenderClaseFija(cliente_id, tfId, dateStr);
-        
-        // 2. Generate a pending recovery ticket
-        const recRes = agregarRecupero({
-          cliente_id,
-          cliente_nombre: `${clientObj.nombre} ${clientObj.apellido}`,
-          turno_original_id: tfId,
-          fecha_inasistencia: dateStr,
-          turno_recupero_id: 'PENDIENTE_DEFINICION',
-          fecha_recupero: ''
-        });
-
-        if (recRes.success) {
-          successCount++;
-        } else {
-          errorMsg = recRes.message;
-        }
-      });
-    });
-
-    if (successCount > 0) {
-      setRecIndexSuccess(`Se dieron de baja ${successCount} clase(s) y se liberaron sus cupos. Ya puedes reprogramarlas.`);
-      setSelectedInasistenciaDates([]);
-      setTimeout(() => setRecIndexSuccess(''), 4000);
-    } else {
-      setRecIndexError(errorMsg || 'Error al procesar las bajas.');
-    }
-  };
 
   // Reprogram pending recovery ticket
   const handleReprogramRecupero = (e: React.FormEvent) => {
@@ -259,6 +190,11 @@ export const TurnosGrid: React.FC = () => {
     const recs = recuperos.filter(r => (r.estado === 'PENDIENTE' || r.estado === 'COMPLETADO') && r.turno_recupero_id === turno.id && r.fecha_recupero === fecha);
     const waitlist = esperaDelTurno(waitlistReservas, turno.id, fecha, sociosPrioritarios, { clientes, turnos });
 
+    const novedad = (novedadesProfesores || []).find(
+      n => n.turno_id === turno.id && n.fecha === fecha && n.tipo === 'REEMPLAZO'
+    );
+    const suplenteObj = novedad ? profesores.find(p => p.id === novedad.reemplazo_profesor_id) : null;
+
     return {
       turno,
       fijos,
@@ -269,7 +205,8 @@ export const TurnosGrid: React.FC = () => {
       waitlist,
       total: fijosActivos.length + vars.length + recs.length,
       cupo: turno.cupo_maximo,
-      profesor: turno.profesor || ''
+      profesor: turno.profesor || '',
+      suplente: suplenteObj?.nombre || null
     };
   };
 
@@ -719,11 +656,15 @@ export const TurnosGrid: React.FC = () => {
                                 )}
                               </div>
 
-                              {rtData.profesor && (
+                              {rtData.suplente ? (
+                                <div className="mt-1 text-[8.5px] font-sans font-bold text-amber-500 truncate max-w-full flex items-center gap-0.5" title={`Suplente: ${rtData.suplente} (Titular: ${rtData.profesor})`}>
+                                  <span>🔄 {rtData.suplente}</span>
+                                </div>
+                              ) : rtData.profesor ? (
                                 <div className="mt-1 text-[8.5px] font-sans font-bold text-zinc-500 truncate max-w-full" title={`Profesor: ${rtData.profesor}`}>
                                   👤 {rtData.profesor}
                                 </div>
-                              )}
+                              ) : null}
                             </div>
                           </td>
                         );
@@ -837,285 +778,135 @@ export const TurnosGrid: React.FC = () => {
 
                   {/* PANEL DERECHO CON FORMULARIOS */}
                   <div className="space-y-6">
-                    {/* FORMULARIO AGENDAR NUEVO RECUPERO */}
+                    {/* ASIGNACIÓN DE RECUPEROS PENDIENTES */}
                     <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-800 shadow-xl space-y-4">
                       <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
-                        <Sparkles className="w-5 h-5 text-amber-500" />
-                        <h3 className="font-sans font-bold text-sm tracking-tight">Dar de Baja Clases</h3>
+                        <Sparkles className="w-5 h-5 text-emerald-500" />
+                        <h3 className="font-sans font-bold text-sm tracking-tight">Asignar Recuperos Pendientes</h3>
                       </div>
 
-                      {recIndexError && (
-                        <div className="bg-red-500/15 text-red-400 p-2.5 rounded-lg font-semibold border border-red-500/10 text-[11px]">
-                          {recIndexError}
-                        </div>
-                      )}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">Seleccionar Socio</label>
+                        <SearchableSelect
+                          theme="dark"
+                          options={optionsSocios}
+                          value={recuperoForm.cliente_id}
+                          onChange={(id) => {
+                            setRecuperoForm({ 
+                              cliente_id: id,
+                              turno_original_id: '',
+                              fecha_inasistencia: '',
+                              fecha_recupero: '',
+                              turno_recupero_id: ''
+                            });
+                            setSelectedPendingRecuperoId(null);
+                          }}
+                          placeholder="-- Buscar socio para asignar recupero --"
+                          noOptionsText="No se encontraron socios"
+                        />
+                      </div>
 
-                      {recIndexSuccess && (
-                        <div className="bg-emerald-500/15 text-emerald-400 p-2.5 rounded-lg font-semibold border border-emerald-500/10 text-[11px]">
-                          {recIndexSuccess}
-                        </div>
-                      )}
-
-                      <form onSubmit={handleBulkDarDeBaja} className="space-y-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">Seleccionar Alumno</label>
-                          <SearchableSelect
-                            theme="dark"
-                            options={optionsSocios}
-                            value={recuperoForm.cliente_id}
-                            onChange={(id) => {
-                              setRecuperoForm({ 
-                                cliente_id: id,
-                                turno_original_id: '',
-                                fecha_inasistencia: '',
-                                fecha_recupero: '',
-                                turno_recupero_id: ''
-                              });
-                              setSelectedInasistenciaDates([]);
-                              setSelectedPendingRecuperoId(null);
-                              setRecIndexError('');
-                              setRecIndexSuccess('');
-                            }}
-                            placeholder="-- Buscar y seleccionar alumno --"
-                            noOptionsText="No se encontraron socios"
-                          />
-                        </div>
-
-                        {recuperoForm.cliente_id && (() => {
-                          const clientObj = clientes.find(c => c.id === recuperoForm.cliente_id);
-                          if (!clientObj) return null;
-
-                          const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-                          const firstDayIndex = new Date(calYear, calMonth, 1).getDay();
-                          
-                          const headers = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
-                          const dayCells: (number | null)[] = [];
-                          for (let i = 0; i < firstDayIndex; i++) {
-                            dayCells.push(null);
-                          }
-                          for (let d = 1; d <= daysInMonth; d++) {
-                            dayCells.push(d);
-                          }
-
-                          const DAYS_NAMES = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
-
+                      {recuperoForm.cliente_id && (() => {
+                        const clientPendingRecs = recuperos.filter(
+                          r => r.cliente_id === recuperoForm.cliente_id && 
+                               r.turno_recupero_id === 'PENDIENTE_DEFINICION' && 
+                               r.estado === 'PENDIENTE'
+                        );
+                        if (clientPendingRecs.length === 0) {
                           return (
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 space-y-2">
-                              <div className="flex justify-between items-center text-white text-[11px] font-bold">
-                                <button 
-                                  type="button" 
-                                  onClick={() => {
-                                    if (calMonth === 0) {
-                                      setCalMonth(11);
-                                      setCalYear(prev => prev - 1);
-                                    } else {
-                                      setCalMonth(prev => prev - 1);
-                                    }
-                                  }} 
-                                  className="p-1 hover:bg-zinc-800 rounded cursor-pointer border-none bg-transparent text-white"
-                                >
-                                  &lt;
-                                </button>
-                                <span>{MESES[calMonth]} {calYear}</span>
-                                <button 
-                                  type="button" 
-                                  onClick={() => {
-                                    if (calMonth === 11) {
-                                      setCalMonth(0);
-                                      setCalYear(prev => prev + 1);
-                                    } else {
-                                      setCalMonth(prev => prev + 1);
-                                    }
-                                  }} 
-                                  className="p-1 hover:bg-zinc-800 rounded cursor-pointer border-none bg-transparent text-white"
-                                >
-                                  &gt;
-                                </button>
-                              </div>
-                              
-                              <div className="grid grid-cols-7 gap-1 text-[10px] text-center text-zinc-400 font-bold border-b border-zinc-800 pb-1">
-                                {headers.map((h, i) => <div key={i}>{h}</div>)}
-                              </div>
-                              
-                              <div className="grid grid-cols-7 gap-1 text-[10px]">
-                                {dayCells.map((day, idx) => {
-                                  if (day === null) return <div key={idx}></div>;
-                                  
-                                  const mm = String(calMonth + 1).padStart(2, '0');
-                                  const dd = String(day).padStart(2, '0');
-                                  const dateStr = `${calYear}-${mm}-${dd}`;
-                                  const dateObj = new Date(dateStr + 'T00:00:00');
-                                  const dayName = DAYS_NAMES[dateObj.getDay()];
-                                  
-                                  const clientFijosOnDay = clientObj.turnos_fijos.filter(tf => tf.startsWith(dayName));
-                                  const hasFijo = clientFijosOnDay.length > 0;
-                                  const isSelected = selectedInasistenciaDates.includes(dateStr);
+                            <p className="text-zinc-500 text-xs italic">
+                              Este socio no posee cupones de recupero pendientes de reprogramar.
+                            </p>
+                          );
+                        }
 
-                                  let cellClass = 'p-1.5 text-center rounded-sm transition-colors cursor-pointer text-zinc-300 hover:bg-zinc-800 bg-transparent border-0 w-full';
-                                  if (isSelected) {
-                                    cellClass = 'p-1.5 text-center rounded-sm bg-amber-500 text-black font-bold border-0 w-full';
-                                  } else if (hasFijo) {
-                                    cellClass = 'p-1.5 text-center rounded-sm bg-zinc-850 border border-zinc-850 hover:border-zinc-700 text-white font-semibold w-full';
-                                  }
+                        const selectedRec = clientPendingRecs.find(r => r.id === selectedPendingRecuperoId);
 
+                        return (
+                          <div className="space-y-4 animate-fade-in pt-1">
+                            {reprogramError && (
+                              <div className="bg-red-500/15 text-red-400 p-2.5 rounded-lg font-semibold border border-red-500/10 text-[11px]">
+                                {reprogramError}
+                              </div>
+                            )}
+
+                            {reprogramSuccess && (
+                              <div className="bg-emerald-500/15 text-emerald-400 p-2.5 rounded-lg font-semibold border border-emerald-500/10 text-[11px]">
+                                {reprogramSuccess}
+                              </div>
+                            )}
+
+                            <div className="space-y-2">
+                              <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold block">1. Elige un cupo libre a reprogramar</label>
+                              <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                                {clientPendingRecs.map(rec => {
+                                  const isSelected = rec.id === selectedPendingRecuperoId;
                                   return (
                                     <button
-                                      key={idx}
+                                      key={rec.id}
                                       type="button"
-                                      disabled={!hasFijo}
                                       onClick={() => {
-                                        setRecIndexError('');
-                                        setRecIndexSuccess('');
-                                        
-                                        setSelectedInasistenciaDates(prev => {
-                                          if (prev.includes(dateStr)) {
-                                            return prev.filter(d => d !== dateStr);
-                                          } else {
-                                            return [...prev, dateStr];
-                                          }
-                                        });
+                                        setSelectedPendingRecuperoId(rec.id);
+                                        setReprogramForm({ turno_recupero_id: '', fecha_recupero: '' });
+                                        setReprogramError('');
                                       }}
-                                      className={`${cellClass} disabled:opacity-40 disabled:cursor-not-allowed`}
+                                      className={`w-full text-left p-2 rounded-lg text-xs font-semibold transition-all border ${
+                                        isSelected
+                                          ? 'bg-emerald-500/20 border-emerald-500 text-white'
+                                          : 'bg-zinc-900 border-zinc-850 hover:bg-zinc-850 text-zinc-300'
+                                      }`}
                                     >
-                                      <div>{day}</div>
-                                      {hasFijo && !isSelected && (
-                                        <div className="w-1 h-1 rounded-full bg-amber-400 mx-auto mt-0.5 animate-pulse"></div>
-                                      )}
+                                      Inasistencia del {rec.fecha_inasistencia} ({rec.turno_original_id})
                                     </button>
                                   );
                                 })}
                               </div>
                             </div>
-                          );
-                        })()}
 
-                        {selectedInasistenciaDates.length > 0 && (
-                          <div className="bg-zinc-900 p-3 rounded-lg border border-zinc-800 text-[11px] space-y-1.5 animate-fade-in">
-                            <div className="font-bold text-zinc-400 uppercase text-[9px] tracking-wider">Fechas seleccionadas a dar de baja:</div>
-                            <div className="flex flex-wrap gap-1">
-                              {selectedInasistenciaDates.map(d => (
-                                <span key={d} className="bg-zinc-850 px-2 py-0.5 rounded font-mono text-[10.5px] font-semibold text-amber-400 border border-zinc-800">
-                                  {d}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <button
-                          type="submit"
-                          disabled={selectedInasistenciaDates.length === 0}
-                          className={`w-full font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all border-none ${
-                            selectedInasistenciaDates.length === 0
-                              ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                              : 'bg-red-600 hover:bg-red-500 text-white shadow-sm shadow-red-500/10 cursor-pointer'
-                          }`}
-                        >
-                          Dar de Baja Clases Seleccionadas
-                        </button>
-                      </form>
-                    </div>
-
-                    {/* FORMULARIO ASIGNAR/REPROGRAMAR CUPOS PENDIENTES */}
-                    {recuperoForm.cliente_id && (() => {
-                      const clientPendingRecs = recuperos.filter(
-                        r => r.cliente_id === recuperoForm.cliente_id && 
-                             r.turno_recupero_id === 'PENDIENTE_DEFINICION' && 
-                             r.estado === 'PENDIENTE'
-                      );
-                      if (clientPendingRecs.length === 0) return null;
-
-                      const selectedRec = clientPendingRecs.find(r => r.id === selectedPendingRecuperoId);
-
-                      return (
-                        <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-800 shadow-xl space-y-4 animate-fade-in">
-                          <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
-                            <Sparkles className="w-5 h-5 text-emerald-500" />
-                            <h3 className="font-sans font-bold text-sm tracking-tight">Asignar Recuperos Libres ({clientPendingRecs.length})</h3>
-                          </div>
-
-                          {reprogramError && (
-                            <div className="bg-red-500/15 text-red-400 p-2.5 rounded-lg font-semibold border border-red-500/10 text-[11px]">
-                              {reprogramError}
-                            </div>
-                          )}
-
-                          {reprogramSuccess && (
-                            <div className="bg-emerald-500/15 text-emerald-400 p-2.5 rounded-lg font-semibold border border-emerald-500/10 text-[11px]">
-                              {reprogramSuccess}
-                            </div>
-                          )}
-
-                          <div className="space-y-2">
-                            <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold block">1. Elige un cupo libre a reprogramar</label>
-                            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
-                              {clientPendingRecs.map(rec => {
-                                const isSelected = rec.id === selectedPendingRecuperoId;
-                                return (
-                                  <button
-                                    key={rec.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedPendingRecuperoId(rec.id);
-                                      setReprogramForm({ turno_recupero_id: '', fecha_recupero: '' });
-                                      setReprogramError('');
-                                    }}
-                                    className={`w-full text-left p-2 rounded-lg text-xs font-semibold transition-all border ${
-                                      isSelected
-                                        ? 'bg-emerald-500/20 border-emerald-500 text-white'
-                                        : 'bg-zinc-900 border-zinc-850 hover:bg-zinc-850 text-zinc-300'
-                                    }`}
+                            {selectedPendingRecuperoId && selectedRec && (
+                              <form onSubmit={handleReprogramRecupero} className="space-y-4 animate-scale-up">
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">2. Turno Destino</label>
+                                  <select
+                                    required
+                                    value={reprogramForm.turno_recupero_id}
+                                    onChange={(e) => setReprogramForm(prev => ({ ...prev, turno_recupero_id: e.target.value }))}
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white text-xs outline-hidden focus:border-zinc-500 font-medium"
                                   >
-                                    Inasistencia del {rec.fecha_inasistencia} ({rec.turno_original_id})
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
+                                    <option value="">-- Escoge slot destino --</option>
+                                    {turnos
+                                      .filter(t => t.id !== selectedRec.turno_original_id)
+                                      .map(t => (
+                                        <option key={t.id} value={t.id}>
+                                          {t.dia} — {t.hora}hs (Ocupación: {t.asignados_ids.length}/{t.cupo_maximo})
+                                        </option>
+                                      ))}
+                                  </select>
+                                </div>
 
-                          {selectedPendingRecuperoId && selectedRec && (
-                            <form onSubmit={handleReprogramRecupero} className="space-y-4 animate-scale-up">
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">2. Turno Destino</label>
-                                <select
-                                  required
-                                  value={reprogramForm.turno_recupero_id}
-                                  onChange={(e) => setReprogramForm(prev => ({ ...prev, turno_recupero_id: e.target.value }))}
-                                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white text-xs outline-hidden focus:border-zinc-500 font-medium"
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">3. Fecha Destino</label>
+                                  <input
+                                    type="date"
+                                    required
+                                    value={reprogramForm.fecha_recupero}
+                                    onChange={(e) => setReprogramForm(prev => ({ ...prev, fecha_recupero: e.target.value }))}
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white text-xs outline-hidden font-mono focus:border-zinc-500"
+                                  />
+                                </div>
+
+                                <button
+                                  type="submit"
+                                  className="w-full bg-emerald-500 text-black hover:bg-emerald-400 font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-emerald-500/10 cursor-pointer border-none"
                                 >
-                                  <option value="">-- Escoge slot destino --</option>
-                                  {turnos
-                                    .filter(t => t.id !== selectedRec.turno_original_id)
-                                    .map(t => (
-                                      <option key={t.id} value={t.id}>
-                                        {t.dia} — {t.hora}hs (Ocupación: {t.asignados_ids.length}/{t.cupo_maximo})
-                                      </option>
-                                    ))}
-                                </select>
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">3. Fecha Destino</label>
-                                <input
-                                  type="date"
-                                  required
-                                  value={reprogramForm.fecha_recupero}
-                                  onChange={(e) => setReprogramForm(prev => ({ ...prev, fecha_recupero: e.target.value }))}
-                                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white text-xs outline-hidden font-mono focus:border-zinc-500"
-                                />
-                              </div>
-
-                              <button
-                                type="submit"
-                                className="w-full bg-emerald-500 text-black hover:bg-emerald-400 font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-emerald-500/10 cursor-pointer border-none"
-                              >
-                                Asignar Turno de Recupero
-                              </button>
-                            </form>
-                          )}
-                        </div>
-                      );
-                    })()}
+                                  Asignar Turno de Recupero
+                                </button>
+                              </form>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
 
                     {/* FORMULARIO REGISTRAR VACACIONES */}
                     <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-800 shadow-xl space-y-4">

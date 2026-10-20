@@ -29,16 +29,19 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   const {
     turnos, clientes, recuperos, waitlistReservas, removerListaEsperaReserva, removerAsignacionFija, sociosPrioritarios, feriados,
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
-    actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo
+    actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo,
+    profesores, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
-  const [guestName, setGuestName] = useState('');
-  const [guestNameConfirmed, setGuestNameConfirmed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
   const [realtimeSuccess, setRealtimeSuccess] = useState<string | null>(null);
+
+  // Estado para gestión de suplencias de profesor en este turno y fecha
+  const [selectedSuplenteId, setSelectedSuplenteId] = useState('');
+  const [showSuplenteSelector, setShowSuplenteSelector] = useState(false);
 
   // Estado para el modal de WhatsApp Masivo
   const [showWspModal, setShowWspModal] = useState(false);
@@ -100,11 +103,59 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
       });
   }, [waitlistReservas, selectedSlot.id, selectedSlot.date, clientes, sociosPrioritarios, turnos]);
   
-  // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date. When full, exclude already on waitlist.
+  // Gestión de Profesor y Suplencias para este turno y fecha
+  const novedadSuplencia = useMemo(() => {
+    return (novedadesProfesores || []).find(
+      n => n.turno_id === selectedSlot.id && n.fecha === selectedSlot.date && n.tipo === 'REEMPLAZO'
+    );
+  }, [novedadesProfesores, selectedSlot.id, selectedSlot.date]);
+
+  const suplenteProf = useMemo(() => {
+    if (!novedadSuplencia?.reemplazo_profesor_id) return null;
+    return profesores.find(p => p.id === novedadSuplencia.reemplazo_profesor_id) || null;
+  }, [novedadSuplencia, profesores]);
+
+  const titularProfObj = useMemo(() => {
+    return profesores.find(
+      p => p.nombre.toLowerCase() === (rtData.profesor || '').toLowerCase() || p.id === rtData.profesor
+    );
+  }, [profesores, rtData.profesor]);
+
+  const handleAsignarSuplente = () => {
+    if (!selectedSuplenteId) return;
+    const res = registrarNovedadProfesor({
+      profesor_id: titularProfObj?.id || (profesores[0]?.id ?? 'prof-titular'),
+      fecha: selectedSlot.date,
+      turno_id: selectedSlot.id,
+      tipo: 'REEMPLAZO',
+      reemplazo_profesor_id: selectedSuplenteId
+    });
+    if (res.success) {
+      setRealtimeSuccess('✅ Suplencia registrada con éxito.');
+      setShowSuplenteSelector(false);
+      setSelectedSuplenteId('');
+      setTimeout(() => setRealtimeSuccess(null), 4000);
+    }
+  };
+
+  const handleQuitarSuplente = () => {
+    if (!novedadSuplencia) return;
+    eliminarNovedadProfesor(novedadSuplencia.id);
+    setRealtimeSuccess('✅ Suplencia eliminada. Se restableció el profesor titular.');
+    setTimeout(() => setRealtimeSuccess(null), 4000);
+  };
+
+  // Candidates: active, don't have this as fijo, don't have booking on this exact shift and date. Exclude guests.
   const candidateClients = useMemo(() => {
     const turnoActual = turnos.find(t => t.id === selectedSlot.id);
     const listaFija = turnoActual?.lista_espera_ids || [];
     return clientes.filter(c => {
+      // Excluir socios que figuren como invitados
+      const esInvitado = (c.apellido || '').toLowerCase().includes('invitado') ||
+        (c.nombre || '').toLowerCase().includes('invitado') ||
+        (c.email || '').startsWith('invitado-');
+      if (esInvitado) return false;
+
       const alreadyInWaitlist = waitlistReservas.some(w => w.cliente_id === c.id && w.turno_id === selectedSlot.id && w.fecha === selectedSlot.date) || listaFija.includes(c.id);
       return c.activo && 
         !c.turnos_fijos.includes(selectedSlot.id) && 
@@ -128,60 +179,13 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   const handleAddRealtimeVariable = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!realtimeCandidateClient && !guestName.trim()) return;
+    if (!realtimeCandidateClient) {
+      setRealtimeError('Debes elegir un socio de la lista para agendar.');
+      return;
+    }
 
     setRealtimeError(null);
     setRealtimeSuccess(null);
-
-    if (guestName.trim()) {
-      const fullGuestName = guestName.trim();
-      const parts = fullGuestName.split(' ');
-      const name = parts[0] || 'Invitado';
-      const lastname = parts.length > 1 ? parts.slice(1).join(' ') + ' (Invitado)' : '(Invitado)';
-      
-      const newGuestResult = addCliente({
-        nombre: name,
-        apellido: lastname,
-        email: `invitado-${Date.now()}@kaha.com`,
-        telefono: '11-0000-0000',
-        tipo: 'FIJO',
-        plan_id: 'p-none',
-        exencion_cobro: 'NINGUNA',
-        allowDuplicate: true,
-        // El alta y la anotación se resuelven en la misma llamada. Si se hiciera
-        // en dos pasos (crear y después anotar), el segundo paso no encuentra al
-        // socio: React todavía no actualizó `clientes` dentro de este handler.
-        initialReservaIndividual: isFull ? undefined : {
-          turno_id: selectedSlot.id,
-          fecha: selectedSlot.date
-        },
-        initialWaitlistReserva: isFull ? {
-          turno_id: selectedSlot.id,
-          fecha: selectedSlot.date
-        } : undefined
-      });
-
-      if (newGuestResult.success) {
-        if (isFull) {
-          setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" registrado en la LISTA DE ESPERA.`);
-        } else {
-          setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" agendado con éxito en la clase.`);
-        }
-        setGuestName('');
-        setRealtimeCandidateClient('');
-        setSearchQuery('');
-        setIsDropdownOpen(false);
-        setTimeout(() => setRealtimeSuccess(null), 5000);
-      } else {
-        setRealtimeError(newGuestResult.message || 'Error al agendar el socio invitado.');
-      }
-      return;
-    }
-
-    if (!realtimeCandidateClient) {
-      setRealtimeError('Debes elegir un alumno de la lista o escribir el nombre de un invitado.');
-      return;
-    }
 
     const res = await crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
     if (res.success) {
@@ -190,7 +194,6 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
       }
       setRealtimeSuccess(`✅ ¡Confirmado! ${res.message}`);
       setRealtimeCandidateClient('');
-      setGuestName('');
       setSearchQuery('');
       setIsDropdownOpen(false);
       setTimeout(() => setRealtimeSuccess(null), 5000);
@@ -425,8 +428,18 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
               <div className="text-sm font-extrabold text-slate-800 font-mono mt-0.5">{rtData.total} Cupos Ocupados</div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold font-sans">Profesor Fijo</div>
-              <div className="text-xs font-bold text-slate-800 mt-0.5">👤 {rtData.profesor || 'No asignado'}</div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold font-sans">
+                {suplenteProf ? 'Profesor Suplente' : 'Profesor Titular'}
+              </div>
+              <div className="text-xs font-bold text-slate-800 mt-0.5">
+                {suplenteProf ? (
+                  <span className="text-amber-600 font-extrabold flex items-center justify-end gap-1" title={`Reemplaza a ${rtData.profesor}`}>
+                    🔄 {suplenteProf.nombre}
+                  </span>
+                ) : (
+                  <span>👤 {rtData.profesor || 'No asignado'}</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -663,11 +676,11 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
               </span>
             </div>
 
-            {/* SELECCIONAR SOCIO REGISTRADO O ESCRIBIR INVITADO */}
-            {!selectedCandidateObj && !(guestName.trim() && guestNameConfirmed) ? (
+            {/* SELECCIONAR SOCIO REGISTRADO */}
+            {!selectedCandidateObj ? (
               <div className="space-y-3 bg-zinc-50 p-3.5 rounded-xl border border-zinc-200">
                 <div className="space-y-1 relative">
-                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">1. Elegir Socio Registrado:</span>
+                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">Elegir Socio Registrado:</span>
                   <div className="relative">
                     <div className="relative flex items-center">
                       <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" />
@@ -707,7 +720,6 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                                 type="button"
                                 onClick={() => {
                                   setRealtimeCandidateClient(c.id);
-                                  setGuestName('');
                                   setIsDropdownOpen(false);
                                   setSearchQuery('');
                                 }}
@@ -727,34 +739,6 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     )}
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2 text-zinc-400 text-[8.5px] font-bold uppercase tracking-wider justify-center select-none">
-                  <div className="h-px bg-zinc-200 flex-1"></div>
-                  <span>O BIEN</span>
-                  <div className="h-px bg-zinc-200 flex-1"></div>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">2. Registrar Socio Invitado puntual:</span>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Ej: Juan Pérez (Invitado)"
-                      value={guestName}
-                      onChange={(e) => { setGuestName(e.target.value); setGuestNameConfirmed(false); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && guestName.trim()) { e.preventDefault(); setGuestNameConfirmed(true); } }}
-                      className="flex-1 border border-zinc-300 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
-                    />
-                    <button
-                      type="button"
-                      disabled={!guestName.trim()}
-                      onClick={() => setGuestNameConfirmed(true)}
-                      className="px-3 py-2 bg-zinc-900 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border-none shrink-0"
-                    >
-                      Usar
-                    </button>
-                  </div>
-                </div>
               </div>
             ) : (
               /* TARJETA DE CONFIRMACIÓN DESTACADA */
@@ -767,7 +751,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     <div>
                       <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Alumno a Confirmar</div>
                       <div className="text-sm font-extrabold text-white">
-                        {selectedCandidateObj ? `${selectedCandidateObj.apellido}, ${selectedCandidateObj.nombre}` : `${guestName.trim()} (Invitado)`}
+                        {selectedCandidateObj ? `${selectedCandidateObj.apellido}, ${selectedCandidateObj.nombre}` : ''}
                       </div>
                     </div>
                   </div>
@@ -775,8 +759,6 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     type="button"
                     onClick={() => {
                       setRealtimeCandidateClient('');
-                      setGuestName('');
-                      setGuestNameConfirmed(false);
                       setSearchQuery('');
                     }}
                     className="text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border-none"
@@ -816,8 +798,6 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     type="button"
                     onClick={() => {
                       setRealtimeCandidateClient('');
-                      setGuestName('');
-                      setGuestNameConfirmed(false);
                       setSearchQuery('');
                     }}
                     className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border-none"
@@ -838,6 +818,75 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     <span>Confirmar y {isFull ? 'Anotar en Espera' : 'Agendar'}</span>
                   </button>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* GESTIÓN DE PROFESOR Y SUPLENCIAS */}
+          <div className="bg-zinc-900 text-white p-4 rounded-xl border border-zinc-800 shadow-md space-y-3 font-sans">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold block">Profesor a cargo del turno</span>
+                <div className="text-sm font-bold mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span>{suplenteProf ? `🔄 ${suplenteProf.nombre} (Suplente)` : `👤 ${rtData.profesor || 'Sin asignar'}`}</span>
+                  {suplenteProf && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-mono">
+                      Reemplaza a {rtData.profesor}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {suplenteProf ? (
+                <button
+                  type="button"
+                  onClick={handleQuitarSuplente}
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-zinc-700 self-start sm:self-auto"
+                >
+                  Restablecer Titular
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowSuplenteSelector(prev => !prev)}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-xs font-bold transition-colors cursor-pointer border-none self-start sm:self-auto"
+                >
+                  {showSuplenteSelector ? 'Cancelar' : 'Cambiar Profe / Asignar Suplente'}
+                </button>
+              )}
+            </div>
+
+            {showSuplenteSelector && !suplenteProf && (
+              <div className="pt-3 border-t border-zinc-800 space-y-2 animate-fade-in">
+                <label className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold block">
+                  Seleccionar profesor de reemplazo para esta fecha:
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <select
+                    value={selectedSuplenteId}
+                    onChange={(e) => setSelectedSuplenteId(e.target.value)}
+                    className="flex-1 bg-zinc-800 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-hidden"
+                  >
+                    <option value="">-- Seleccionar suplente --</option>
+                    {profesores
+                      .filter(p => p.activo && p.id !== titularProfObj?.id && p.nombre.toLowerCase() !== (rtData.profesor || '').toLowerCase())
+                      .map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre} ({p.telefono || p.email})
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!selectedSuplenteId}
+                    onClick={handleAsignarSuplente}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold text-xs rounded-lg transition-colors cursor-pointer border-none shrink-0"
+                  >
+                    Confirmar Suplencia
+                  </button>
+                </div>
+                <p className="text-[10.5px] text-zinc-400">
+                  Esta suplencia quedará registrada y se computará automáticamente en la Liquidación de horas del mes.
+                </p>
               </div>
             )}
           </div>
