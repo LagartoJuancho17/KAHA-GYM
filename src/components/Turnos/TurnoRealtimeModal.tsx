@@ -35,6 +35,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [guestNameConfirmed, setGuestNameConfirmed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
@@ -194,13 +196,56 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   const handleAddRealtimeVariable = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!realtimeCandidateClient) {
-      setRealtimeError('Debes elegir un socio de la lista para agendar.');
+    if (!realtimeCandidateClient && !guestName.trim()) {
+      setRealtimeError('Debés elegir un socio de la lista o escribir el nombre de un invitado.');
       return;
     }
 
     setRealtimeError(null);
     setRealtimeSuccess(null);
+
+    if (guestName.trim()) {
+      const fullGuestName = guestName.trim();
+      const parts = fullGuestName.split(' ');
+      const name = parts[0] || 'Invitado';
+      const lastname = parts.length > 1 ? parts.slice(1).join(' ') + ' (Invitado)' : '(Invitado)';
+      
+      const newGuestResult = addCliente({
+        nombre: name,
+        apellido: lastname,
+        email: `invitado-${Date.now()}@kaha.com`,
+        telefono: '11-0000-0000',
+        tipo: 'FIJO',
+        plan_id: 'p-none',
+        exencion_cobro: 'NINGUNA',
+        allowDuplicate: true,
+        initialReservaIndividual: isFull ? undefined : {
+          turno_id: selectedSlot.id,
+          fecha: selectedSlot.date
+        },
+        initialWaitlistReserva: isFull ? {
+          turno_id: selectedSlot.id,
+          fecha: selectedSlot.date
+        } : undefined
+      });
+
+      if (newGuestResult.success) {
+        if (isFull) {
+          setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" registrado en la LISTA DE ESPERA.`);
+        } else {
+          setRealtimeSuccess(`✅ ¡Confirmado! Invitado "${fullGuestName}" agendado con éxito en la clase.`);
+        }
+        setGuestName('');
+        setGuestNameConfirmed(false);
+        setRealtimeCandidateClient('');
+        setSearchQuery('');
+        setIsDropdownOpen(false);
+        setTimeout(() => setRealtimeSuccess(null), 5000);
+      } else {
+        setRealtimeError(newGuestResult.message || 'Error al agendar el socio invitado.');
+      }
+      return;
+    }
 
     const res = await crearReservaIndividual(realtimeCandidateClient, selectedSlot.id, selectedSlot.date);
     if (res.success) {
@@ -209,6 +254,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
       }
       setRealtimeSuccess(`✅ ¡Confirmado! ${res.message}`);
       setRealtimeCandidateClient('');
+      setGuestName('');
+      setGuestNameConfirmed(false);
       setSearchQuery('');
       setIsDropdownOpen(false);
       setTimeout(() => setRealtimeSuccess(null), 5000);
@@ -701,11 +748,11 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
               </span>
             </div>
 
-            {/* SELECCIONAR SOCIO REGISTRADO */}
-            {!selectedCandidateObj ? (
+            {/* SELECCIONAR SOCIO REGISTRADO O INVITADO */}
+            {!selectedCandidateObj && !(guestName.trim() && guestNameConfirmed) ? (
               <div className="space-y-3 bg-zinc-50 p-3.5 rounded-xl border border-zinc-200">
                 <div className="space-y-1 relative">
-                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">Elegir Socio Registrado:</span>
+                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">1. Elegir Socio Registrado:</span>
                   <div className="relative">
                     <div className="relative flex items-center">
                       <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" />
@@ -764,6 +811,34 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     )}
                   </div>
                 </div>
+
+                <div className="flex items-center gap-2 text-zinc-400 text-[8.5px] font-bold uppercase tracking-wider justify-center select-none">
+                  <div className="h-px bg-zinc-200 flex-1"></div>
+                  <span>O BIEN</span>
+                  <div className="h-px bg-zinc-200 flex-1"></div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-zinc-600 font-bold font-sans block">2. Registrar Socio Invitado puntual:</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ej: Juan Pérez (Invitado)"
+                      value={guestName}
+                      onChange={(e) => { setGuestName(e.target.value); setGuestNameConfirmed(false); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && guestName.trim()) { e.preventDefault(); setGuestNameConfirmed(true); } }}
+                      className="flex-1 border border-zinc-300 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                    />
+                    <button
+                      type="button"
+                      disabled={!guestName.trim()}
+                      onClick={() => setGuestNameConfirmed(true)}
+                      className="px-3 py-2 bg-zinc-900 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border-none shrink-0"
+                    >
+                      Usar
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               /* TARJETA DE CONFIRMACIÓN DESTACADA */
@@ -776,7 +851,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     <div>
                       <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Alumno a Confirmar</div>
                       <div className="text-sm font-extrabold text-white">
-                        {selectedCandidateObj ? `${selectedCandidateObj.apellido}, ${selectedCandidateObj.nombre}` : ''}
+                        {selectedCandidateObj ? `${selectedCandidateObj.apellido}, ${selectedCandidateObj.nombre}` : `${guestName.trim()} (Invitado)`}
                       </div>
                     </div>
                   </div>
@@ -784,6 +859,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     type="button"
                     onClick={() => {
                       setRealtimeCandidateClient('');
+                      setGuestName('');
+                      setGuestNameConfirmed(false);
                       setSearchQuery('');
                     }}
                     className="text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border-none"
@@ -823,6 +900,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                     type="button"
                     onClick={() => {
                       setRealtimeCandidateClient('');
+                      setGuestName('');
+                      setGuestNameConfirmed(false);
                       setSearchQuery('');
                     }}
                     className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border-none"
