@@ -70,6 +70,7 @@ interface GymContextType {
   reordenarEsperaTurno: (turnoId: string, fecha: string, nuevoOrdenClienteIds: string[]) => void;
   procesarPromocionListaEspera: (turnoId: string, fecha: string, currentClientes?: Cliente[], excludeClienteId?: string) => Cliente[];
   sincronizarEsperaTurno: (turnoId: string, fecha: string) => Promise<void>;
+  promoverDeListaEspera: (clienteId: string, turnoId: string, fecha: string) => Promise<{ success: boolean; message: string }>;
 
   // Clientes Methods
   addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean; initialReservaIndividual?: { turno_id: string; fecha: string }; initialWaitlistReserva?: { turno_id: string; fecha: string } }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
@@ -4090,6 +4091,106 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const promoverDeListaEspera = async (
+    clienteId: string, 
+    turnoId: string, 
+    fecha: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const cliente = clientes.find(c => c.id === clienteId);
+    if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
+
+    const turno = turnos.find(t => t.id === turnoId || t.db_uuid === turnoId);
+    const turnoLocalId = turno ? turno.id : turnoId;
+
+    // 1. Crear reserva individual manual garantizada (override directo del admin)
+    const nuevaReserva: ReservaIndividual = {
+      id: `res-manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      turno_id: turnoLocalId,
+      fecha,
+      creado_at: new Date().toISOString()
+    };
+
+    // Si ya tenía reserva en este turno y fecha, actualizar / no duplicar
+    const yaTieneReserva = (cliente.reservas_individuales || []).some(
+      r => r.turno_id === turnoLocalId && r.fecha === fecha
+    );
+
+    const filtradasReservas = (cliente.reservas_individuales || []).filter(
+      r => !(r.turno_id === turnoLocalId && r.fecha === fecha)
+    );
+    const nuevasReservas = yaTieneReserva 
+      ? cliente.reservas_individuales || [] 
+      : [...filtradasReservas, nuevaReserva];
+
+    // Limpiar suspensión de esta fecha si existía para que figure activo en la clase
+    const nuevasSuspensiones = (cliente.clases_suspendidas || []).filter(
+      s => !(s.turno_id === turnoLocalId && s.fecha === fecha)
+    );
+
+    const updatedClientes = clientes.map(c => {
+      if (c.id === clienteId) {
+        return {
+          ...c,
+          reservas_individuales: nuevasReservas,
+          clases_suspendidas: nuevasSuspensiones
+        };
+      }
+      return c;
+    });
+
+    // 2. Remover de waitlist local y en Supabase
+    const newWl = waitlistReservas.filter(
+      w => !(w.cliente_id === clienteId && (w.turno_id === turnoLocalId || w.turno_id === turnoId) && w.fecha === fecha)
+    );
+    setWaitlistReservas(newWl);
+    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
+    persistirEsperaEnSupabase('baja', clienteId, turnoLocalId, fecha);
+
+    // 3. Persistir en clientes
+    setClientes(updatedClientes);
+    saveState(updatedClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+
+    if (supabase) {
+      supabase.from('clientes').update({
+        reservas_individuales: nuevasReservas,
+        clases_suspendidas: nuevasSuspensiones
+      }).eq('id', clienteId).then(({ error }) => {
+        if (error) console.error('Error al persistir promoción manual en Supabase:', error);
+      });
+    }
+
+    // 4. Notificaciones y Auditoría
+    const horaClase = turno ? turno.hora : '00:00';
+    const newNotif: AlertaNotificacion = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      tipo: 'SISTEMA',
+      titulo: '¡Cupo Asignado a la Clase!',
+      mensaje: `Fuiste promovido/a al turno de las ${horaClase} hs el día ${fecha}.`,
+      fecha: new Date().toISOString(),
+      leido: false
+    };
+
+    try {
+      const storedNotifs = localStorage.getItem('gym_notificaciones');
+      const parsedNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
+      localStorage.setItem('gym_notificaciones', JSON.stringify([newNotif, ...parsedNotifs]));
+      setNotificaciones([newNotif, ...parsedNotifs]);
+    } catch(e) {}
+
+    addAuditLog('LISTA_ESPERA_PROMOCION_MANUAL', {
+      cliente: `${cliente.nombre} ${cliente.apellido}`,
+      turno_id: turnoLocalId,
+      fecha
+    });
+
+    notificarAltaWaitlist(clienteId, turnoLocalId, fecha);
+
+    return { 
+      success: true, 
+      message: `¡${cliente.nombre} ${cliente.apellido} promovido/a a la clase exitosamente!` 
+    };
+  };
+
   const cancelarReservaIndividual = (clienteId: string, reservaId: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
     if (!cliente) return { success: false, message: 'Cliente no encontrado.' };
@@ -5996,7 +6097,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       googleUser, signInWithGoogle, signInWithEmailAndPassword, signOutGoogle,
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva, reordenarEsperaTurno,
-      procesarPromocionListaEspera, sincronizarEsperaTurno,
+      procesarPromocionListaEspera, sincronizarEsperaTurno, promoverDeListaEspera,
       sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, ponerEnReposo, sacarDeReposo, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, retomarSocioPausado, postergarPausaSocio, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,

@@ -30,7 +30,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
     actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo,
     profesores, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
-    reordenarEsperaTurno, procesarPromocionListaEspera, sincronizarEsperaTurno
+    reordenarEsperaTurno, procesarPromocionListaEspera, sincronizarEsperaTurno, promoverDeListaEspera
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
@@ -689,6 +689,26 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                           </button>
                         </div>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setRealtimeError(null);
+                          setRealtimeSuccess(null);
+                          const res = await promoverDeListaEspera(wl.clienteId, selectedSlot.id, selectedSlot.date);
+                          if (res.success) {
+                            setRealtimeSuccess(`✅ ¡${wl.nombre} promovido a la clase exitosamente!`);
+                          } else {
+                            setRealtimeError(res.message);
+                          }
+                          setTimeout(() => setRealtimeSuccess(null), 4000);
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-[10.5px] shadow-xs cursor-pointer border-none transition-all"
+                        title="Subir a la clase inmediatamente"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Promover</span>
+                      </button>
 
                       <button
                         type="button"
