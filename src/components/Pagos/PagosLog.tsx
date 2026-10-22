@@ -179,7 +179,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
         const cl = clientes.find(c => c.id === p.cliente_id);
         const nameText = cl ? `${cl.nombre} ${cl.apellido}`.toLowerCase() : (p.cliente_nombre_completo || '').toLowerCase();
         const conceptoText = (p.concepto || '').toLowerCase();
-        const comprobanteText = (p.comprobante_nro || '').toLowerCase();
+        const comprobanteText = ((p as any).comprobante_nro || p.hash_transaccion || '').toLowerCase();
         const mesText = (p.mes_correspondiente || '').toLowerCase();
         if (!nameText.includes(query) && !conceptoText.includes(query) && !comprobanteText.includes(query) && !mesText.includes(query)) return false;
       }

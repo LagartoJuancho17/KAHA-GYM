@@ -255,6 +255,10 @@ const triggerVibration = (type: 'add' | 'delete' | 'success' | 'error') => {
   }
 };
 
+// Helper global para validación estricta de UUID en toda la aplicación
+const isUuid = (str: string | null | undefined): boolean =>
+  Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
 export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -709,7 +713,47 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setPlanes(mappedPlanes);
       setClientes(clientList);
       setTurnos(shiftList);
-      setPagos(mappedPagos);
+
+      // Rescate y sincronización de pagos locales que no llegaron a subir a Supabase (ej: fallos de red o de runtime)
+      const localP = localStorage.getItem('gym_pagos');
+      let mergedPagos = mappedPagos;
+      if (localP) {
+        try {
+          const localPagosList: Pago[] = JSON.parse(localP);
+          const dbIds = new Set(mappedPagos.map(p => p.id));
+          const pagosFaltantes = localPagosList.filter(lp => !dbIds.has(lp.id));
+          if (pagosFaltantes.length > 0) {
+            console.log(`[Supabase] Detectados ${pagosFaltantes.length} pagos locales no sincronizados, subiendo a Supabase...`);
+            const payloadsToInsert = pagosFaltantes.map(np => {
+              const item: any = {
+                id: np.id,
+                cliente_id: (np.es_externo || !isUuid(np.cliente_id)) ? null : np.cliente_id,
+                monto: np.monto,
+                medio_pago: np.medio_pago,
+                mes_correspondiente: np.mes_correspondiente,
+                hash_transaccion: np.hash_transaccion,
+                destino_transferencia: np.destino_transferencia || null,
+                fecha_pago: np.fecha_pago,
+                creado_at: np.creado_at
+              };
+              if (np.es_externo) item.es_externo = true;
+              if (np.concepto) item.concepto = np.concepto;
+              if (np.cliente_nombre_completo) item.cliente_nombre_completo = np.cliente_nombre_completo;
+              return item;
+            });
+            supabase.from('pagos').insert(payloadsToInsert).then(({ error }) => {
+              if (error) console.error('[Supabase] Error al sincronizar pagos faltantes:', error.message);
+              else console.log(`✅ Pagos: ${payloadsToInsert.length} pago(s) rescatado(s) y sincronizado(s) a Supabase`);
+            });
+            mergedPagos = [...pagosFaltantes, ...mappedPagos];
+          }
+        } catch (e) {
+          console.warn('Error al verificar pagos locales:', e);
+        }
+      }
+
+      setPagos(mergedPagos);
+      localStorage.setItem('gym_pagos', JSON.stringify(mergedPagos));
       setRecuperos(mappedRecs);
 
       // Lista de espera por fecha: la base manda. Se mapea el uuid del turno al id
@@ -863,33 +907,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               socio_id: n.socio_id || undefined
             }));
 
-          // Merge: si hay novedades locales que no están en la DB, subirlas
-          const localNov = localStorage.getItem('gym_novedades');
-          const localParsed: Novedad[] = localNov ? JSON.parse(localNov) : [];
-          const localNovedades = localParsed.filter(n => !(n.titulo?.includes('Gracias por tu pago') && !n.socio_id));
-          const dbIds = new Set(mappedNovedades.map(n => n.id));
-          const localFaltantes = localNovedades.filter(n => !dbIds.has(n.id));
-
-          if (localFaltantes.length > 0) {
-            const toUpsert = localFaltantes.map(n => ({
-              id: n.id,
-              titulo: n.titulo,
-              contenido: n.contenido,
-              fecha: n.fecha,
-              categoria: n.categoria,
-              creado_por: n.creado_por,
-              destacado: n.destacado,
-              ...(n.socio_id ? { socio_id: n.socio_id } : {})
-            }));
-            supabase.from('novedades').upsert(toUpsert, { onConflict: 'id' }).then(({ error }) => {
-              if (error) console.warn('[KAHA] No se pudieron subir novedades locales a Supabase:', error.message);
-              else console.log(`✅ Novedades: ${toUpsert.length} novedad(es) local(es) sincronizadas a Supabase`);
-            });
-          }
-
-          const merged = [...localFaltantes, ...mappedNovedades];
-          setNovedades(merged);
-          localStorage.setItem('gym_novedades', JSON.stringify(merged));
+          // Supabase es la fuente de verdad única para novedades: no resucitar novedades eliminadas desde localStorage
+          setNovedades(mappedNovedades);
+          localStorage.setItem('gym_novedades', JSON.stringify(mappedNovedades));
         }
       } catch (novErr) {
         // Error inesperado: usar localStorage
@@ -925,9 +945,34 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             creado_at: g.creado_at
           }));
 
+          // Deduplicación defensiva en memoria / carga:
+          // Si por reintentos o ejecuciones simultáneas existen gastos con mismo concepto, monto y mes,
+          // nos quedamos con uno solo y purgamos el duplicado obsoleto.
+          const cleanGastos: Gasto[] = [];
+          const vistosKey = new Set<string>();
+          for (const g of mappedGastos) {
+            const mes = (g.fecha || '').slice(0, 7);
+            const conc = (g.concepto || '').trim().toLowerCase();
+            const dupKey = (g.categoria === 'ALQUILER' || g.categoria === 'PROFESORES')
+              ? `${g.categoria}__${conc}__${g.monto}__${mes}`
+              : null;
+
+            if (dupKey) {
+              if (vistosKey.has(dupKey)) {
+                console.warn(`[KAHA] Gasto duplicado omitido en carga: ${g.concepto} ($${g.monto}) id: ${g.id}`);
+                if (supabase) {
+                  supabase.from('gastos').delete().eq('id', g.id).then();
+                }
+                continue;
+              }
+              vistosKey.add(dupKey);
+            }
+            cleanGastos.push(g);
+          }
+
           // Supabase es la fuente de verdad única para gastos: no resucitar gastos eliminados desde localStorage
-          setGastos(mappedGastos);
-          localStorage.setItem('gym_gastos', JSON.stringify(mappedGastos));
+          setGastos(cleanGastos);
+          localStorage.setItem('gym_gastos', JSON.stringify(cleanGastos));
         }
       } catch (gErr) {
         console.warn('[KAHA] Error al cargar gastos de Supabase:', gErr);
@@ -3795,15 +3840,27 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const reordenarEsperaTurno = (turnoId: string, fecha: string, nuevoOrdenClienteIds: string[]) => {
+    // Calculamos una base temporal usando la fecha más temprana de los que están en esta espera
+    const entriesCoincidentes = waitlistReservas.filter(w => w.turno_id === turnoId && w.fecha === fecha);
+    const earliestTime = entriesCoincidentes.length > 0
+      ? Math.min(...entriesCoincidentes.map(w => new Date(w.creado_at).getTime()).filter(t => !isNaN(t) && t > 0))
+      : (Date.now() - 3600000);
+    const baseTime = !isNaN(earliestTime) && earliestTime < Date.now() ? earliestTime : (Date.now() - 3600000);
+
+    const updatesParaDb: Array<{ id: string; creado_at: string }> = [];
+
     setWaitlistReservas(prev => {
-      const baseTime = Date.now();
       const updated = prev.map(w => {
         if (w.turno_id === turnoId && w.fecha === fecha) {
           const idx = nuevoOrdenClienteIds.indexOf(w.cliente_id);
           if (idx !== -1) {
+            const nuevoCreadoAt = new Date(baseTime + idx * 1000).toISOString();
+            if (w.id && !w.id.startsWith('matriz-auto-') && !w.id.startsWith('vip-auto-')) {
+              updatesParaDb.push({ id: w.id, creado_at: nuevoCreadoAt });
+            }
             return {
               ...w,
-              creado_at: new Date(baseTime + idx * 1000).toISOString()
+              creado_at: nuevoCreadoAt
             };
           }
         }
@@ -3812,7 +3869,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('gym_waitlist_reservas', JSON.stringify(updated));
       return updated;
     });
-    addToast('success', 'Orden de lista de espera actualizado.');
+
+    if (supabase && updatesParaDb.length > 0) {
+      Promise.all(
+        updatesParaDb.map(u =>
+          supabase.from('lista_espera_reservas').update({ creado_at: u.creado_at }).eq('id', u.id)
+        )
+      ).then(() => {
+        console.log(`[Supabase] ${updatesParaDb.length} registros de lista_espera_reservas actualizados en Supabase.`);
+      }).catch(err => {
+        console.warn('Error al actualizar orden en lista_espera_reservas:', err);
+      });
+    }
+
+    addAuditLog('ESPERA_REORDENADA', { turno_id: turnoId, fecha, nuevo_orden: nuevoOrdenClienteIds });
+    addToast('success', 'Orden de lista de espera guardado.');
   };
 
   const procesarPromocionListaEspera = (

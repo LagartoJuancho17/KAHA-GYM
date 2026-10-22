@@ -203,7 +203,7 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
 
     // 1. Alumnos fijos de este día de la semana
     (clientes || []).forEach(c => {
-      if (c.estado !== 'ACTIVO' && c.estado !== 'PENDIENTE_PAGO') return;
+      if (c.estado !== 'ACTIVO' && (c.estado as any) !== 'PENDIENTE_PAGO') return;
       if (!Array.isArray(c.turnos_fijos)) return;
       if (c.turnos_fijos.some(tf => tf.toUpperCase().startsWith(diaNombre))) {
         if (c.email && !c.email.toLowerCase().startsWith('invitado-') && !c.email.endsWith('@kaha.com')) {
@@ -217,7 +217,7 @@ export const FeriadosConfigModal: React.FC<FeriadosConfigModalProps> = ({ isOpen
 
     // 2. Alumnos con reserva individual o recupero en esta fecha
     (turnos || []).filter(t => t.dia === diaNombre).forEach(t => {
-      (t.participantes || []).forEach(p => {
+      ((t as any).participantes || []).forEach((p: any) => {
         if (typeof p === 'object' && p.fecha === f.fecha) {
           const c = (clientes || []).find(cli => cli.id === p.clienteId);
           if (c && c.email && !c.email.toLowerCase().startsWith('invitado-') && !c.email.endsWith('@kaha.com')) {
