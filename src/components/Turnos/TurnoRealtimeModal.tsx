@@ -1,5 +1,4 @@
-// src/components/Turnos/TurnoRealtimeModal.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle, Mail, CalendarOff } from 'lucide-react';
@@ -31,7 +30,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
     actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo,
     profesores, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
-    reordenarEsperaTurno
+    reordenarEsperaTurno, procesarPromocionListaEspera, sincronizarEsperaTurno
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
@@ -54,6 +53,15 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   // Estado para el modal de Email a Alumnos de la Clase
   const [showEmailModal, setShowEmailModal] = useState(false);
+
+  const autoPromoteTriggeredRef = useRef<string>('');
+
+  // Sincronizar lista de espera desde Supabase para asegurar datos frescos
+  useEffect(() => {
+    sincronizarEsperaTurno(selectedSlot.id, selectedSlot.date);
+  }, [selectedSlot.id, selectedSlot.date, sincronizarEsperaTurno]);
+
+
 
   const getCellRealtimeData = (turnoId: string, fecha: string) => {
     const turno = turnos.find(t => t.id === turnoId);
@@ -105,6 +113,18 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         };
       });
   }, [waitlistReservas, selectedSlot.id, selectedSlot.date, clientes, sociosPrioritarios, turnos]);
+
+  // Auto-promover por defecto si hay cupos disponibles y alumnos en lista de espera
+  useEffect(() => {
+    if (!isFull && waitlistItems.length > 0) {
+      const candidateIds = waitlistItems.map(w => w.clienteId).join(',');
+      const signature = `${selectedSlot.id}_${selectedSlot.date}_${candidateIds}_${rtData.total}`;
+      if (autoPromoteTriggeredRef.current !== signature) {
+        autoPromoteTriggeredRef.current = signature;
+        procesarPromocionListaEspera(selectedSlot.id, selectedSlot.date);
+      }
+    }
+  }, [isFull, waitlistItems, selectedSlot.id, selectedSlot.date, rtData.total, procesarPromocionListaEspera]);
   
   // Gestión de Profesor y Suplencias para este turno y fecha
   const novedadSuplencia = useMemo(() => {
@@ -617,15 +637,9 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                   <ListOrdered className="w-4 h-4 text-amber-600" />
                   <span>Lista de Espera ({waitlistItems.length})</span>
                 </div>
-                {!isFull ? (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 animate-pulse">
-                    ¡Hay cupo disponible!
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-amber-700 font-semibold">
-                    Auto-promoción al liberarse un cupo
-                  </span>
-                )}
+                <span className="text-[10px] text-amber-700 font-semibold">
+                  Auto-promoción al liberarse un cupo
+                </span>
               </div>
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
                 {waitlistItems.map((wl, idx) => (
@@ -675,41 +689,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                           </button>
                         </div>
                       )}
-                      {!isFull && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setRealtimeError(null);
-                            setRealtimeSuccess(null);
-                            const turnoObj = turnos.find(t => t.id === selectedSlot.id);
-                            const hayLugarFijo = turnoObj ? (turnoObj.asignados_ids || []).length < turnoObj.cupo_maximo : false;
 
-                            if (wl.esMatrizFija && hayLugarFijo) {
-                              asignarClienteFijo(wl.clienteId, selectedSlot.id);
-                              if (wl.id && !wl.id.startsWith('matriz-auto-')) {
-                                removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
-                              }
-                              setRealtimeSuccess(`✅ ¡${wl.nombre} promovido a cupo fijo exitosamente!`);
-                            } else {
-                              const res = await crearReservaIndividual(wl.clienteId, selectedSlot.id, selectedSlot.date);
-                              if (res.success && !res.putInWaitlist) {
-                                removerListaEsperaReserva(wl.clienteId, selectedSlot.id, selectedSlot.date);
-                                setRealtimeSuccess(`✅ ¡${wl.nombre} asignado a la clase exitosamente!`);
-                              } else if (res.putInWaitlist) {
-                                setRealtimeError(res.message || 'El turno sigue completo. El alumno permanece en lista de espera.');
-                              } else {
-                                setRealtimeError(res.message);
-                              }
-                            }
-                            setTimeout(() => setRealtimeSuccess(null), 4000);
-                          }}
-                          className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-xs cursor-pointer border-none transition-all"
-                          title="Asignar cupo disponible a este socio"
-                        >
-                          <UserCheck className="w-3 h-3" />
-                          <span>Promover</span>
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() => {

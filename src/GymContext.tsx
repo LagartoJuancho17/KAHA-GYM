@@ -68,6 +68,8 @@ interface GymContextType {
   agregarListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
   removerListaEsperaReserva: (clienteId: string, turnoId: string, fecha: string) => { success: boolean; message: string };
   reordenarEsperaTurno: (turnoId: string, fecha: string, nuevoOrdenClienteIds: string[]) => void;
+  procesarPromocionListaEspera: (turnoId: string, fecha: string, currentClientes?: Cliente[], excludeClienteId?: string) => Cliente[];
+  sincronizarEsperaTurno: (turnoId: string, fecha: string) => Promise<void>;
 
   // Clientes Methods
   addCliente: (cliente: Omit<Cliente, 'id' | 'creado_at' | 'deuda_acumulada' | 'ultimo_mes_pagado' | 'estado' | 'turnos_fijos' | 'activo'> & { tipo?: TipoCliente; turnos_fijos?: string[]; deuda_acumulada?: number; allowDuplicate?: boolean; initialReservaIndividual?: { turno_id: string; fecha: string }; initialWaitlistReserva?: { turno_id: string; fecha: string } }) => { success: boolean; message: string; duplicate?: boolean; id?: string };
@@ -3788,6 +3790,15 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fecha 
     });
 
+    // Si el turno en esta fecha tiene cupos disponibles, auto-promover inmediatamente por defecto
+    const turno = turnos.find(t => t.id === turnoId || t.db_uuid === turnoId);
+    if (turno) {
+      const ocupacion = calcularOcupacion(turno, fecha, clientes, recuperos).total;
+      if (ocupacion < turno.cupo_maximo) {
+        procesarPromocionListaEspera(turnoId, fecha);
+      }
+    }
+
     return { success: true, message: 'Te has anotado en la lista de espera exitosamente.' };
   };
 
@@ -3889,32 +3900,31 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const procesarPromocionListaEspera = (
     turnoId: string, 
     fecha: string, 
-    currentClientes: Cliente[],
+    currentClientes?: Cliente[],
     excludeClienteId?: string
   ): Cliente[] => {
-    // ITERATIVO con una copia LOCAL de la espera, no recursivo sobre el closure de
-    // `waitlistReservas`. Antes, cuando el primero de la cola era invalido (socio
-    // dado de baja mientras esperaba), el codigo hacia
-    // `setWaitlistReservas(filtrado)` y se LLAMABA A SI MISMO — pero `setState` no
-    // actualiza la variable del closure de forma sincronica, asi que la llamada
-    // recursiva volvia a leer el MISMO `waitlistReservas` de siempre, encontraba
-    // la MISMA entrada invalida, y recursaba de nuevo: recursion infinita real
-    // (stack overflow) cada vez que un candidato de la espera estuviera inactivo.
-    // La baja de un socio (bajaLogicaCliente) ahora limpia sus filas de espera,
-    // pero igual conviene que esta funcion no dependa de eso para no crashear.
-    let esperaLocal = waitlistReservas;
+    const turno = turnos.find(t => t.id === turnoId || t.db_uuid === turnoId);
+    const baseClientes = currentClientes || clientes;
+    if (!turno) return baseClientes;
+
+    let updatedList = [...baseClientes];
+    let esperaLocal = [...waitlistReservas];
     if (excludeClienteId) {
       esperaLocal = esperaLocal.filter(w => !(w.cliente_id === excludeClienteId && w.turno_id === turnoId && w.fecha === fecha));
     }
     const entradasAEliminar: typeof waitlistReservas = [];
-
-    let candidateClient: Cliente | undefined;
-    let nextWaitlistEntry: (typeof waitlistReservas)[number] | undefined;
+    const promovidos: Array<{ cliente: Cliente; waitlistEntry: (typeof waitlistReservas)[number] }> = [];
 
     while (true) {
-      const waitingList = esperaDelTurno(esperaLocal, turnoId, fecha, sociosPrioritarios, { clientes: currentClientes, turnos });
+      // 1. Verificar si hay cupo disponible en el turno para esta fecha
+      const ocupacionActual = calcularOcupacion(turno, fecha, updatedList, recuperos).total;
+      if (ocupacionActual >= turno.cupo_maximo) {
+        break;
+      }
+
+      // 2. Obtener lista de espera ordenada para este turno y fecha
+      const waitingList = esperaDelTurno(esperaLocal, turnoId, fecha, sociosPrioritarios, { clientes: updatedList, turnos });
       if (waitingList.length === 0) {
-        candidateClient = undefined;
         break;
       }
       const candidato = waitingList[0];
@@ -3926,22 +3936,47 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         continue;
       }
 
-      const cliente = currentClientes.find(c => c.id === candidato.cliente_id && c.activo);
-      if (cliente) {
-        candidateClient = cliente;
-        nextWaitlistEntry = candidato;
-        break;
+      const cliente = updatedList.find(c => c.id === candidato.cliente_id && c.activo);
+      if (!cliente) {
+        // Entrada inválida (socio inactivo o inexistente)
+        entradasAEliminar.push(candidato);
+        esperaLocal = esperaLocal.filter(w => w.id !== candidato.id);
+        continue;
       }
-      // Entrada invalida (socio inactivo): se saca de la copia LOCAL y se sigue
-      // el loop sobre esa copia, nunca sobre el closure viejo.
-      entradasAEliminar.push(candidato);
-      esperaLocal = esperaLocal.filter(w => w.id !== candidato.id);
+
+      // Validar si el cliente ya tiene reserva o clase fija activa hoy en este turno
+      const yaTieneReserva = (cliente.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === fecha);
+      const yaEsFijoActivo = cliente.turnos_fijos.includes(turnoId) && !(cliente.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === fecha);
+      if (yaTieneReserva || yaEsFijoActivo) {
+        entradasAEliminar.push(candidato);
+        esperaLocal = esperaLocal.filter(w => w.id !== candidato.id);
+        continue;
+      }
+
+      // Auto-promote candidate
+      const nuevaReservaAuto: ReservaIndividual = {
+        id: `res-auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        turno_id: turnoId,
+        fecha,
+        creado_at: new Date().toISOString()
+      };
+
+      updatedList = updatedList.map(c => {
+        if (c.id === cliente.id) {
+          return {
+            ...c,
+            reservas_individuales: [...(c.reservas_individuales || []), nuevaReservaAuto]
+          };
+        }
+        return c;
+      });
+
+      promovidos.push({ cliente, waitlistEntry: candidato });
+      esperaLocal = esperaLocal.filter(w => w.id !== candidato.id && !(w.cliente_id === candidato.cliente_id && w.turno_id === turnoId && w.fecha === fecha));
     }
 
-    // Persistir de una sola vez las entradas invalidas que se fueron descartando.
+    // Persistir de una sola vez las entradas inválidas que se fueron descartando
     if (entradasAEliminar.length > 0) {
-      setWaitlistReservas(esperaLocal);
-      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(esperaLocal));
       entradasAEliminar.forEach(e => {
         if (!e.id.startsWith('matriz-auto-') && !e.id.startsWith('vip-auto-')) {
           persistirEsperaEnSupabase('baja', e.cliente_id, turnoId, fecha);
@@ -3949,81 +3984,110 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    if (!candidateClient || !nextWaitlistEntry) return currentClientes;
+    if (promovidos.length > 0) {
+      setWaitlistReservas(esperaLocal);
+      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(esperaLocal));
 
-    // Auto-promote candidate
-    const nuevaReservaAuto: ReservaIndividual = {
-      id: `res-auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      turno_id: turnoId,
-      fecha,
-      creado_at: new Date().toISOString()
-    };
+      if (!currentClientes) {
+        setClientes(updatedList);
+        saveState(updatedList, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+      }
 
-    const updatedList = currentClientes.map(c => {
-      if (c.id === candidateClient.id) {
-        return {
-          ...c,
-          reservas_individuales: [...(c.reservas_individuales || []), nuevaReservaAuto]
+      const horaClase = turno ? turno.hora : '00:00';
+
+      for (const { cliente, waitlistEntry } of promovidos) {
+        if (supabase) {
+          const promovido = updatedList.find(c => c.id === cliente.id);
+          if (promovido) {
+            supabase.from('clientes')
+              .update({ reservas_individuales: promovido.reservas_individuales || [] })
+              .eq('id', cliente.id)
+              .then(({ error }) => {
+                if (error) console.error('Error al persistir la reserva del socio promovido:', error);
+              });
+          }
+        }
+
+        if (!waitlistEntry.id.startsWith('matriz-auto-') && !waitlistEntry.id.startsWith('vip-auto-')) {
+          persistirEsperaEnSupabase('baja', waitlistEntry.cliente_id, turnoId, fecha);
+        }
+
+        const newNotif: AlertaNotificacion = {
+          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          tipo: 'SISTEMA',
+          titulo: '¡Cupo Asignado por Lista de Espera!',
+          mensaje: `Se liberó un cupo y fuiste promovido al turno de las ${horaClase} hs el día ${fecha}.`,
+          fecha: new Date().toISOString(),
+          leido: false
         };
-      }
-      return c;
-    });
 
-    // Persistir la reserva del promovido. Antes esto solo vivia en memoria y en
-    // localStorage: el socio entraba en la pantalla del admin pero su reserva nunca
-    // llegaba a la base, asi que al recargar desaparecia y el lugar quedaba libre
-    // otra vez. Los callers hacen saveState() pero ninguno sube este cliente.
-    if (supabase) {
-      const promovido = updatedList.find(c => c.id === candidateClient.id);
-      if (promovido) {
-        supabase.from('clientes')
-          .update({ reservas_individuales: promovido.reservas_individuales || [] })
-          .eq('id', candidateClient.id)
-          .then(({ error }) => {
-            if (error) console.error('Error al persistir la reserva del socio promovido:', error);
-          });
+        try {
+          const storedNotifs = localStorage.getItem('gym_notificaciones');
+          const parsedNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
+          localStorage.setItem('gym_notificaciones', JSON.stringify([newNotif, ...parsedNotifs]));
+          setNotificaciones([newNotif, ...parsedNotifs]);
+        } catch(e) {}
+
+        addAuditLog('LISTA_ESPERA_PROMOCION_AUTO', {
+          cliente: `${cliente.nombre} ${cliente.apellido}`,
+          turno_id: turnoId,
+          fecha
+        });
+
+        notificarAltaWaitlist(cliente.id, turnoId, fecha);
       }
+    } else if (entradasAEliminar.length > 0) {
+      setWaitlistReservas(esperaLocal);
+      localStorage.setItem('gym_waitlist_reservas', JSON.stringify(esperaLocal));
     }
 
-    // Remove from waitlist (local + Supabase: ya entro a la clase, no espera mas).
-    // Filtra sobre `esperaLocal` (ya sin las entradas invalidas descartadas arriba
-    // en este mismo llamado), no sobre el `waitlistReservas` del closure: ese
-    // sigue siendo la foto vieja hasta el proximo render, y filtrar desde ahi
-    // resucitaria las entradas invalidas que recien se habian sacado.
-    const newWl = esperaLocal.filter(w => w.id !== nextWaitlistEntry!.id && !(w.cliente_id === nextWaitlistEntry!.cliente_id && w.turno_id === turnoId && w.fecha === fecha));
-    setWaitlistReservas(newWl);
-    localStorage.setItem('gym_waitlist_reservas', JSON.stringify(newWl));
-    persistirEsperaEnSupabase('baja', nextWaitlistEntry.cliente_id, turnoId, fecha);
-
-    // Send internal notification to nextClient
-    const turno = turnos.find(t => t.id === turnoId);
-    const horaClase = turno ? turno.hora : '00:00';
-    const newNotif: AlertaNotificacion = {
-      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      tipo: 'SISTEMA',
-      titulo: '¡Cupo Asignado por Lista de Espera!',
-      mensaje: `Se liberó un cupo y fuiste promovido al turno de las ${horaClase} hs el día ${fecha}.`,
-      fecha: new Date().toISOString(),
-      leido: false
-    };
-
-    try {
-      const storedNotifs = localStorage.getItem('gym_notificaciones');
-      const parsedNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
-      localStorage.setItem('gym_notificaciones', JSON.stringify([newNotif, ...parsedNotifs]));
-      setNotificaciones([newNotif, ...parsedNotifs]);
-    } catch(e) {}
-
-    addAuditLog('LISTA_ESPERA_PROMOCION_AUTO', {
-      cliente: `${candidateClient.nombre} ${candidateClient.apellido}`,
-      turno_id: turnoId,
-      fecha
-    });
-
-    // Notificar al socio promovido (Email + Modal en App)
-    notificarAltaWaitlist(candidateClient.id, turnoId, fecha);
-
     return updatedList;
+  };
+
+  const sincronizarEsperaTurno = async (turnoId: string, fecha: string): Promise<void> => {
+    if (!supabase) return;
+    try {
+      const turnoUuid = await resolveTurnoUuid(turnoId);
+      if (!turnoUuid) return;
+      const { data: remoteWl, error: wlErr } = await supabase
+        .from('lista_espera_reservas')
+        .select('*')
+        .eq('turno_id', turnoUuid)
+        .eq('fecha', fecha);
+      if (!wlErr && remoteWl) {
+        setWaitlistReservas(prevWl => {
+          const otherSlots = prevWl.filter(w => !(w.turno_id === turnoId && w.fecha === fecha));
+          const currentSlotLocal = prevWl.filter(w => w.turno_id === turnoId && w.fecha === fecha);
+          const mappedRemote: WaitlistReserva[] = remoteWl.map(rw => ({
+            id: rw.id,
+            cliente_id: rw.cliente_id,
+            turno_id: turnoId,
+            fecha: rw.fecha,
+            creado_at: rw.creado_at
+          }));
+          const combinedSlot = [...mappedRemote];
+          currentSlotLocal.forEach(loc => {
+            if (!combinedSlot.some(c => c.cliente_id === loc.cliente_id)) {
+              combinedSlot.push(loc);
+            }
+          });
+          const combinedAll = [...otherSlots, ...combinedSlot];
+          localStorage.setItem('gym_waitlist_reservas', JSON.stringify(combinedAll));
+          return combinedAll;
+        });
+
+        // Si hay vacante disponible, auto-promover inmediatamente por defecto
+        const turno = turnos.find(t => t.id === turnoId || t.db_uuid === turnoId);
+        if (turno) {
+          const ocupacion = calcularOcupacion(turno, fecha, clientes, recuperos).total;
+          if (ocupacion < turno.cupo_maximo) {
+            procesarPromocionListaEspera(turnoId, fecha);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error al sincronizar espera del turno:', e);
+    }
   };
 
   const cancelarReservaIndividual = (clienteId: string, reservaId: string) => {
@@ -4081,6 +4145,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const finalClientes = procesarPromocionListaEspera(reserva.turno_id, reserva.fecha, updatedClientes, clienteId);
     saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    sincronizarEsperaTurno(reserva.turno_id, reserva.fecha);
 
     if (supabase) {
       const targetClient = finalClientes.find(c => c.id === clienteId);
@@ -4150,6 +4215,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const finalClientes = procesarPromocionListaEspera(turnoId, fecha, updatedClientes, clienteId);
     saveState(finalClientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs);
+    sincronizarEsperaTurno(turnoId, fecha);
 
     if (supabase) {
       const targetClient = finalClientes.find(c => c.id === clienteId);
@@ -5930,6 +5996,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       googleUser, signInWithGoogle, signInWithEmailAndPassword, signOutGoogle,
       pendingRegistrationUser, completeSocioRegistration,
       waitlistReservas, agregarListaEsperaReserva, removerListaEsperaReserva, reordenarEsperaTurno,
+      procesarPromocionListaEspera, sincronizarEsperaTurno,
       sociosPrioritarios, marcarSocioPrioritario, quitarSocioPrioritario,
       addCliente, updateCliente, autorizarCliente, bajaLogicaCliente, ponerEnReposo, sacarDeReposo, altaCliente, eliminarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, retomarSocioPausado, postergarPausaSocio, bajaClasesSocio, importarClientesCSV,
       updatePrecioPlan,

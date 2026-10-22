@@ -299,3 +299,31 @@ test('Matriz Fija: no se sintetiza si ya tiene reserva confirmada en esa fecha p
   assert.equal(espera21[0].cliente_id, 'jaqueline');
 });
 
+test('Auto-promoción secuencial: al ser promovido un alumno, el siguiente toma P1', () => {
+  const turnos = [{ id: 'VIERNES-08:30', lista_espera_ids: [] }];
+  let clientes = [
+    { id: 'eugenia', activo: true, turnos_fijos: [], reservas_individuales: [] },
+    { id: 'martin', activo: true, turnos_fijos: [], reservas_individuales: [] }
+  ];
+  let waitlist = [
+    w('1', 'eugenia', '2026-10-22T11:23:00Z', 'VIERNES-08:30', '2026-10-23'),
+    w('2', 'martin', '2026-10-22T11:30:00Z', 'VIERNES-08:30', '2026-10-23')
+  ];
+
+  // Primer paso: eugenia es la primera en entrar
+  const proximo1 = proximoEnEntrar(waitlist, 'VIERNES-08:30', '2026-10-23', new Set(), { clientes, turnos });
+  assert.equal(proximo1?.cliente_id, 'eugenia');
+
+  // Eugenia es promovida a la clase (recibe reserva)
+  clientes = clientes.map(c => c.id === 'eugenia'
+    ? { ...c, reservas_individuales: [{ turno_id: 'VIERNES-08:30', fecha: '2026-10-23' }] }
+    : c
+  );
+  waitlist = waitlist.filter(w => w.cliente_id !== 'eugenia');
+
+  // Segundo paso: ahora martin es el siguiente en entrar para el segundo cupo libre
+  const proximo2 = proximoEnEntrar(waitlist, 'VIERNES-08:30', '2026-10-23', new Set(), { clientes, turnos });
+  assert.equal(proximo2?.cliente_id, 'martin');
+});
+
+
