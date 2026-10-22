@@ -128,9 +128,9 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
     individuales: activeIndividualReservations.length
   }), [socio.turnos_fijos, diasPorSemanaSocio, currentCalendarMonth, reintegratedSuspensionsCount, activeIndividualReservations]);
 
-  const totalMonthlySlots = balance.tope;
+  const totalMonthlySlots = Math.max(balance.tope, balance.fijas);
   const usedSlots = balance.usados;
-  const availableSlots = balance.libres;
+  const availableSlots = Math.max(0, totalMonthlySlots - usedSlots);
 
   // Unified sessions list (excluding past dates, including next month)
   const sesionesDelMes = useMemo(() => {
@@ -314,22 +314,16 @@ export const SocioReservas: React.FC<SocioReservasProps> = ({
           </div>
           <div className="space-y-1">
             <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">
-              {balance.excedidos > 0 ? 'Clases por encima del plan' : 'Cupos Libres por Asignar'}
+              Cupos Libres por Asignar
             </p>
             <div className="flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${
-                balance.excedidos > 0 ? 'bg-amber-500' : availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                availableSlots > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
               }`}></span>
-              <p className={`text-lg font-black ${balance.excedidos > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
-                {balance.excedidos > 0 ? `+${balance.excedidos}` : availableSlots}
+              <p className="text-lg font-black text-slate-800">
+                {availableSlots}
               </p>
             </div>
-            {/* El tope es informativo: pasarse no impide reservar, solo se avisa. */}
-            {balance.excedidos > 0 && (
-              <p className="text-[9px] text-amber-600 leading-tight">
-                Podés seguir reservando; se te contabilizan como extra.
-              </p>
-            )}
           </div>
         </div>
 
