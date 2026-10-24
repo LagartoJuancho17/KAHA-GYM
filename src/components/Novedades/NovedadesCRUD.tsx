@@ -4,6 +4,7 @@ import { Novedad } from '../../types';
 import { Megaphone, Plus, Check, Search } from 'lucide-react';
 import { NovedadFormModal } from './NovedadFormModal';
 import { NovedadesList } from './NovedadesList';
+import { NovedadEmailModal } from './NovedadEmailModal';
 
 export const NovedadesCRUD: React.FC = () => {
   const { novedades, updateNovedad, deleteNovedad } = useGym();
@@ -11,7 +12,9 @@ export const NovedadesCRUD: React.FC = () => {
   // States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingNovedad, setEditingNovedad] = useState<Novedad | null>(null);
+  const [emailNovedad, setEmailNovedad] = useState<Novedad | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
+
   const [buscarText, setBuscarText] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -145,6 +148,7 @@ export const NovedadesCRUD: React.FC = () => {
         onEdit={openEditModal}
         onDelete={handleDelete}
         onToggleDestacada={handleToggleDestacada}
+        onSendEmail={(nov) => setEmailNovedad(nov)}
         filterCategory={filterCategory}
       />
 
@@ -153,6 +157,14 @@ export const NovedadesCRUD: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         editingNovedad={editingNovedad}
+        onSuccess={handleShowSuccess}
+      />
+
+      {/* EMAIL MODAL PANEL */}
+      <NovedadEmailModal
+        isOpen={!!emailNovedad}
+        onClose={() => setEmailNovedad(null)}
+        novedad={emailNovedad}
         onSuccess={handleShowSuccess}
       />
 

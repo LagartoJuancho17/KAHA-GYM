@@ -1,8 +1,8 @@
-// src/components/Novedades/NovedadFormModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Novedad } from '../../types';
-import { Megaphone, AlertCircle, X } from 'lucide-react';
+import { Megaphone, AlertCircle, X, Mail } from 'lucide-react';
+import { getDestinatariosNovedad, enviarNovedadEmailBackend } from '../../lib/emailNovedades';
 
 interface NovedadFormModalProps {
   isOpen: boolean;
@@ -17,7 +17,7 @@ export const NovedadFormModal: React.FC<NovedadFormModalProps> = ({
   editingNovedad,
   onSuccess
 }) => {
-  const { addNovedad, updateNovedad, googleUser } = useGym();
+  const { addNovedad, updateNovedad, googleUser, clientes } = useGym();
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -25,7 +25,13 @@ export const NovedadFormModal: React.FC<NovedadFormModalProps> = ({
     categoria: 'INFORMACION' as Novedad['categoria'],
     destacado: false
   });
+  const [enviarPorEmail, setEnviarPorEmail] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const destinatariosValidos = useMemo(() => {
+    return getDestinatariosNovedad(clientes, editingNovedad?.socio_id);
+  }, [clientes, editingNovedad]);
 
   useEffect(() => {
     if (editingNovedad) {
@@ -35,6 +41,7 @@ export const NovedadFormModal: React.FC<NovedadFormModalProps> = ({
         categoria: editingNovedad.categoria,
         destacado: editingNovedad.destacado
       });
+      setEnviarPorEmail(false); // Por defecto en edición no reenviar salvo que lo marquen
     } else {
       setFormData({
         titulo: '',
@@ -42,13 +49,14 @@ export const NovedadFormModal: React.FC<NovedadFormModalProps> = ({
         categoria: 'INFORMACION',
         destacado: false
       });
+      setEnviarPorEmail(true); // Por defecto al crear nueva, enviar por email
     }
     setErrorMsg(null);
   }, [editingNovedad, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -58,36 +66,74 @@ export const NovedadFormModal: React.FC<NovedadFormModalProps> = ({
     }
 
     const autor = googleUser?.email || 'admin@gimnasio.com.ar';
+    setIsSubmitting(true);
 
-    if (editingNovedad) {
-      const res = updateNovedad(editingNovedad.id, {
-        titulo: formData.titulo,
-        contenido: formData.contenido,
-        categoria: formData.categoria,
-        destacado: formData.destacado
-      });
-      if (res.success) {
-        onSuccess('Novedad actualizada con éxito.');
-        onClose();
+    try {
+      if (editingNovedad) {
+        const res = updateNovedad(editingNovedad.id, {
+          titulo: formData.titulo,
+          contenido: formData.contenido,
+          categoria: formData.categoria,
+          destacado: formData.destacado
+        });
+        if (res.success) {
+          if (enviarPorEmail && destinatariosValidos.length > 0) {
+            const novActualizada: Novedad = {
+              ...editingNovedad,
+              titulo: formData.titulo,
+              contenido: formData.contenido,
+              categoria: formData.categoria,
+              destacado: formData.destacado
+            };
+            enviarNovedadEmailBackend({
+              novedad: novActualizada,
+              destinatarios: destinatariosValidos
+            }).catch(err => console.warn('Error al despachar emails de novedad:', err));
+            onSuccess(`Novedad actualizada y enviada a ${destinatariosValidos.length} socios por email.`);
+          } else {
+            onSuccess('Novedad actualizada con éxito.');
+          }
+          onClose();
+        } else {
+          setErrorMsg(res.message);
+        }
       } else {
-        setErrorMsg(res.message);
+        const res = addNovedad({
+          titulo: formData.titulo,
+          contenido: formData.contenido,
+          categoria: formData.categoria,
+          destacado: formData.destacado,
+          creado_por: autor
+        });
+        if (res.success) {
+          if (enviarPorEmail && destinatariosValidos.length > 0) {
+            const newNov: Novedad = {
+              id: res.id || `nov-${Date.now()}`,
+              titulo: formData.titulo,
+              contenido: formData.contenido,
+              categoria: formData.categoria,
+              destacado: formData.destacado,
+              creado_por: autor,
+              fecha: new Date().toISOString()
+            };
+            enviarNovedadEmailBackend({
+              novedad: newNov,
+              destinatarios: destinatariosValidos
+            }).catch(err => console.warn('Error al despachar emails de novedad:', err));
+            onSuccess(`Novedad publicada y enviada a ${destinatariosValidos.length} socios por email.`);
+          } else {
+            onSuccess('Novedad publicada con éxito.');
+          }
+          onClose();
+        } else {
+          setErrorMsg(res.message);
+        }
       }
-    } else {
-      const res = addNovedad({
-        titulo: formData.titulo,
-        contenido: formData.contenido,
-        categoria: formData.categoria,
-        destacado: formData.destacado,
-        creado_por: autor
-      });
-      if (res.success) {
-        onSuccess('Novedad publicada con éxito.');
-        onClose();
-      } else {
-        setErrorMsg(res.message);
-      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs select-none animate-fade-in font-sans">
@@ -178,22 +224,52 @@ export const NovedadFormModal: React.FC<NovedadFormModalProps> = ({
             />
           </div>
 
+          {/* Enviar por Correo Electrónico */}
+          <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl transition-all">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={enviarPorEmail}
+                onChange={(e) => setEnviarPorEmail(e.target.checked)}
+                className="mt-0.5 w-4.5 h-4.5 accent-emerald-600 rounded border-emerald-300"
+              />
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-xs">
+                  <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                  {editingNovedad ? 'Enviar actualización por correo electrónico' : 'Enviar por correo electrónico a los socios'}
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-normal">
+                  Se enviará automáticamente a los <strong>{destinatariosValidos.length} socios activos</strong> con email registrado.
+                </p>
+              </div>
+            </label>
+          </div>
+
           {/* Botonera */}
           <div className="flex gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
+              disabled={isSubmitting}
               className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-bold bg-white hover:bg-slate-50 transition-all cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border-none shadow-xs transition-all cursor-pointer"
+              disabled={isSubmitting}
+              className={`flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border-none shadow-xs transition-all cursor-pointer ${
+                isSubmitting ? 'opacity-70 cursor-wait' : ''
+              }`}
             >
-              {editingNovedad ? 'Guardar Cambios' : 'Publicar Ahora'}
+              {isSubmitting
+                ? 'Publicando y enviando...'
+                : editingNovedad
+                  ? (enviarPorEmail ? 'Guardar y Enviar' : 'Guardar Cambios')
+                  : (enviarPorEmail ? 'Publicar y Enviar Mail' : 'Publicar Ahora')}
             </button>
           </div>
+
 
         </form>
       </div>

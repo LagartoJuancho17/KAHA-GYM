@@ -1,13 +1,13 @@
-// src/components/Novedades/NovedadesList.tsx
 import React from 'react';
 import { Novedad } from '../../types';
-import { Megaphone, Calendar, User, Star, Edit3, Trash2 } from 'lucide-react';
+import { Megaphone, Calendar, User, Star, Edit3, Trash2, Mail } from 'lucide-react';
 
 interface NovedadesListProps {
   filteredNovedades: Novedad[];
   onEdit: (nov: Novedad) => void;
   onDelete: (id: string) => void;
   onToggleDestacada: (nov: Novedad) => void;
+  onSendEmail: (nov: Novedad) => void;
   filterCategory: string;
 }
 
@@ -16,8 +16,10 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
   onEdit,
   onDelete,
   onToggleDestacada,
+  onSendEmail,
   filterCategory
 }) => {
+
   const getCategoryTheme = (category: Novedad['categoria']) => {
     switch (category) {
       case 'ARANCELES':
@@ -120,6 +122,14 @@ export const NovedadesList: React.FC<NovedadesListProps> = ({
                   }`}
                 >
                   <Star className={`w-4 h-4 ${nov.destacado ? 'fill-amber-500' : ''}`} />
+                </button>
+
+                <button
+                  onClick={() => onSendEmail(nov)}
+                  title="Enviar por correo electrónico a los socios"
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-all cursor-pointer"
+                >
+                  <Mail className="w-4 h-4 text-emerald-600" />
                 </button>
 
                 <button

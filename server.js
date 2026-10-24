@@ -708,6 +708,182 @@ app.post('/api/send-class-email', async (req, res) => {
   }
 });
 
+// Genera HTML para novedades de KAHA GYM
+function generarHtmlEmailNovedad(novedad, nombreSocio) {
+  const iconos = {
+    ARANCELES: '💰',
+    TURNOS: '📅',
+    EVENTOS: '🎉',
+    INFORMACION: '📢'
+  };
+  const icono = iconos[novedad?.categoria] || '📢';
+  const tag = {
+    ARANCELES: 'Aranceles y Pagos',
+    TURNOS: 'Horarios y Turnos',
+    EVENTOS: 'Talleres y Eventos',
+    INFORMACION: 'Comunicado Oficial'
+  }[novedad?.categoria] || 'Comunicado';
+
+  const firstName = (nombreSocio || 'Socio').trim().split(' ')[0] || 'Socio';
+
+  return `<!doctype html><html><body style="margin:0;background:#062319;font-family:Inter,Arial,sans-serif;color:#1f2937;">
+    <div style="max-width:560px;margin:20px auto;padding:0 16px;">
+      <div style="background:#043d2f;border:1px solid #059669;border-radius:24px 24px 0 0;padding:28px 24px 22px;text-align:center;">
+        <div style="display:inline-block;background:#10b981;color:#043d2f;font-size:11px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;padding:4px 12px;border-radius:9999px;margin-bottom:10px;">KAHA GYM</div>
+        <div style="margin-bottom:6px;">
+          <span style="display:inline-block;background:rgba(255,255,255,0.12);color:#a7f3d0;font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;text-transform:uppercase;">${icono} ${tag}</span>
+          ${novedad?.destacado ? '<span style="display:inline-block;background:#f59e0b;color:#ffffff;font-size:10px;font-weight:900;padding:3px 8px;border-radius:8px;margin-left:6px;text-transform:uppercase;">⭐ Destacado</span>' : ''}
+        </div>
+        <h1 style="color:#ffffff;margin:8px 0 0;font-size:20px;font-weight:900;letter-spacing:-0.02em;">${novedad?.titulo || 'Comunicado'}</h1>
+      </div>
+      <div style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 24px 24px;padding:26px;">
+        <p style="margin:0 0 14px;color:#111827;font-size:14px;font-weight:600;">¡Hola, ${firstName}! 👋</p>
+        <div style="color:#374151;font-size:14px;line-height:1.75;white-space:pre-line;background:#f9fafb;border:1px solid #f3f4f6;border-radius:16px;padding:18px;margin-bottom:20px;">
+${novedad?.contenido || ''}
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px;margin-bottom:18px;text-align:center;">
+          <p style="margin:0;color:#166534;font-size:12px;font-weight:600;">📲 Podés ver todas las circulares y gestionar tus turnos desde tu portal de socio en KAHA GYM.</p>
+        </div>
+        <div style="border-top:1px solid #f3f4f6;padding-top:16px;text-align:center;">
+          <p style="margin:0;color:#059669;font-size:12px;font-weight:700;">Equipo KAHA GYM</p>
+          <p style="margin:3px 0 0;color:#9ca3af;font-size:11px;">Entrenamiento, salud y movimiento 💚</p>
+        </div>
+      </div>
+    </div>
+  </body></html>`;
+}
+
+// Endpoint para enviar novedades y comunicados por email a los socios
+app.post('/api/send-novedad-email', async (req, res) => {
+  try {
+    const { novedad, destinatarios = [] } = req.body || {};
+
+    if (!novedad || !novedad.titulo) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos de la novedad' });
+    }
+
+    let targets = destinatarios;
+    if ((!targets || targets.length === 0) && supabase) {
+      const query = supabase
+        .from('clientes')
+        .select('id, nombre, apellido, email')
+        .eq('activo', true);
+
+      if (novedad.socio_id) {
+        query.eq('id', novedad.socio_id);
+      }
+
+      const { data: clients, error: cliErr } = await query;
+      if (cliErr) throw cliErr;
+      targets = (clients || []).map(c => ({
+        id: c.id,
+        nombre: `${c.nombre} ${c.apellido || ''}`.trim(),
+        email: c.email
+      }));
+    }
+
+    // Filtrar emails válidos y no invitados
+    targets = (targets || []).filter(t => {
+      const clean = String(t.email || '').trim().toLowerCase();
+      const esInvitado = clean.startsWith('invitado-') && clean.endsWith('@kaha.com');
+      return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean) && !esInvitado;
+    });
+
+    if (targets.length === 0) {
+      return res.status(400).json({ ok: false, error: 'No se encontraron destinatarios con email válido' });
+    }
+
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>';
+    const iconos = { ARANCELES: '💰', TURNOS: '📅', EVENTOS: '🎉', INFORMACION: '📢' };
+    const icono = iconos[novedad.categoria] || '📢';
+    const prefijo = novedad.destacado ? '⭐ ' : '';
+    const subject = novedad.asunto || `${prefijo}${icono} ${novedad.titulo} — KAHA GYM`;
+
+    console.log(`>> [send-novedad-email] Enviando novedad "${novedad.titulo}" a ${targets.length} socios...`);
+
+    let enviados = 0;
+    let errores = 0;
+    const fallidos = [];
+
+    if (!apiKey) {
+      console.log(`>> [send-novedad-email] [DEV-SIMULACIÓN] Novedad enviada simulada a ${targets.length} socios.`);
+      return res.status(200).json({
+        ok: true,
+        enviados: targets.length,
+        errores: 0,
+        total: targets.length,
+        simulated: true
+      });
+    }
+
+    // Si hay muchos destinatarios, usar Resend Batch API (hasta 100 por lote)
+    const batchPayload = targets.map(t => {
+      const cleanEmail = String(t.email).trim().toLowerCase();
+      const html = novedad.html || generarHtmlEmailNovedad(novedad, t.nombre);
+      return {
+        from,
+        to: [cleanEmail],
+        subject,
+        html
+      };
+    });
+
+    const chunkSize = 100;
+    for (let i = 0; i < batchPayload.length; i += chunkSize) {
+      const chunk = batchPayload.slice(i, i + chunkSize);
+      try {
+        const resp = await fetch('https://api.resend.com/emails/batch', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(chunk)
+        });
+
+        if (resp.ok) {
+          enviados += chunk.length;
+        } else {
+          const errData = await resp.json().catch(() => ({}));
+          console.error('>> [send-novedad-email] Error de Resend Batch:', errData);
+          errores += chunk.length;
+          fallidos.push({ lote: i, error: errData });
+        }
+      } catch (chunkErr) {
+        console.error('>> [send-novedad-email] Error de conexión Resend:', chunkErr);
+        errores += chunk.length;
+      }
+    }
+
+    // Registrar en logs_auditoria si Supabase está activo
+    if (supabase) {
+      await supabase.from('logs_auditoria').insert({
+        accion: 'EMAIL_NOVEDAD_ENVIADO',
+        detalles: {
+          novedad_id: novedad.id,
+          titulo: novedad.titulo,
+          categoria: novedad.categoria,
+          destinatarios_total: targets.length,
+          enviados,
+          errores,
+          fecha: new Date().toISOString()
+        }
+      }).catch(err => console.warn('>> [send-novedad-email] Error al registrar log:', err.message));
+    }
+
+    console.log(`>> [send-novedad-email] Envío completado: ${enviados} enviados, ${errores} errores.`);
+    return res.status(200).json({
+      ok: true,
+      enviados,
+      errores,
+      total: targets.length,
+      fallidos
+    });
+  } catch (err) {
+    console.error('>> [send-novedad-email] Error general:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 
 // ============================================================================
 // COBRANZA AUTOMÁTICA (día 5 y día 10)
