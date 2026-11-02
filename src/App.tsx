@@ -15,6 +15,7 @@ import { NovedadesCRUD } from './components/Novedades/NovedadesCRUD';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SocioRegistrationForm } from './components/Auth/SocioRegistrationForm';
 import { AuthorizeClientModal } from './components/Clientes/AuthorizeClientModal';
+import { ControlPresentesModal } from './components/Turnos/ControlPresentesModal';
 import { Footer } from './components/Common/Footer';
 import { MensajeMensualReminder } from './components/Notifications/MensajeMensualReminder';
 import logoKaha from './assets/logokaha.png';
@@ -23,7 +24,7 @@ import {
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
   CalendarRange, ShieldAlert, LineChart, ShieldCheck,
   Menu, X, MapPin, Shield, Megaphone, Check, Bell, Trash2,
-  CheckCircle2, AlertTriangle
+  CheckCircle2, AlertTriangle, UserCheck
 } from 'lucide-react';
 
 type TabID = 'DASHBOARD' | 'CLIENTES' | 'PLANES' | 'TURNOS' | 'PAGOS' | 'MOROSIDAD' | 'PROYECCIONES' | 'AUDITORIA' | 'NOVEDADES';
@@ -44,6 +45,7 @@ function InnerApp() {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [authorizingClientId, setAuthorizingClientId] = useState<string | null>(null);
   const [clientToOpenTurnosAfterAuth, setClientToOpenTurnosAfterAuth] = useState<string | null>(null);
+  const [showPresentesModal, setShowPresentesModal] = useState(false);
 
   const handleStartAuthorization = (clientId: string) => {
     setAuthorizingClientId(clientId);
@@ -552,8 +554,23 @@ function InnerApp() {
             </div>
           </div>
 
-          {/* BELL NOTIFICATIONS TRIGGER */}
-          <div className="relative">
+          <div className="flex items-center gap-2">
+            {/* CONTROL DE PRESENTES TRIGGER */}
+            {['ADMIN', 'OPERADOR', 'PROFESOR'].includes(rolActivo) && (
+              <button
+                onClick={() => setShowPresentesModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs hover:shadow transition-all cursor-pointer border border-emerald-500/30"
+                id="admin-header-presentes-trigger"
+                title="Tomar presentes / Lista de asistencia de la clase actual"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-lime-300" />
+                <span className="hidden sm:inline">Tomar Presentes</span>
+                <span className="sm:hidden">Presentes</span>
+              </button>
+            )}
+
+            {/* BELL NOTIFICATIONS TRIGGER */}
+            <div className="relative">
             <button
               onClick={() => {
                 setShowNotificationsDropdown(!showNotificationsDropdown);
@@ -643,6 +660,7 @@ function InnerApp() {
                 </div>
               </>
             )}
+            </div>
           </div>
         </header>
 
@@ -682,6 +700,11 @@ function InnerApp() {
           }}
         />
       )}
+
+      <ControlPresentesModal
+        isOpen={showPresentesModal}
+        onClose={() => setShowPresentesModal(false)}
+      />
       {/* BARRA DE ACCESOS DIRECTOS FIJA INFERIOR (MOBILE/TABLET) */}
       <nav
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/98 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center justify-around px-2"

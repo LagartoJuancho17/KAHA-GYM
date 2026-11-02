@@ -13,8 +13,9 @@ import { TurnoRealtimeModal } from './TurnoRealtimeModal';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { TurnoExportModal } from './TurnoExportModal';
 import { FeriadosConfigModal } from './FeriadosConfigModal';
+import { ControlPresentesModal } from './ControlPresentesModal';
 import { SearchableSelect } from '../Common/SearchableSelect';
-import { History, Download, CalendarOff } from 'lucide-react';
+import { History, Download, CalendarOff, UserCheck } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 import { esperaDelTurno } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
@@ -31,6 +32,7 @@ export const TurnosGrid: React.FC = () => {
 
   const [showFeriadosModal, setShowFeriadosModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showPresentesModal, setShowPresentesModal] = useState(false);
   const [exportInitialMode, setExportInitialMode] = useState<'SEMANAL' | 'FIJA'>('SEMANAL');
   const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('TIEMPO_REAL');
   const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(() => semanaOffsetInicial());
@@ -233,6 +235,16 @@ export const TurnosGrid: React.FC = () => {
 
         {/* ACCIONES Y SUB TOOGLE */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={() => setShowPresentesModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
+            id="btn-control-presentes-turnos"
+            title="Tomar presentes y controlar asistencia de la clase actual"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-lime-300" />
+            <span>Tomar Presentes</span>
+          </button>
+
           <button
             onClick={() => setShowHistorialModal(true)}
             className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
@@ -1009,6 +1021,11 @@ export const TurnosGrid: React.FC = () => {
       <FeriadosConfigModal
         isOpen={showFeriadosModal}
         onClose={() => setShowFeriadosModal(false)}
+      />
+
+      <ControlPresentesModal
+        isOpen={showPresentesModal}
+        onClose={() => setShowPresentesModal(false)}
       />
     </div>
   );

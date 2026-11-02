@@ -4,6 +4,7 @@ import { Cliente } from '../../types';
 import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle, Mail, CalendarOff } from 'lucide-react';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { TurnoClassEmailModal } from './TurnoClassEmailModal';
+import { ControlPresentesModal } from './ControlPresentesModal';
 import { esperaDelTurno, esPrioritario } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
 import { esEmailValido, AlumnoClaseEmail } from '../../lib/emailClase';
@@ -53,6 +54,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
   // Estado para el modal de Email a Alumnos de la Clase
   const [showEmailModal, setShowEmailModal] = useState(false);
+  // Estado para el modal de Control de Presentes
+  const [showPresentesModal, setShowPresentesModal] = useState(false);
 
   const autoPromoteTriggeredRef = useRef<string>('');
 
@@ -442,6 +445,15 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPresentesModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer border border-emerald-500/40"
+              title="Tomar lista y presentes de esta clase"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-lime-300" />
+              <span className="hidden sm:inline">Tomar Presentes</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowHistorial(true)}
@@ -1188,6 +1200,14 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         fecha={selectedSlot.date}
         profesor={rtData.profesor}
         alumnos={alumnosParaEmail}
+      />
+
+      {/* MODAL CONTROL DE PRESENTES / ASISTENCIA */}
+      <ControlPresentesModal
+        isOpen={showPresentesModal}
+        onClose={() => setShowPresentesModal(false)}
+        turnoIdInicial={selectedSlot.id}
+        fechaInicial={selectedSlot.date}
       />
     </div>
   );

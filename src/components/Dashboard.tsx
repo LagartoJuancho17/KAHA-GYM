@@ -5,7 +5,8 @@ import {
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
   TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2,
-  Eye, EyeOff, Mail, Send, UserMinus, PauseCircle, CalendarOff, FileText
+  Eye, EyeOff, Mail, Send, UserMinus, PauseCircle, CalendarOff, FileText,
+  UserCheck
 } from 'lucide-react';
 import { Gasto, PagoEnRevision, OrigenGasto } from '../types';
 import { EmailInicioMesModal } from './Notifications/EmailInicioMesModal';
@@ -14,6 +15,7 @@ import { AdminPausadosReviewModal } from './Morosos/AdminPausadosReviewModal';
 import { EmailReporteMorososAdminModal } from './Notifications/EmailReporteMorososAdminModal';
 import { EmailReporteCierreMesAdminModal } from './Notifications/EmailReporteCierreMesAdminModal';
 import { FeriadosConfigModal } from './Turnos/FeriadosConfigModal';
+import { ControlPresentesModal } from './Turnos/ControlPresentesModal';
 import { hoyArgentina } from '../lib/fechas';
 import { estaEmailInicioMesEnviado } from '../lib/emailInicioMes';
 import { pausadosPendientesDeRevision } from '../lib/pausa';
@@ -98,6 +100,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showEmailReporteModal, setShowEmailReporteModal] = useState(false);
   // Modal de Revisión de Socios Pausados
   const [showPausadosModal, setShowPausadosModal] = useState(false);
+  // Modal de Control de Asistencia y Presentes
+  const [showPresentesModal, setShowPresentesModal] = useState(false);
 
   const handleToggleBalance = () => {
     setMostrarBalance(prev => !prev);
@@ -279,6 +283,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
         
         {/* BOTONERA ACCESOS RAPIDOS */}
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setShowPresentesModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white pl-4 pr-1.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:shadow-md cursor-pointer border border-emerald-500/40"
+            id="quick-presentes-btn"
+            title="Dar presentes de la clase actual"
+          >
+            Tomar Presentes
+            <span className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+              <UserCheck className="w-3.5 h-3.5 text-lime-200" />
+            </span>
+          </button>
+
           <button
             onClick={() => {
               if (setShowAddPagoModal) setShowAddPagoModal(true);
@@ -1391,6 +1407,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <FeriadosConfigModal
         isOpen={showFeriadosModal}
         onClose={() => setShowFeriadosModal(false)}
+      />
+
+      {/* MODAL CONTROL DE PRESENTES / ASISTENCIA */}
+      <ControlPresentesModal
+        isOpen={showPresentesModal}
+        onClose={() => setShowPresentesModal(false)}
       />
     </div>
   );
