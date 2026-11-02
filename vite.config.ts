@@ -128,6 +128,55 @@ export default defineConfig(({ mode }) => {
                   res.end(JSON.stringify({ error: err.message || 'Invalid JSON payload' }));
                 }
               });
+            } else if (req.url === '/api/send-admin-monthly-summary' && req.method === 'POST') {
+              let body = '';
+              req.on('data', chunk => {
+                body += chunk.toString();
+              });
+              req.on('end', async () => {
+                try {
+                  const { asunto, cuerpo, destinatariosAdmin, titulo } = JSON.parse(body || '{}');
+                  const admins = Array.isArray(destinatariosAdmin) && destinatariosAdmin.length > 0
+                    ? destinatariosAdmin
+                    : (destinatariosAdmin ? String(destinatariosAdmin).split(',').map((s: string) => s.trim()) : ['totoarr17@gmail.com', 'jmferrariprofe@gmail.com']);
+
+                  const apiKey = env.RESEND_API_KEY;
+                  let enviados = 0;
+                  let errores = 0;
+
+                  if (apiKey) {
+                    for (const admin of admins) {
+                      try {
+                        const resp = await fetch('https://api.resend.com/emails', {
+                          method: 'POST',
+                          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            from: env.RESEND_FROM || 'KAHA GYM <onboarding@resend.dev>',
+                            to: [admin],
+                            subject: asunto || '📋 [KAHA GYM] Resumen Ejecutivo de Cierre de Mes',
+                            html: `<div style="font-family: sans-serif; padding: 20px; white-space: pre-line;">${cuerpo}</div>`
+                          })
+                        });
+                        if (resp.ok) enviados++;
+                        else errores++;
+                      } catch {
+                        errores++;
+                      }
+                    }
+                  } else {
+                    console.log('>> [Vite Dev] Simulación de envío de Resumen Cierre a Admins:', admins);
+                    enviados = admins.length;
+                  }
+
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ ok: true, enviados, errores, simulated: !apiKey, destinatarios: admins }));
+                } catch (err: any) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ ok: false, error: err.message }));
+                }
+              });
             } else {
               next();
             }

@@ -3,12 +3,13 @@ import React, { useState, useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente, MedioPago } from '../../types';
 import { 
-  AlertTriangle, ShieldAlert, DollarSign, X, Receipt, UserMinus, Mail, MessageCircle
+  AlertTriangle, ShieldAlert, DollarSign, X, Receipt, UserMinus, Mail, MessageCircle, FileText
 } from 'lucide-react';
 import { MorososCronSimulator } from './MorososCronSimulator';
 import { MorososList } from './MorososList';
 import { AdminBajasReviewModal } from './AdminBajasReviewModal';
 import { EmailReporteMorososAdminModal } from '../Notifications/EmailReporteMorososAdminModal';
+import { EmailReporteCierreMesAdminModal } from '../Notifications/EmailReporteCierreMesAdminModal';
 import { MorososDobleCheckModal, MorososDobleCheckConfig } from './MorososDobleCheckModal';
 import { RondaRecordatoriosModal } from './RondaRecordatoriosModal';
 import { armarRonda } from '../../lib/rondaRecordatorios';
@@ -35,6 +36,7 @@ export const MorososControl: React.FC = () => {
   const [showBajasModal, setShowBajasModal] = useState(false);
   const [showRondaModal, setShowRondaModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showCierreMesModal, setShowCierreMesModal] = useState(false);
 
   // Estado del Modal de Doble Chequeo de Autorización
   const [dobleCheckConfig, setDobleCheckConfig] = useState<MorososDobleCheckConfig | null>(null);
@@ -210,6 +212,16 @@ export const MorososControl: React.FC = () => {
               <span>Mandar recordatorios ({rondaPendiente})</span>
             </button>
           )}
+          <button
+            onClick={() => setShowCierreMesModal(true)}
+            className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs border border-zinc-700"
+            id="btn-reporte-cierre-morosos"
+            title="Pasa en limpio deudas perdonadas, pausados y turnos impagos del mes cerrado"
+          >
+            <FileText className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Reporte Cierre a Admins</span>
+          </button>
+
           <button
             onClick={() => setShowEmailModal(true)}
             className="px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
@@ -447,6 +459,12 @@ export const MorososControl: React.FC = () => {
       <EmailReporteMorososAdminModal
         isOpen={showEmailModal}
         onClose={() => setShowEmailModal(false)}
+      />
+
+      {/* MODAL REPORTE EJECUTIVO DE CIERRE DE MES (ADMINS) */}
+      <EmailReporteCierreMesAdminModal
+        isOpen={showCierreMesModal}
+        onClose={() => setShowCierreMesModal(false)}
       />
 
       {/* MODAL DE DOBLE CHECKEO PARA MOVIMIENTOS Y BAJAS */}

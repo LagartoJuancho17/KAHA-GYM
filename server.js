@@ -1056,6 +1056,62 @@ app.post('/api/cron/reporte-morosos', async (req, res) => {
   }
 });
 
+// Endpoint para envío del Reporte Ejecutivo de Cierre de Mes a Administradores (Días 1 a 5)
+app.post('/api/send-admin-monthly-summary', async (req, res) => {
+  try {
+    const { asunto, cuerpo, destinatariosAdmin, titulo } = req.body || {};
+    const defaultAdmins = (process.env.ADMIN_EMAILS || 'totoarr17@gmail.com,jmferrariprofe@gmail.com')
+      .split(',').map(s => s.trim()).filter(Boolean);
+
+    const admins = Array.isArray(destinatariosAdmin) && destinatariosAdmin.length > 0
+      ? destinatariosAdmin
+      : (typeof destinatariosAdmin === 'string' && destinatariosAdmin.trim() 
+          ? destinatariosAdmin.split(',').map(s => s.trim()).filter(Boolean)
+          : defaultAdmins);
+
+    const subject = asunto || '📋 [KAHA GYM] Resumen Ejecutivo de Cierre de Mes';
+    const title = titulo || 'Resumen Ejecutivo de Cierre de Mes';
+
+    let enviados = 0, errores = 0;
+    const detalles = [];
+
+    for (const admin of admins) {
+      const r = await enviarMailSimple({
+        email: admin,
+        asunto: subject,
+        titulo: title,
+        cuerpo: cuerpo || 'Reporte de administración KAHA GYM'
+      });
+      if (r.ok) {
+        enviados++;
+        detalles.push({ email: admin, ok: true, id: r.id });
+      } else {
+        errores++;
+        detalles.push({ email: admin, ok: false, reason: r.reason });
+      }
+    }
+
+    if (supabase) {
+      await supabase.from('logs_auditoria').insert({
+        accion: 'REPORTE_CIERRE_MES_ADMIN_ENVIADO',
+        detalles: {
+          destinatarios: admins,
+          enviados,
+          errores,
+          asunto: subject,
+          fecha: new Date().toISOString()
+        }
+      }).catch(err => console.warn('>> [send-admin-monthly-summary] Error al registrar log:', err.message));
+    }
+
+    console.log(`>> [send-admin-monthly-summary] Envío finalizado: ${enviados} enviados, ${errores} errores a ${admins.join(', ')}`);
+    return res.status(200).json({ ok: true, enviados, errores, destinatarios: admins, detalles });
+  } catch (err) {
+    console.error('>> [send-admin-monthly-summary] Error:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Serve static assets from build output folder
 app.use(express.static(path.join(__dirname, 'dist')));
 

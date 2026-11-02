@@ -5,13 +5,14 @@ import {
   Users, AlertTriangle, TrendingUp, DollarSign, 
   Calendar, ArrowUpRight, Plus, Receipt, Grid, ListOrdered,
   TrendingDown, X, Minus, Check, AlertCircle, CheckCircle2,
-  Eye, EyeOff, Mail, Send, UserMinus, PauseCircle, CalendarOff
+  Eye, EyeOff, Mail, Send, UserMinus, PauseCircle, CalendarOff, FileText
 } from 'lucide-react';
 import { Gasto, PagoEnRevision, OrigenGasto } from '../types';
 import { EmailInicioMesModal } from './Notifications/EmailInicioMesModal';
 import { AdminBajasReviewModal } from './Morosos/AdminBajasReviewModal';
 import { AdminPausadosReviewModal } from './Morosos/AdminPausadosReviewModal';
 import { EmailReporteMorososAdminModal } from './Notifications/EmailReporteMorososAdminModal';
+import { EmailReporteCierreMesAdminModal } from './Notifications/EmailReporteCierreMesAdminModal';
 import { FeriadosConfigModal } from './Turnos/FeriadosConfigModal';
 import { hoyArgentina } from '../lib/fechas';
 import { estaEmailInicioMesEnviado } from '../lib/emailInicioMes';
@@ -90,6 +91,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Modal Email de Inicio de Mes a socios
   const [showEmailMesModal, setShowEmailMesModal] = useState(false);
   const [mailEnviadoLocal, setMailEnviadoLocal] = useState(false);
+  // Modal de Reporte Ejecutivo de Cierre de Mes a Admins (Días 1-5)
+  const [showReporteCierreModal, setShowReporteCierreModal] = useState(false);
   // Modal de Revisión de Bajas Día 10+
   const [showBajasModal, setShowBajasModal] = useState(false);
   const [showEmailReporteModal, setShowEmailReporteModal] = useState(false);
@@ -324,6 +327,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Grilla Horarios
           </button>
 
+          {/* REPORTE DE CIERRE DE MES A ADMINISTRADORES (DÍAS 1 A 5) */}
+          <button
+            onClick={() => setShowReporteCierreModal(true)}
+            className="bg-zinc-900 hover:bg-zinc-800 text-white px-3.5 sm:px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer border border-zinc-700"
+            id="quick-reporte-cierre-btn"
+            title="Pasa en limpio perdonados, pausados y socios que vinieron sin pagar del mes cerrado"
+          >
+            <FileText className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Reporte Cierre Mes</span>
+            {diaHoy <= 5 && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            )}
+          </button>
+
           {/* COMUNICADOS POR EMAIL CON APROBACIÓN PREVIA */}
           <button
             onClick={() => setShowEmailMesModal(true)}
@@ -390,14 +407,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowEmailMesModal(true)}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer transition-all"
-            id="banner-open-monthly-email-btn"
-          >
-            <Send className="w-3.5 h-3.5" />
-            Revisar y Enviar Mail
-          </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowReporteCierreModal(true)}
+              className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer transition-all border border-zinc-700"
+              id="banner-open-reporte-cierre-btn"
+              title="Pasa en limpio perdonados, pausados y turnos impagos del mes cerrado"
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-400" />
+              Reporte Cierre a Admins
+            </button>
+            <button
+              onClick={() => setShowEmailMesModal(true)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer transition-all"
+              id="banner-open-monthly-email-btn"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Revisar Mail a Socios
+            </button>
+          </div>
         </div>
       )}
 
@@ -1332,6 +1360,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
         isOpen={showEmailMesModal} 
         onClose={() => setShowEmailMesModal(false)}
         onSent={() => setMailEnviadoLocal(true)} 
+      />
+
+      {/* MODAL REPORTE EJECUTIVO DE CIERRE DE MES A ADMINISTRADORES (DÍAS 1 A 5) */}
+      <EmailReporteCierreMesAdminModal
+        isOpen={showReporteCierreModal}
+        onClose={() => setShowReporteCierreModal(false)}
       />
 
       {/* MODAL REVISIÓN DE BAJAS DE TURNOS FIJOS (DÍA 10+) */}
