@@ -382,57 +382,57 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in font-sans"
+      className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in font-sans"
       role="dialog"
       aria-modal="true"
       aria-labelledby="presentes-modal-title"
       ref={modalRef}
     >
-      <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden text-slate-800">
+      <div className="bg-white sm:border border-slate-200 sm:shadow-2xl sm:rounded-2xl w-full max-w-4xl h-full sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden text-slate-800">
         
-        {/* HEADER PRINCIPAL */}
-        <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-800 text-white px-5 py-4 border-b border-zinc-700 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-lime-400 text-zinc-950 flex items-center justify-center font-extrabold shadow-sm shrink-0">
-              <UserCheck className="w-5 h-5" />
+        {/* HEADER PRINCIPAL RESPONSIVE */}
+        <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-800 text-white px-3.5 sm:px-5 py-2.5 sm:py-3.5 border-b border-zinc-700 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-lime-400 text-zinc-950 flex items-center justify-center font-extrabold shadow-sm shrink-0">
+              <UserCheck className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 id="presentes-modal-title" className="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h3 id="presentes-modal-title" className="text-sm sm:text-base font-bold tracking-tight text-white leading-tight">
                   Control de Presentes
                 </h3>
                 {estadoTemporal && (
-                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${estadoTemporal.color}`}>
+                  <span className={`text-[9px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider ${estadoTemporal.color}`}>
                     {estadoTemporal.texto}
                   </span>
                 )}
                 {ultimoGuardadoHora && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-lime-300 font-semibold bg-zinc-800/80 px-2 py-0.5 rounded-md border border-zinc-700">
-                    <CheckCircle2 className="w-3 h-3 text-lime-400" />
-                    Guardado {ultimoGuardadoHora} hs
+                  <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] text-lime-300 font-semibold bg-zinc-800/80 px-1.5 sm:px-2 py-0.5 rounded border border-zinc-700">
+                    <CheckCircle2 className="w-3 h-3 text-lime-400 shrink-0" />
+                    <span>Guardado {ultimoGuardadoHora} hs</span>
                   </span>
                 )}
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Tomá lista en el inicio de cada horario y verificá el estado de cuenta de cada alumno
+              <p className="text-[11px] text-zinc-400 truncate hidden sm:block mt-0.5">
+                Tomá lista al inicio de cada horario y verificá el estado de pago de cada alumno
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-zinc-700"
+            className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-zinc-700 shrink-0"
             aria-label="Cerrar modal de control de presentes"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* SELECTOR DE FECHA Y HORARIOS */}
-        <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 shrink-0 space-y-3">
-          {/* Fila: Selector de Fecha + Navegación */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+        {/* SELECTOR DE FECHA Y HORARIOS RESPONSIVE */}
+        <div className="bg-slate-50 border-b border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5 shrink-0 space-y-2">
+          {/* Fila: Selector de Fecha + Navegación + Profesor */}
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <div className="flex items-center bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden">
                 <button
                   type="button"
@@ -441,16 +441,16 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                     const prev = new Date(y, m - 1, d - 1, 12, 0, 0);
                     setFechaSeleccionada(prev.toISOString().slice(0, 10));
                   }}
-                  className="px-2 py-1.5 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer border-r border-slate-200"
+                  className="px-2 py-1 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer border-r border-slate-200"
                   title="Día anterior"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <input
                   type="date"
                   value={fechaSeleccionada}
                   onChange={e => e.target.value && setFechaSeleccionada(e.target.value)}
-                  className="px-2 py-1 text-xs font-semibold text-slate-800 bg-transparent border-none outline-hidden cursor-pointer"
+                  className="px-2 py-0.5 text-xs font-semibold text-slate-800 bg-transparent border-none outline-hidden cursor-pointer"
                 />
                 <button
                   type="button"
@@ -459,10 +459,10 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                     const next = new Date(y, m - 1, d + 1, 12, 0, 0);
                     setFechaSeleccionada(next.toISOString().slice(0, 10));
                   }}
-                  className="px-2 py-1.5 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer border-l border-slate-200"
+                  className="px-2 py-1 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer border-l border-slate-200"
                   title="Día siguiente"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -470,7 +470,7 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setFechaSeleccionada(hoyArg)}
-                  className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
+                  className="text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors cursor-pointer"
                 >
                   Volver a Hoy
                 </button>
@@ -483,111 +483,102 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
 
             {/* Profesor a cargo */}
             {turnoActual?.profesor && (
-              <div className="flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-medium">
-                <span>Profesor a cargo:</span>
+              <div className="flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md text-[11px] sm:text-xs font-medium">
+                <span className="text-amber-700">Profe:</span>
                 <span className="font-bold">{turnoActual.profesor}</span>
               </div>
             )}
           </div>
 
-          {/* Carrusel de Horarios del Día */}
-          <div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-              {turnosDelDia.length === 0 ? (
-                <div className="text-xs text-slate-500 py-1">
-                  No hay clases programadas para este día ({diaDeFecha}).
-                </div>
-              ) : (
-                turnosDelDia.map(t => {
-                  const seleccionado = t.id === turnoSeleccionadoId;
-                  const tieneGuardado = turnosGuardadosSet.has(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setTurnoSeleccionadoId(t.id)}
-                      className={`
-                        relative px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer
-                        ${seleccionado
-                          ? 'bg-zinc-900 text-white shadow-md border border-zinc-900 scale-102'
-                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs'
-                        }
-                      `}
-                    >
-                      <Clock className={`w-3 h-3 ${seleccionado ? 'text-lime-400' : 'text-slate-400'}`} />
-                      <span>{t.hora} hs</span>
-                      {tieneGuardado && (
-                        <span
-                          className={`w-2 h-2 rounded-full ${seleccionado ? 'bg-lime-400' : 'bg-emerald-500'}`}
-                          title="Asistencia registrada"
-                        />
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
+          {/* Carrusel Horizontal de Horarios del Día */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+            {turnosDelDia.length === 0 ? (
+              <div className="text-xs text-slate-500 py-1">
+                No hay clases programadas para este día ({diaDeFecha}).
+              </div>
+            ) : (
+              turnosDelDia.map(t => {
+                const seleccionado = t.id === turnoSeleccionadoId;
+                const tieneGuardado = turnosGuardadosSet.has(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTurnoSeleccionadoId(t.id)}
+                    className={`
+                      relative px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer whitespace-nowrap
+                      ${seleccionado
+                        ? 'bg-zinc-900 text-white shadow-sm border border-zinc-900'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs'
+                      }
+                    `}
+                  >
+                    <Clock className={`w-3 h-3 ${seleccionado ? 'text-lime-400' : 'text-slate-400'} shrink-0`} />
+                    <span>{t.hora} hs</span>
+                    {tieneGuardado && (
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${seleccionado ? 'bg-lime-400' : 'bg-emerald-500'}`}
+                        title="Asistencia registrada"
+                      />
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 
-        {/* MÉTRICAS & BARRA DE ACCIÓN */}
+        {/* MÉTRICAS & BARRA DE ACCIÓN RESPONSIVE */}
         {turnoActual ? (
           <>
-            <div className="px-5 py-3 bg-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              {/* Contadores */}
-              <div className="flex items-center gap-3 sm:gap-6 text-xs">
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">Convocados</span>
-                  <span className="font-extrabold text-slate-800 text-sm">
-                    {metricas.totalInscriptos} / {metricas.cupoMaximo}
+            <div className="px-3 sm:px-5 py-2 sm:py-2.5 bg-white border-b border-slate-100 shrink-0 space-y-2">
+              {/* Contadores en Grid (4 columnas compactas) */}
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-3 text-center">
+                <div className="bg-slate-50 border border-slate-200/60 rounded-lg py-1 px-1">
+                  <span className="text-slate-400 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider block">Convocados</span>
+                  <span className="font-extrabold text-slate-800 text-xs sm:text-sm">
+                    {metricas.totalInscriptos}/{metricas.cupoMaximo}
                   </span>
                 </div>
 
-                <div className="h-7 w-px bg-slate-200" />
-
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">Presentes</span>
-                  <span className="font-extrabold text-emerald-600 text-sm">
-                    {metricas.totalPresentes} ({metricas.porcentajeAsistencia}%)
+                <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-lg py-1 px-1">
+                  <span className="text-slate-400 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider block">Presentes</span>
+                  <span className="font-extrabold text-emerald-600 text-xs sm:text-sm">
+                    {metricas.totalPresentes} <span className="text-[10px] font-semibold">({metricas.porcentajeAsistencia}%)</span>
                   </span>
                 </div>
 
-                <div className="h-7 w-px bg-slate-200" />
-
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">Ausentes</span>
-                  <span className="font-extrabold text-slate-500 text-sm">
+                <div className="bg-slate-50 border border-slate-200/60 rounded-lg py-1 px-1">
+                  <span className="text-slate-400 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider block">Ausentes</span>
+                  <span className="font-extrabold text-slate-500 text-xs sm:text-sm">
                     {metricas.totalAusentes}
                   </span>
                 </div>
 
-                <div className="h-7 w-px bg-slate-200" />
-
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">Vacantes</span>
-                  <span className="font-extrabold text-sky-600 text-sm">
+                <div className="bg-sky-50/60 border border-sky-200/60 rounded-lg py-1 px-1">
+                  <span className="text-slate-400 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider block">Vacantes</span>
+                  <span className="font-extrabold text-sky-600 text-xs sm:text-sm">
                     {metricas.lugaresLibres}
                   </span>
                 </div>
               </div>
 
               {/* Botonera de acciones masivas */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={handleDarPresenteATodos}
-                  className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  className="flex-1 sm:flex-none justify-center px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                   title="Marcar como presente a todos los convocados"
                 >
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="hidden sm:inline">Todos Presentes</span>
-                  <span className="sm:hidden">Todos</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Todos Presentes</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleMarcarTodosAusentes}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-all cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-all cursor-pointer shrink-0"
                   title="Desmarcar todos"
                 >
                   Limpiar
@@ -596,35 +587,35 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setMostrarBuscadorWalkin(prev => !prev)}
-                  className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  className="flex-1 sm:flex-none justify-center px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                   title="Agregar alumno espontáneo a esta clase"
                 >
-                  <Plus className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>+ Espontáneo</span>
+                  <Plus className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Espontáneo</span>
                 </button>
               </div>
             </div>
 
             {/* BUSCADOR DE ALUMNO ESPONTÁNEO (WALK-IN) */}
             {mostrarBuscadorWalkin && (
-              <div className="bg-indigo-50/60 border-b border-indigo-100 px-5 py-3 shrink-0 animate-fade-in">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-xs font-bold text-indigo-900 flex items-center gap-1">
-                    <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
-                    Agregar Alumno Espontáneo (Walk-in) a la clase de las {turnoActual.hora} hs:
+              <div className="bg-indigo-50/80 border-b border-indigo-100 px-3 sm:px-5 py-2.5 shrink-0 animate-fade-in">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-xs font-bold text-indigo-900 flex items-center gap-1 truncate">
+                    <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <span>Agregar Espontáneo a las {turnoActual.hora} hs:</span>
                   </span>
                   <button
                     onClick={() => {
                       setMostrarBuscadorWalkin(false);
                       setBusquedaWalkin('');
                     }}
-                    className="text-xs text-indigo-500 hover:text-indigo-800 cursor-pointer"
+                    className="text-xs text-indigo-600 hover:text-indigo-900 font-semibold cursor-pointer shrink-0"
                   >
                     Cancelar
                   </button>
                 </div>
 
-                <div className="relative max-w-md">
+                <div className="relative w-full max-w-md">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
@@ -644,11 +635,11 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                         onClick={() => handleAgregarWalkin(socio)}
                         className="px-3 py-2 hover:bg-indigo-50 flex items-center justify-between cursor-pointer transition-colors"
                       >
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">{socio.nombre} {socio.apellido}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">{socio.email || 'Sin email'}</p>
+                        <div className="min-w-0 pr-2">
+                          <p className="text-xs font-bold text-slate-800 truncate">{socio.nombre} {socio.apellido}</p>
+                          <p className="text-[10px] text-slate-500 font-mono truncate">{socio.email || 'Sin email'}</p>
                         </div>
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded shrink-0">
                           Agregar
                         </span>
                       </div>
@@ -657,27 +648,27 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                 )}
                 {busquedaWalkin && sociosElegiblesWalkin.length === 0 && (
                   <p className="text-[11px] text-slate-500 mt-1.5 italic">
-                    No se encontraron socios activos que coincidan con la búsqueda.
+                    No se encontraron socios activos que coincidan.
                   </p>
                 )}
               </div>
             )}
 
             {/* FILTRO RÁPIDO DE ALUMNOS */}
-            {todosLosAlumnos.length > 6 && (
-              <div className="px-5 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 shrink-0">
-                <Search className="w-3.5 h-3.5 text-slate-400" />
+            {todosLosAlumnos.length > 5 && (
+              <div className="px-3 sm:px-5 py-1.5 bg-slate-50/70 border-b border-slate-100 flex items-center gap-2 shrink-0">
+                <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <input
                   type="text"
                   value={filtroAlumnos}
                   onChange={e => setFiltroAlumnos(e.target.value)}
-                  placeholder="Filtrar por nombre en esta clase..."
+                  placeholder="Filtrar alumnos por nombre en esta clase..."
                   className="bg-transparent text-xs text-slate-700 outline-hidden w-full placeholder:text-slate-400"
                 />
                 {filtroAlumnos && (
                   <button
                     onClick={() => setFiltroAlumnos('')}
-                    className="text-xs text-slate-400 hover:text-slate-600"
+                    className="text-xs text-slate-400 hover:text-slate-600 shrink-0"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -685,8 +676,8 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
               </div>
             )}
 
-            {/* LISTA DE ALUMNOS (CARDS / ROWS) */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 divide-y divide-slate-100 min-h-[220px]">
+            {/* LISTA DE ALUMNOS (CARDS / ROWS RESPONSIVE) */}
+            <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-2 divide-y divide-slate-100">
               {alumnosFiltrados.length === 0 ? (
                 <div className="text-center py-12 px-4 text-slate-400">
                   <Users className="w-10 h-10 mx-auto text-slate-300 mb-2" />
@@ -705,106 +696,106 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                     <div
                       key={alumno.clienteId}
                       className={`
-                        py-2.5 px-3 rounded-xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3
+                        py-2 px-2.5 sm:px-3.5 sm:py-2.5 rounded-xl transition-all flex flex-row items-center justify-between gap-2.5 border my-1
                         ${esPresente
-                          ? 'bg-emerald-50/40 hover:bg-emerald-50/80 border border-emerald-200/60'
-                          : 'hover:bg-slate-50 border border-transparent'
+                          ? 'bg-emerald-50/40 hover:bg-emerald-50/70 border-emerald-200/80'
+                          : 'hover:bg-slate-50/80 border-slate-200/50 bg-white'
                         }
                       `}
                     >
                       {/* Información del socio */}
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <span className="text-xs font-mono text-slate-400 w-5 shrink-0 text-right">
+                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono text-slate-400 w-4 shrink-0 text-right">
                           {idx + 1}.
                         </span>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-bold text-slate-900 text-sm truncate">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+                            <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
                               {alumno.apellido}, {alumno.nombre}
                             </span>
 
                             {/* Badge de tipo de inscripción */}
                             {alumno.tipoInscripcion === 'FIJO' && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
                                 Fijo
                               </span>
                             )}
                             {alumno.tipoInscripcion === 'VARIABLE' && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                              <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
                                 Reserva
                               </span>
                             )}
                             {alumno.tipoInscripcion === 'RECUPERO' && (
                               <span
-                                className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200"
+                                className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200 shrink-0"
                                 title={`Recupera falta del ${alumno.recuperoOrigen || ''}`}
                               >
                                 Recupero
                               </span>
                             )}
                             {alumno.tipoInscripcion === 'WALKIN' && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
                                 Walk-in
                               </span>
                             )}
 
                             {/* Alerta de Deuda / Cuota */}
                             {alumno.alDia ? (
-                              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                              <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded shrink-0">
                                 Al día
                               </span>
                             ) : (
                               <span
-                                className="inline-flex items-center gap-1 text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full"
+                                className="inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 sm:px-2 py-0.2 rounded-full shrink-0"
                                 title={`Debe $${alumno.debeMonto.toLocaleString('es-AR')} (Último mes: ${alumno.ultimoMesPagado || 'Nunca'})`}
                               >
-                                <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                                <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-600 shrink-0" />
                                 Debe ${alumno.debeMonto.toLocaleString('es-AR')}
                               </span>
                             )}
                           </div>
 
-                          <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2 mt-0.5 font-mono">
-                            <span>{alumno.planNombre}</span>
+                          <div className="text-[10px] sm:text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5 font-mono">
+                            <span className="truncate">{alumno.planNombre}</span>
                             {alumno.telefono && (
                               <>
                                 <span>·</span>
-                                <span>{alumno.telefono}</span>
+                                <span className="truncate">{alumno.telefono}</span>
                               </>
                             )}
                             {alumno.tipoInscripcion === 'RECUPERO' && alumno.recuperoOrigen && (
-                              <span className="text-amber-700 font-sans text-[10px]">
-                                (Origen: {alumno.recuperoOrigen})
+                              <span className="text-amber-700 font-sans text-[9px] sm:text-[10px] truncate">
+                                ({alumno.recuperoOrigen})
                               </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Botones de acción individual */}
-                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      {/* Botón de Asistencia: siempre alineado a la derecha sin romper la fila */}
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {alumno.tipoInscripcion === 'WALKIN' && (
                           <button
                             type="button"
                             onClick={() => handleRemoverWalkin(alumno.clienteId)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                             title="Quitar alumno espontáneo"
                           >
                             <X className="w-4 h-4" />
                           </button>
                         )}
 
-                        {/* Switch de Asistencia (Mínimo 44x44px para cumplimiento de accesibilidad y pantalla táctil) */}
+                        {/* Switch de Asistencia (44px min height para pantalla táctil) */}
                         <button
                           type="button"
                           onClick={() => togglePresente(alumno.clienteId)}
                           aria-pressed={esPresente}
                           className={`
-                            min-h-[44px] min-w-[130px] px-3 py-2 rounded-xl text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer
+                            h-10 sm:h-11 min-w-[96px] sm:min-w-[124px] px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer
                             outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2
                             ${esPresente
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm focus-visible:ring-emerald-500'
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs focus-visible:ring-emerald-500'
                               : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 focus-visible:ring-slate-400'
                             }
                           `}
@@ -812,12 +803,12 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
                         >
                           {esPresente ? (
                             <>
-                              <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+                              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-200 shrink-0" />
                               <span>PRESENTE</span>
                             </>
                           ) : (
                             <>
-                              <UserX className="w-4 h-4 text-slate-400 shrink-0" />
+                              <UserX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
                               <span>AUSENTE</span>
                             </>
                           )}
@@ -830,12 +821,12 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
             </div>
 
             {/* SECCIÓN NOTAS DE LA CLASE */}
-            <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-200 shrink-0">
+            <div className="px-3 sm:px-5 py-2 bg-slate-50 border-t border-slate-200 shrink-0">
               <input
                 type="text"
                 value={notasClase}
                 onChange={e => setNotasClase(e.target.value)}
-                placeholder="Observaciones de la clase (opcional, ej: aviso de llegada tarde, WOD especial, incidentes)..."
+                placeholder="Observaciones de la clase (opcional, ej: aviso de llegada tarde, WOD)..."
                 className="w-full text-xs text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-hidden focus:border-slate-400 shadow-2xs placeholder:text-slate-400"
               />
             </div>
@@ -847,21 +838,21 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
           </div>
         )}
 
-        {/* FOOTER GENERAL CON BOTÓN DE GUARDADO */}
-        <div className="bg-white border-t border-slate-200 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="text-xs text-slate-500">
+        {/* FOOTER GENERAL RESPONSIVE CON BOTÓN DE GUARDADO */}
+        <div className="bg-white border-t border-slate-200 px-3 sm:px-5 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 shrink-0 pb-[max(env(safe-area-inset-bottom),10px)]">
+          <div className="text-[11px] sm:text-xs text-slate-500 truncate flex-1 min-w-0 pr-1">
             {turnoActual ? (
-              <span>
-                Clase <strong className="text-slate-800">{turnoActual.hora} hs</strong> ({turnoActual.dia}) · {metricas.totalPresentes} presente(s) marcados
+              <span className="truncate block">
+                <strong className="text-slate-800">{turnoActual.hora} hs</strong> ({turnoActual.dia}) · <span className="font-bold text-emerald-600">{metricas.totalPresentes}</span> presentes
               </span>
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+              className="px-3 sm:px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
             >
               Cerrar
             </button>
@@ -870,10 +861,10 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
               type="button"
               disabled={guardando || !turnoActual}
               onClick={handleGuardarAsistencia}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="px-4 sm:px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
               id="btn-guardar-asistencia-modal"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-4 h-4 shrink-0" />
               <span>{guardando ? 'Guardando...' : 'Guardar Asistencia'}</span>
             </button>
           </div>

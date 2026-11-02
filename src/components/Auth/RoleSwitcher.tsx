@@ -32,16 +32,21 @@ export const RoleSwitcher: React.FC = () => {
     return null;
   }
 
-  const isOperatorBound = googleUser?.role === 'OPERADOR';
+  const isOperatorBound = googleUser?.role === 'OPERADOR' || googleUser?.role === 'PROFESOR';
 
-  const rolLabel = rolActivo === 'ADMIN' ? 'Administrador' : rolActivo === 'OPERADOR' ? 'Profesor' : 'Socio';
+  const rolLabel = rolActivo === 'ADMIN' 
+    ? 'Administrador' 
+    : (rolActivo === 'PROFESOR' || rolActivo === 'OPERADOR') 
+    ? 'Profesor' 
+    : 'Socio';
+
   const rolColor = rolActivo === 'ADMIN' 
     ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100/80' 
-    : rolActivo === 'OPERADOR' 
-    ? 'text-slate-700 bg-slate-100 border-slate-300 hover:bg-slate-200/80' 
+    : (rolActivo === 'OPERADOR' || rolActivo === 'PROFESOR')
+    ? 'text-indigo-700 bg-indigo-50 border-indigo-300 hover:bg-indigo-100/80' 
     : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100/80';
 
-  const handleSelectRole = (newRole: 'ADMIN' | 'OPERADOR' | 'SOCIO') => {
+  const handleSelectRole = (newRole: 'ADMIN' | 'OPERADOR' | 'PROFESOR' | 'SOCIO') => {
     if (newRole === 'ADMIN' && isOperatorBound) return;
     setRolActivo(newRole);
     setIsDropdownOpen(false);
@@ -65,7 +70,7 @@ export const RoleSwitcher: React.FC = () => {
             id="role-dropdown-trigger"
           >
             {rolActivo === 'ADMIN' && <Shield className="w-3.5 h-3.5 text-sky-600" />}
-            {rolActivo === 'OPERADOR' && <Dumbbell className="w-3.5 h-3.5 text-slate-600" />}
+            {(rolActivo === 'OPERADOR' || rolActivo === 'PROFESOR') && <Dumbbell className="w-3.5 h-3.5 text-indigo-600" />}
             {rolActivo === 'SOCIO' && <User className="w-3.5 h-3.5 text-emerald-600" />}
             <span>{rolLabel}</span>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
@@ -98,21 +103,21 @@ export const RoleSwitcher: React.FC = () => {
                 {rolActivo === 'ADMIN' && <Check className="w-3.5 h-3.5 text-sky-600" />}
               </button>
 
-              {/* OPERADOR OPTION */}
+              {/* PROFESOR OPTION */}
               <button
                 type="button"
-                onClick={() => handleSelectRole('OPERADOR')}
+                onClick={() => handleSelectRole('PROFESOR')}
                 className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors border-none bg-transparent cursor-pointer ${
-                  rolActivo === 'OPERADOR'
-                    ? 'bg-slate-100 font-bold text-slate-900'
+                  (rolActivo === 'PROFESOR' || rolActivo === 'OPERADOR')
+                    ? 'bg-indigo-50 font-bold text-indigo-900'
                     : 'hover:bg-slate-50 text-slate-700'
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  <Dumbbell className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Profesor / Operador</span>
+                  <Dumbbell className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Profesor / Clases</span>
                 </span>
-                {rolActivo === 'OPERADOR' && <Check className="w-3.5 h-3.5 text-slate-600" />}
+                {(rolActivo === 'PROFESOR' || rolActivo === 'OPERADOR') && <Check className="w-3.5 h-3.5 text-indigo-600" />}
               </button>
 
               {/* SOCIO OPTION */}

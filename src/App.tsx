@@ -483,6 +483,21 @@ function InnerApp() {
               );
             })}
           </nav>
+
+          {/* ACCESO DIRECTO CONTROL DE PRESENTES EN SIDEBAR */}
+          {['ADMIN', 'OPERADOR', 'PROFESOR'].includes(rolActivo) && (
+            <button
+              onClick={() => {
+                setIsSidebarOpen(false);
+                setShowPresentesModal(true);
+              }}
+              className="w-full mt-3 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs hover:shadow transition-all cursor-pointer border border-emerald-500/30"
+              id="sidebar-presentes-trigger"
+            >
+              <UserCheck className="w-4 h-4 text-lime-300" />
+              <span>Tomar Presentes</span>
+            </button>
+          )}
         </div>
 
         {/* LOGGED CONTEXT CARD (Dynamic Google user) */}
@@ -541,29 +556,29 @@ function InnerApp() {
         <RoleSwitcher />
 
         {/* GEOMETRIC THEMED SUB-HEADER (Matching the clean header element) */}
-        <header className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-4 flex flex-row items-center justify-between gap-3 shadow-xs" id="sub-header-container">
-          <div className="min-w-0 flex-1 flex items-center gap-2.5">
-            <img src={logoKaha} alt="KAHA GYM Logo" className="w-8 h-8 rounded-lg object-contain shrink-0 hidden sm:block shadow-2xs" />
+        <header className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2 sm:py-3.5 flex flex-row items-center justify-between gap-2 sm:gap-3 shadow-xs" id="sub-header-container">
+          <div className="min-w-0 flex-1 flex items-center gap-2">
+            <img src={logoKaha} alt="KAHA GYM Logo" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain shrink-0 hidden sm:block shadow-2xs" />
             <div className="min-w-0">
-              <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-0.5 font-mono">
-                Entorno Seguro
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest block font-mono leading-none mb-0.5">
+                {rolActivo === 'PROFESOR' ? 'PANEL PROFESOR' : rolActivo === 'OPERADOR' ? 'OPERADOR' : 'ENTORNO SEGURO'}
               </span>
-              <span className="font-display text-sm sm:text-xl font-bold text-zinc-900 flex items-center gap-2 tracking-tight truncate" id="current-tab-label-header">
+              <span className="font-display text-xs sm:text-lg font-bold text-zinc-900 flex items-center gap-1.5 tracking-tight truncate leading-tight" id="current-tab-label-header">
                 {currentTab.desc}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* CONTROL DE PRESENTES TRIGGER */}
             {['ADMIN', 'OPERADOR', 'PROFESOR'].includes(rolActivo) && (
               <button
                 onClick={() => setShowPresentesModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs hover:shadow transition-all cursor-pointer border border-emerald-500/30"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs hover:shadow transition-all cursor-pointer border border-emerald-500/30"
                 id="admin-header-presentes-trigger"
                 title="Tomar presentes / Lista de asistencia de la clase actual"
               >
-                <UserCheck className="w-3.5 h-3.5 text-lime-300" />
+                <UserCheck className="w-3.5 h-3.5 text-lime-300 shrink-0" />
                 <span className="hidden sm:inline">Tomar Presentes</span>
                 <span className="sm:hidden">Presentes</span>
               </button>
@@ -707,25 +722,53 @@ function InnerApp() {
       />
       {/* BARRA DE ACCESOS DIRECTOS FIJA INFERIOR (MOBILE/TABLET) */}
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/98 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center justify-around px-2"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/98 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center justify-around px-1"
         id="admin-bottom-shortcuts-bar"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)', height: '64px' }}
       >
-        {/* PANEL / DASHBOARD */}
+        {/* PANEL / DASHBOARD (Solo Admin) */}
+        {rolActivo === 'ADMIN' && (
+          <button
+            onClick={() => setActiveTab('DASHBOARD')}
+            className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
+              activeTab === 'DASHBOARD' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+            }`}
+          >
+            <LayoutDashboard className={`w-5 h-5 ${activeTab === 'DASHBOARD' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+            <span className="text-[9px] uppercase tracking-wider font-sans">Panel</span>
+          </button>
+        )}
+
+        {/* TURNOS */}
         <button
-          onClick={() => setActiveTab('DASHBOARD')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
-            activeTab === 'DASHBOARD' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+          onClick={() => setActiveTab('TURNOS')}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
+            activeTab === 'TURNOS' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
           }`}
         >
-          <LayoutDashboard className={`w-5 h-5 ${activeTab === 'DASHBOARD' ? 'text-zinc-950' : 'text-zinc-400'}`} />
-          <span className="text-[9px] uppercase tracking-wider font-sans">Panel</span>
+          <CalendarRange className={`w-5 h-5 ${activeTab === 'TURNOS' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+          <span className="text-[9px] uppercase tracking-wider font-sans">Turnos</span>
         </button>
+
+        {/* BOTÓN CENTRAL DESTACADO: TOMAR PRESENTES (ADMIN Y PROFESORES) */}
+        {['ADMIN', 'OPERADOR', 'PROFESOR'].includes(rolActivo) && (
+          <button
+            onClick={() => setShowPresentesModal(true)}
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-2xl transition-all cursor-pointer border-none bg-emerald-50 text-emerald-800 scale-105 shadow-2xs"
+            id="mobile-nav-presentes-btn"
+            title="Tomar lista de presentes de la clase actual"
+          >
+            <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+              <UserCheck className="w-4 h-4 text-lime-200" />
+            </div>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-700">Presentes</span>
+          </button>
+        )}
 
         {/* SOCIOS */}
         <button
           onClick={() => setActiveTab('CLIENTES')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent relative ${
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all cursor-pointer border-none bg-transparent relative ${
             activeTab === 'CLIENTES' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
           }`}
         >
@@ -736,36 +779,42 @@ function InnerApp() {
           )}
         </button>
 
-        {/* TURNOS */}
-        <button
-          onClick={() => setActiveTab('TURNOS')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
-            activeTab === 'TURNOS' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
-          }`}
-        >
-          <CalendarRange className={`w-5 h-5 ${activeTab === 'TURNOS' ? 'text-zinc-950' : 'text-zinc-400'}`} />
-          <span className="text-[9px] uppercase tracking-wider font-sans">Turnos</span>
-        </button>
+        {/* NOVEDADES (Para Profesor/Operador) */}
+        {rolActivo !== 'ADMIN' && (
+          <button
+            onClick={() => setActiveTab('NOVEDADES')}
+            className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
+              activeTab === 'NOVEDADES' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+            }`}
+          >
+            <Megaphone className={`w-5 h-5 ${activeTab === 'NOVEDADES' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+            <span className="text-[9px] uppercase tracking-wider font-sans">Novedades</span>
+          </button>
+        )}
 
-        {/* PAGOS / ECONOMIA */}
-        <button
-          onClick={() => setActiveTab('PAGOS')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
-            activeTab === 'PAGOS' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
-          }`}
-        >
-          <CreditCard className={`w-5 h-5 ${activeTab === 'PAGOS' ? 'text-zinc-950' : 'text-zinc-400'}`} />
-          <span className="text-[9px] uppercase tracking-wider font-sans">Economía</span>
-        </button>
+        {/* PAGOS / ECONOMIA (Solo Admin) */}
+        {rolActivo === 'ADMIN' && (
+          <button
+            onClick={() => setActiveTab('PAGOS')}
+            className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all cursor-pointer border-none bg-transparent ${
+              activeTab === 'PAGOS' ? 'text-zinc-950 font-bold' : 'text-zinc-400 font-medium'
+            }`}
+          >
+            <CreditCard className={`w-5 h-5 ${activeTab === 'PAGOS' ? 'text-zinc-950' : 'text-zinc-400'}`} />
+            <span className="text-[9px] uppercase tracking-wider font-sans">Economía</span>
+          </button>
+        )}
 
-        {/* MENÚ MÁS */}
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border-none bg-transparent text-zinc-500"
-        >
-          <Menu className="w-5 h-5 text-zinc-600" />
-          <span className="text-[9px] uppercase tracking-wider font-sans">Más</span>
-        </button>
+        {/* MENÚ MÁS (Para Profesor) */}
+        {rolActivo !== 'ADMIN' && (
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all cursor-pointer border-none bg-transparent text-zinc-500"
+          >
+            <Menu className="w-5 h-5 text-zinc-600" />
+            <span className="text-[9px] uppercase tracking-wider font-sans">Más</span>
+          </button>
+        )}
       </nav>
 
       {/* Recordatorio mensual: solo para ADMIN y OPERADOR */}
