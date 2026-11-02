@@ -250,64 +250,33 @@ export function calcularMetricasAsistencia(
 
 export const STORAGE_KEY_ASISTENCIAS = 'kaha_asistencias_v1';
 
-export const SEED_ASISTENCIAS: Record<string, RegistroAsistenciaClase> = {
-  '2026-10-30_VIERNES-08:30': {
-    id: '2026-10-30_VIERNES-08:30',
-    fecha: '2026-10-30',
-    turnoId: 'VIERNES-08:30',
-    dia: 'VIERNES',
-    hora: '08:30',
-    profesor: 'Juanchi',
-    presentesIds: ['c-1', 'c-2', 'c-3', 'c-4', 'c-5'],
-    ausentesIds: ['c-6'],
-    walkins: [],
-    notas: 'Clase técnica de levantamiento. Excelente ritmo.',
-    actualizadoAt: '2026-10-30T09:30:00.000Z',
-    guardadoPor: 'juanchi@kaha.fit'
-  },
-  '2026-10-30_VIERNES-19:00': {
-    id: '2026-10-30_VIERNES-19:00',
-    fecha: '2026-10-30',
-    turnoId: 'VIERNES-19:00',
-    dia: 'VIERNES',
-    hora: '19:00',
-    profesor: 'Rulo',
-    presentesIds: ['c-7', 'c-8', 'c-9', 'c-10', 'c-11', 'c-12'],
-    ausentesIds: ['c-13'],
-    walkins: [],
-    notas: 'WOD en parejas. Todos presentes a horario.',
-    actualizadoAt: '2026-10-30T20:00:00.000Z',
-    guardadoPor: 'rulo@kaha.fit'
-  },
-  '2026-11-02_LUNES-07:30': {
-    id: '2026-11-02_LUNES-07:30',
-    fecha: '2026-11-02',
-    turnoId: 'LUNES-07:30',
-    dia: 'LUNES',
-    hora: '07:30',
-    profesor: 'Juanchi',
-    presentesIds: ['c-1', 'c-3', 'c-5', 'c-7', 'c-8'],
-    ausentesIds: ['c-2'],
-    walkins: [],
-    notas: 'Arranque de semana con fuerza.',
-    actualizadoAt: '2026-11-02T08:30:00.000Z',
-    guardadoPor: 'juanchi@kaha.fit'
-  }
-};
-
 // In-memory fallback for SSR/tests
-let memoryStoreAsistencias: Record<string, RegistroAsistenciaClase> = { ...SEED_ASISTENCIAS };
+let memoryStoreAsistencias: Record<string, RegistroAsistenciaClase> = {};
 
 export function leerTodasLasAsistencias(): Record<string, RegistroAsistenciaClase> {
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       const data = window.localStorage.getItem(STORAGE_KEY_ASISTENCIAS);
       if (data) {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data) as Record<string, RegistroAsistenciaClase>;
+        // Filtrar datos ficticios de prueba iniciales ('c-1', 'c-2', etc.)
+        let huboSeedsFicticios = false;
+        const limpios: Record<string, RegistroAsistenciaClase> = {};
+        for (const [key, reg] of Object.entries(parsed)) {
+          const tieneIdFicticio = (reg.presentesIds || []).some(id => id.startsWith('c-') && id.length <= 4);
+          if (tieneIdFicticio) {
+            huboSeedsFicticios = true;
+          } else {
+            limpios[key] = reg;
+          }
+        }
+        if (huboSeedsFicticios) {
+          window.localStorage.setItem(STORAGE_KEY_ASISTENCIAS, JSON.stringify(limpios));
+          return limpios;
+        }
+        return parsed;
       }
-      // Inicializar con semillas iniciales
-      window.localStorage.setItem(STORAGE_KEY_ASISTENCIAS, JSON.stringify(SEED_ASISTENCIAS));
-      return { ...SEED_ASISTENCIAS };
+      return {};
     } catch {
       // Fallback
     }
