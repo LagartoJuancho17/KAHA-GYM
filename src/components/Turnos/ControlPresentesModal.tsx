@@ -66,6 +66,18 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
 
   const hoyArg = hoyArgentina();
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(fechaInicial || hoyArg);
+
+  // Sincronizar fecha inicial al abrir modal si se especificó
+  useEffect(() => {
+    if (isOpen) {
+      if (fechaInicial) {
+        setFechaSeleccionada(fechaInicial);
+      } else {
+        setFechaSeleccionada(hoyArg);
+      }
+    }
+  }, [isOpen, fechaInicial, hoyArg]);
+
   const diaDeFecha = useMemo(() => obtenerDiaDeFecha(fechaSeleccionada), [fechaSeleccionada]);
 
   // Turnos del día seleccionado

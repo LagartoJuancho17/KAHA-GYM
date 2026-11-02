@@ -250,8 +250,53 @@ export function calcularMetricasAsistencia(
 
 export const STORAGE_KEY_ASISTENCIAS = 'kaha_asistencias_v1';
 
+export const SEED_ASISTENCIAS: Record<string, RegistroAsistenciaClase> = {
+  '2026-10-30_VIERNES-08:30': {
+    id: '2026-10-30_VIERNES-08:30',
+    fecha: '2026-10-30',
+    turnoId: 'VIERNES-08:30',
+    dia: 'VIERNES',
+    hora: '08:30',
+    profesor: 'Juanchi',
+    presentesIds: ['c-1', 'c-2', 'c-3', 'c-4', 'c-5'],
+    ausentesIds: ['c-6'],
+    walkins: [],
+    notas: 'Clase técnica de levantamiento. Excelente ritmo.',
+    actualizadoAt: '2026-10-30T09:30:00.000Z',
+    guardadoPor: 'juanchi@kaha.fit'
+  },
+  '2026-10-30_VIERNES-19:00': {
+    id: '2026-10-30_VIERNES-19:00',
+    fecha: '2026-10-30',
+    turnoId: 'VIERNES-19:00',
+    dia: 'VIERNES',
+    hora: '19:00',
+    profesor: 'Rulo',
+    presentesIds: ['c-7', 'c-8', 'c-9', 'c-10', 'c-11', 'c-12'],
+    ausentesIds: ['c-13'],
+    walkins: [],
+    notas: 'WOD en parejas. Todos presentes a horario.',
+    actualizadoAt: '2026-10-30T20:00:00.000Z',
+    guardadoPor: 'rulo@kaha.fit'
+  },
+  '2026-11-02_LUNES-07:30': {
+    id: '2026-11-02_LUNES-07:30',
+    fecha: '2026-11-02',
+    turnoId: 'LUNES-07:30',
+    dia: 'LUNES',
+    hora: '07:30',
+    profesor: 'Juanchi',
+    presentesIds: ['c-1', 'c-3', 'c-5', 'c-7', 'c-8'],
+    ausentesIds: ['c-2'],
+    walkins: [],
+    notas: 'Arranque de semana con fuerza.',
+    actualizadoAt: '2026-11-02T08:30:00.000Z',
+    guardadoPor: 'juanchi@kaha.fit'
+  }
+};
+
 // In-memory fallback for SSR/tests
-let memoryStoreAsistencias: Record<string, RegistroAsistenciaClase> = {};
+let memoryStoreAsistencias: Record<string, RegistroAsistenciaClase> = { ...SEED_ASISTENCIAS };
 
 export function leerTodasLasAsistencias(): Record<string, RegistroAsistenciaClase> {
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -260,6 +305,9 @@ export function leerTodasLasAsistencias(): Record<string, RegistroAsistenciaClas
       if (data) {
         return JSON.parse(data);
       }
+      // Inicializar con semillas iniciales
+      window.localStorage.setItem(STORAGE_KEY_ASISTENCIAS, JSON.stringify(SEED_ASISTENCIAS));
+      return { ...SEED_ASISTENCIAS };
     } catch {
       // Fallback
     }
@@ -270,6 +318,19 @@ export function leerTodasLasAsistencias(): Record<string, RegistroAsistenciaClas
 export function guardarRegistroAsistencia(registro: RegistroAsistenciaClase): void {
   const todas = leerTodasLasAsistencias();
   todas[registro.id] = registro;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY_ASISTENCIAS, JSON.stringify(todas));
+    } catch {
+      // Fallback
+    }
+  }
+  memoryStoreAsistencias = todas;
+}
+
+export function eliminarRegistroAsistencia(id: string): void {
+  const todas = leerTodasLasAsistencias();
+  delete todas[id];
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       window.localStorage.setItem(STORAGE_KEY_ASISTENCIAS, JSON.stringify(todas));
@@ -295,5 +356,72 @@ export function obtenerTurnosConAsistenciaDelDia(fecha: string): Set<string> {
     }
   });
   return res;
+}
+
+export interface MetricasHistoricasAsistencia {
+  totalClases: number;
+  totalPresentes: number;
+  totalAusentes: number;
+  totalWalkins: number;
+  promedioPresentesPorClase: number;
+  porcentajeGlobal: number;
+  rankingSocios: Array<{ clienteId: string; totalPresentes: number }>;
+}
+
+export function calcularMetricasHistoricas(
+  registros: RegistroAsistenciaClase[]
+): MetricasHistoricasAsistencia {
+  if (!registros || registros.length === 0) {
+    return {
+      totalClases: 0,
+      totalPresentes: 0,
+      totalAusentes: 0,
+      totalWalkins: 0,
+      promedioPresentesPorClase: 0,
+      porcentajeGlobal: 0,
+      rankingSocios: []
+    };
+  }
+
+  let totalPresentes = 0;
+  let totalAusentes = 0;
+  let totalWalkins = 0;
+  const conteoPorSocio = new Map<string, number>();
+
+  registros.forEach(r => {
+    const presCount = (r.presentesIds || []).length;
+    const ausCount = (r.ausentesIds || []).length;
+    const walkCount = (r.walkins || []).length;
+
+    totalPresentes += presCount;
+    totalAusentes += ausCount;
+    totalWalkins += walkCount;
+
+    (r.presentesIds || []).forEach(id => {
+      conteoPorSocio.set(id, (conteoPorSocio.get(id) || 0) + 1);
+    });
+  });
+
+  const totalInscriptos = totalPresentes + totalAusentes;
+  const promedioPresentesPorClase = registros.length > 0
+    ? Math.round((totalPresentes / registros.length) * 10) / 10
+    : 0;
+  const porcentajeGlobal = totalInscriptos > 0
+    ? Math.round((totalPresentes / totalInscriptos) * 100)
+    : 0;
+
+  const rankingSocios = Array.from(conteoPorSocio.entries())
+    .map(([clienteId, totalPresentes]) => ({ clienteId, totalPresentes }))
+    .sort((a, b) => b.totalPresentes - a.totalPresentes);
+
+  return {
+    totalClases: registros.length,
+    totalPresentes,
+    totalAusentes,
+    totalWalkins,
+    promedioPresentesPorClase,
+    porcentajeGlobal,
+    rankingSocios
+  };
 }
 

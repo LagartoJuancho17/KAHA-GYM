@@ -9,7 +9,9 @@ import {
   calcularMetricasAsistencia,
   guardarRegistroAsistencia,
   obtenerRegistroAsistencia,
-  obtenerTurnosConAsistenciaDelDia
+  obtenerTurnosConAsistenciaDelDia,
+  eliminarRegistroAsistencia,
+  calcularMetricasHistoricas
 } from './controlAsistencia';
 import { Cliente, RecuperoTurno, Turno, Plan } from '../types';
 
@@ -202,5 +204,44 @@ describe('Control de Asistencia y Presentes', () => {
     const turnosHoy = obtenerTurnosConAsistenciaDelDia('2026-11-02');
     assert.ok(turnosHoy.has('LUNES-19:00'));
     assert.equal(turnosHoy.has('LUNES-20:00'), false);
+  });
+
+  it('calcularMetricasHistoricas calcula totales, porcentajes y ranking de socios', () => {
+    const registros = [
+      {
+        id: 'r1',
+        fecha: '2026-11-01',
+        turnoId: 'DOMINGO-10:00',
+        dia: 'DOMINGO',
+        hora: '10:00',
+        presentesIds: ['c1', 'c2'],
+        ausentesIds: ['c3'],
+        walkins: [{ clienteId: 'w1' }],
+        actualizadoAt: '2026-11-01T10:00:00Z'
+      },
+      {
+        id: 'r2',
+        fecha: '2026-11-02',
+        turnoId: 'LUNES-19:00',
+        dia: 'LUNES',
+        hora: '19:00',
+        presentesIds: ['c1', 'c3'],
+        ausentesIds: [],
+        walkins: [],
+        actualizadoAt: '2026-11-02T19:00:00Z'
+      }
+    ] as any;
+
+    const stats = calcularMetricasHistoricas(registros);
+    assert.equal(stats.totalClases, 2);
+    assert.equal(stats.totalPresentes, 4);
+    assert.equal(stats.totalAusentes, 1);
+    assert.equal(stats.totalWalkins, 1);
+    assert.equal(stats.promedioPresentesPorClase, 2);
+    assert.equal(stats.porcentajeGlobal, 80); // 4 presentes de 5 inscriptos = 80%
+
+    // c1 vino a las 2 clases
+    assert.equal(stats.rankingSocios[0].clienteId, 'c1');
+    assert.equal(stats.rankingSocios[0].totalPresentes, 2);
   });
 });

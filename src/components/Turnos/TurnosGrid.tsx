@@ -14,6 +14,7 @@ import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { TurnoExportModal } from './TurnoExportModal';
 import { FeriadosConfigModal } from './FeriadosConfigModal';
 import { ControlPresentesModal } from './ControlPresentesModal';
+import { PresentesHistoricoView } from './PresentesHistoricoView';
 import { SearchableSelect } from '../Common/SearchableSelect';
 import { History, Download, CalendarOff, UserCheck } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
@@ -33,8 +34,9 @@ export const TurnosGrid: React.FC = () => {
   const [showFeriadosModal, setShowFeriadosModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showPresentesModal, setShowPresentesModal] = useState(false);
+  const [asistenciaModalSlot, setAsistenciaModalSlot] = useState<{ turnoId?: string; fecha?: string } | null>(null);
   const [exportInitialMode, setExportInitialMode] = useState<'SEMANAL' | 'FIJA'>('SEMANAL');
-  const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL'>('TIEMPO_REAL');
+  const [subTab, setSubTab] = useState<'GRILLA' | 'TIEMPO_REAL' | 'ASISTENCIAS'>('TIEMPO_REAL');
   const [realtimeWeekOffset, setRealtimeWeekOffset] = useState<number>(() => semanaOffsetInicial());
 
   // Feriado próximo: sólo se visualiza y habilita el botón si faltan 10 días o menos
@@ -236,7 +238,10 @@ export const TurnosGrid: React.FC = () => {
         {/* ACCIONES Y SUB TOOGLE */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
-            onClick={() => setShowPresentesModal(true)}
+            onClick={() => {
+              setAsistenciaModalSlot(null);
+              setShowPresentesModal(true);
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
             id="btn-control-presentes-turnos"
             title="Tomar presentes y controlar asistencia de la clase actual"
@@ -290,7 +295,7 @@ export const TurnosGrid: React.FC = () => {
               }`}
               id="subtab-tiemporeal-trigger"
             >
-              Turnera de Tiempo Real
+              Turnera Tiempo Real
             </button>
             <button
               onClick={() => setSubTab('GRILLA')}
@@ -301,7 +306,19 @@ export const TurnosGrid: React.FC = () => {
               }`}
               id="subtab-grilla-trigger"
             >
-              Matriz Fija Semanal
+              Matriz Semanal
+            </button>
+            <button
+              onClick={() => setSubTab('ASISTENCIAS')}
+              className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center flex items-center justify-center gap-1.5 ${
+                subTab === 'ASISTENCIAS'
+                  ? 'bg-white text-emerald-900 shadow-sm font-bold'
+                  : 'text-zinc-500 hover:text-zinc-950'
+              }`}
+              id="subtab-asistencias-trigger"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Registro de Presentes</span>
             </button>
           </div>
         </div>
@@ -1006,6 +1023,16 @@ export const TurnosGrid: React.FC = () => {
         </div>
       )}
 
+      {/* CONTABILIZACIÓN Y REGISTRO DE PRESENTES */}
+      {subTab === 'ASISTENCIAS' && (
+        <PresentesHistoricoView
+          onAbrirTomarPresentes={(turnoId, fecha) => {
+            setAsistenciaModalSlot(turnoId && fecha ? { turnoId, fecha } : null);
+            setShowPresentesModal(true);
+          }}
+        />
+      )}
+
       {/* MODAL HISTORIAL DE MOVIMIENTOS */}
       <TurnosHistorialModal
         isOpen={showHistorialModal}
@@ -1025,7 +1052,12 @@ export const TurnosGrid: React.FC = () => {
 
       <ControlPresentesModal
         isOpen={showPresentesModal}
-        onClose={() => setShowPresentesModal(false)}
+        onClose={() => {
+          setShowPresentesModal(false);
+          setAsistenciaModalSlot(null);
+        }}
+        turnoIdInicial={asistenciaModalSlot?.turnoId}
+        fechaInicial={asistenciaModalSlot?.fecha}
       />
     </div>
   );
