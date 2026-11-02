@@ -401,7 +401,7 @@ function InnerApp() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row text-slate-900 font-sans antialiased" id="app-wrapper">
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row text-slate-900 font-sans antialiased max-w-full overflow-x-clip" id="app-wrapper">
       
       {/* MOBILE HEADER BAR */}
       <div className="lg:hidden bg-white text-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-200 z-50 sticky top-0 shadow-xs">
@@ -423,23 +423,23 @@ function InnerApp() {
         </button>
       </div>
 
-      {/* LEFT NAVIGATION SIDEBAR (GEOMETRIC CLEAN LIGHT BACKGROUND) */}
+      {/* LEFT NAVIGATION SIDEBAR (PERMANENTLY FIXED & STICKY ON DESKTOP) */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-[260px] bg-white text-slate-600 px-6 pb-6 pt-20 lg:pt-6 flex flex-col justify-between border-r border-slate-200 transition-transform duration-300 transform overflow-y-auto
-        lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:shrink-0
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        fixed inset-y-0 left-0 z-40 w-[260px] bg-white text-slate-600 px-4 pb-4 pt-18 lg:pt-4 flex flex-col justify-between border-r border-slate-200 transition-transform duration-300 transform overflow-y-auto
+        lg:translate-x-0
+        ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
       `} id="app-sidebar-nav">
         
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2.5">
           {/* Logo / Brand */}
-          <div className="mb-2 hidden lg:block">
-            <div className="flex items-center gap-3">
-              <img src={logoKaha} alt="KAHA GYM" className="w-9 h-9 rounded-xl object-contain shrink-0" />
+          <div className="mb-1 hidden lg:block px-2">
+            <div className="flex items-center gap-2.5">
+              <img src={logoKaha} alt="KAHA GYM" className="w-8 h-8 rounded-xl object-contain shrink-0" />
               <div>
-                <h1 className="font-display text-zinc-900 text-base font-bold tracking-tight leading-none" id="sidebar-logo-heading">
+                <h1 className="font-display text-zinc-900 text-sm font-bold tracking-tight leading-none" id="sidebar-logo-heading">
                   KAHA GYM
                 </h1>
-                <span className="text-zinc-400 text-[10px] font-semibold tracking-widest block uppercase mt-0.5" id="sidebar-logo-subtitle">
+                <span className="text-zinc-400 text-[9px] font-semibold tracking-widest block uppercase mt-0.5" id="sidebar-logo-subtitle">
                   {rolActivo === 'PROFESOR' ? 'Panel Profesores' : 'Panel de Control'}
                 </span>
               </div>
@@ -447,7 +447,7 @@ function InnerApp() {
           </div>
 
           {/* Nav List */}
-          <nav className="flex flex-col gap-1" id="sidebar-navigation-items">
+          <nav className="flex flex-col gap-0.5" id="sidebar-navigation-items">
             {TAB_ITEMS.map(item => {
               const Icon = item.icon;
               const isSelected = activeTab === item.id;
@@ -464,7 +464,7 @@ function InnerApp() {
                   }}
                   title={item.desc}
                   className={`
-                    w-full px-4 py-3 rounded-full flex items-center gap-3 text-xs font-semibold transition-all duration-150 outline-none cursor-pointer
+                    w-full px-3 py-2 rounded-xl flex items-center gap-2.5 text-xs font-semibold transition-all duration-150 outline-none cursor-pointer
                     ${isSelected
                       ? 'bg-zinc-900 text-white border border-zinc-900 shadow-sm'
                       : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border border-transparent'
@@ -472,10 +472,10 @@ function InnerApp() {
                   `}
                   id={`tab-btn-sidebar-${item.id.toLowerCase()}`}
                 >
-                  <Icon className={`w-4 h-4 transition-colors ${isSelected ? 'text-lime-300' : 'text-zinc-400'}`} />
-                  <span className="flex-1 text-left">{item.label}</span>
+                  <Icon className={`w-4 h-4 transition-colors shrink-0 ${isSelected ? 'text-lime-300' : 'text-zinc-400'}`} />
+                  <span className="flex-1 text-left truncate">{item.label}</span>
                   {pendingCount > 0 && (
-                    <span className="bg-amber-500 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-full animate-pulse tracking-wide shadow-sm">
+                    <span className="bg-amber-500 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-full animate-pulse tracking-wide shadow-sm shrink-0">
                       {pendingCount}
                     </span>
                   )}
@@ -491,27 +491,27 @@ function InnerApp() {
                 setIsSidebarOpen(false);
                 setShowPresentesModal(true);
               }}
-              className="w-full mt-3 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs hover:shadow transition-all cursor-pointer border border-emerald-500/30"
+              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs hover:shadow transition-all cursor-pointer border border-emerald-500/30 shrink-0"
               id="sidebar-presentes-trigger"
             >
-              <UserCheck className="w-4 h-4 text-lime-300" />
+              <UserCheck className="w-4 h-4 text-lime-300 shrink-0" />
               <span>Tomar Presentes</span>
             </button>
           )}
         </div>
 
         {/* LOGGED CONTEXT CARD (Dynamic Google user) */}
-        <div className="pt-3 border-t border-slate-200 mt-6 flex flex-col gap-2.5" id="sidebar-user-context-card">
-          <div className="flex items-center gap-2.5">
+        <div className="pt-2.5 border-t border-slate-200 mt-2 flex flex-col gap-2 shrink-0" id="sidebar-user-context-card">
+          <div className="flex items-center gap-2">
             {googleUser?.picture ? (
               <img 
                 src={googleUser.picture} 
                 alt={googleUser.name} 
-                className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-extrabold text-xs flex items-center justify-center border border-indigo-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-extrabold text-xs flex items-center justify-center border border-indigo-100 shrink-0">
                 {googleUser?.name ? googleUser.name.slice(0, 2).toUpperCase() : 'G'}
               </div>
             )}
@@ -519,11 +519,11 @@ function InnerApp() {
               <p className="text-[11px] font-bold text-slate-800 truncate leading-none">
                 {googleUser?.name || 'Usuario Google'}
               </p>
-              <p className="text-[9px] text-slate-500 font-mono truncate mt-1 leading-none" title={googleUser?.email}>
+              <p className="text-[9px] text-slate-500 font-mono truncate mt-0.5 leading-none" title={googleUser?.email}>
                 {googleUser?.email || 'N/A'}
               </p>
               {rolActivo === 'PROFESOR' && (
-                <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded bg-violet-50 border border-violet-200 text-violet-700 text-[8px] font-bold uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1 mt-0.5 px-1 py-0.2 rounded bg-violet-50 border border-violet-200 text-violet-700 text-[8px] font-bold uppercase tracking-wide">
                   👩‍🏫 Profesor/a
                 </span>
               )}
@@ -550,7 +550,7 @@ function InnerApp() {
       )}
 
       {/* RIGHT SIDE MAIN CONTAINER */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen" id="main-content-flow">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen lg:pl-[260px]" id="main-content-flow">
         
         {/* Floating Top Header: DB switcher & Roles */}
         <RoleSwitcher />
