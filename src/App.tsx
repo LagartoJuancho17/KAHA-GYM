@@ -426,7 +426,7 @@ function InnerApp() {
       {/* LEFT NAVIGATION SIDEBAR (GEOMETRIC CLEAN LIGHT BACKGROUND) */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-[260px] bg-white text-slate-600 px-6 pb-6 pt-20 lg:pt-6 flex flex-col justify-between border-r border-slate-200 transition-transform duration-300 transform overflow-y-auto
-        lg:translate-x-0 lg:static lg:h-screen
+        lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:shrink-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `} id="app-sidebar-nav">
         
@@ -556,7 +556,7 @@ function InnerApp() {
         <RoleSwitcher />
 
         {/* GEOMETRIC THEMED SUB-HEADER (Matching the clean header element) */}
-        <header className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2 sm:py-3.5 flex flex-row items-center justify-between gap-2 sm:gap-3 shadow-xs" id="sub-header-container">
+        <header className="bg-white/98 backdrop-blur-md border-b border-slate-200 px-3 sm:px-6 py-2 sm:py-3.5 flex flex-row items-center justify-between gap-2 sm:gap-3 shadow-xs sticky top-0 z-30" id="sub-header-container">
           <div className="min-w-0 flex-1 flex items-center gap-2">
             <img src={logoKaha} alt="KAHA GYM Logo" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain shrink-0 hidden sm:block shadow-2xs" />
             <div className="min-w-0">
