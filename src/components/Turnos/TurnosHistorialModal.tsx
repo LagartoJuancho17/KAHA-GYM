@@ -33,7 +33,8 @@ const ACCIONES_TURNOS = [
   'RECUPERO_PENDIENTE_PROGRAMADO',
   'CUPO_TURNO_EDITADO',
   'PROFESOR_TURNO_ASIGNADO',
-  'CLIENTE_REGISTRO_VACACIONES'
+  'CLIENTE_REGISTRO_VACACIONES',
+  'CONTROL_ASISTENCIA_REGISTRADA'
 ];
 
 export const TurnosHistorialModal: React.FC<TurnosHistorialModalProps> = ({
@@ -181,6 +182,13 @@ export const TurnosHistorialModal: React.FC<TurnosHistorialModalProps> = ({
           color: 'bg-zinc-100 text-zinc-900 border-zinc-300',
           icon: <Filter className="w-4 h-4 text-zinc-600" />,
           resumen: `Turno ${log.detalles?.turno_id || ''} -> Nuevo cupo máximo: ${log.detalles?.nuevo_cupo}`
+        };
+      case 'CONTROL_ASISTENCIA_REGISTRADA':
+        return {
+          titulo: 'Planilla de Presentes / Asistencia',
+          color: 'bg-emerald-50 text-emerald-900 border-emerald-300',
+          icon: <UserCheck className="w-4 h-4 text-emerald-600" />,
+          resumen: `Clase ${log.detalles?.hora || ''} hs (${log.detalles?.fecha || ''}): ${log.detalles?.presentes ?? 0} presentes de ${log.detalles?.inscriptos ?? 0} convocados. ${log.detalles?.recuperos_completados ? `(${log.detalles.recuperos_completados} recupero/s completado/s)` : ''}`
         };
       default:
         return {
