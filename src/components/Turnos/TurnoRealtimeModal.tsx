@@ -427,24 +427,31 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs" id="realtime-turno-modal">
-      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-md overflow-hidden relative animate-scale-up max-h-[90vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs font-sans text-xs" 
+      id="realtime-turno-modal"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92vh] flex flex-col my-auto"
+        onClick={e => e.stopPropagation()}
+      >
         
-        {/* Header */}
-        <div className="bg-slate-900 text-white p-5 flex justify-between items-center">
-          <div>
-            <h3 className="text-sm font-bold tracking-tight flex items-center gap-1.5 animate-pulse">
-              <Clock className="w-4 h-4 text-emerald-400" />
-              Control Tiempo Real: {selectedSlot.id.split('-')[0]} — {selectedSlot.id.split('-')[1]} hs
+        {/* Header (Fijo en el tope del modal) */}
+        <div className="bg-slate-900 text-white p-4 sm:p-5 flex justify-between items-center shrink-0 border-b border-slate-800 sticky top-0 z-10">
+          <div className="min-w-0 pr-2">
+            <h3 className="text-sm font-bold tracking-tight flex items-center gap-1.5 animate-pulse truncate">
+              <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Control Tiempo Real: {selectedSlot.id.split('-')[0]} — {selectedSlot.id.split('-')[1]} hs</span>
             </h3>
-            <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1">
+            <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1 truncate">
               <span>Fecha de la clase:</span>
               <strong className="text-emerald-400 font-mono capitalize">
                 {new Date(selectedSlot.date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} ({(() => { const p = selectedSlot.date.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : selectedSlot.date; })()})
               </strong>
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={() => setShowPresentesModal(true)}
@@ -466,14 +473,15 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             <button
               onClick={onClose}
               className="text-zinc-400 hover:text-white bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer border-none"
+              title="Cerrar modal"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-5 space-y-5">
+        {/* Body (Scrollable independiente) */}
+        <div className="p-4 sm:p-5 space-y-5 overflow-y-auto flex-1">
           {/* Feriado Alert Banner */}
           {statusFeriado.esFeriado && (
             <div className={`p-3.5 rounded-xl border flex items-start gap-3 ${
@@ -1009,10 +1017,10 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         </div>
 
         {/* Footer */}
-        <div className="bg-zinc-50 px-5 py-4 border-t border-zinc-100 flex justify-end font-sans">
+        <div className="bg-zinc-50 px-5 py-3.5 border-t border-zinc-100 flex justify-end font-sans shrink-0">
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold transition-colors cursor-pointer border-none"
+            className="px-5 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border-none shadow-xs"
           >
             Cerrar
           </button>
