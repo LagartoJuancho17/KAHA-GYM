@@ -11,12 +11,13 @@ import {
 import { TurnoDetailsModal } from './TurnoDetailsModal';
 import { TurnoRealtimeModal } from './TurnoRealtimeModal';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
+import { SociosPrioritariosModal } from './SociosPrioritariosModal';
 import { TurnoExportModal } from './TurnoExportModal';
 import { FeriadosConfigModal } from './FeriadosConfigModal';
 import { ControlPresentesModal } from './ControlPresentesModal';
 import { PresentesHistoricoView } from './PresentesHistoricoView';
 import { SearchableSelect } from '../Common/SearchableSelect';
-import { History, Download, CalendarOff, UserCheck } from 'lucide-react';
+import { History, Crown, Download, CalendarOff, UserCheck } from 'lucide-react';
 import { hoyArgentina, semanaOffsetInicial, etiquetaSemanaRelativa } from '../../lib/fechas';
 import { esperaDelTurno } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
@@ -31,6 +32,7 @@ export const TurnosGrid: React.FC = () => {
     profesores, novedadesProfesores
   } = useGym();
 
+  const [showPrioritariosModal, setShowPrioritariosModal] = useState(false);
   const [showFeriadosModal, setShowFeriadosModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showPresentesModal, setShowPresentesModal] = useState(false);
@@ -258,6 +260,16 @@ export const TurnosGrid: React.FC = () => {
           >
             <History className="w-3.5 h-3.5 text-lime-400" />
             <span>Historial de Movimientos</span>
+          </button>
+
+          <button
+            onClick={() => setShowPrioritariosModal(true)}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold text-[11px] sm:text-xs transition-all shadow-xs cursor-pointer border-none shrink-0"
+            id="btn-socios-prioritarios"
+            title="Socios que entran primero en la lista de espera de un turno"
+          >
+            <Crown className="w-3.5 h-3.5 text-violet-200" />
+            <span>Socios con Prioridad</span>
           </button>
 
           {proximoFeriadoInfo?.mostrar && (
@@ -1040,6 +1052,11 @@ export const TurnosGrid: React.FC = () => {
       <TurnosHistorialModal
         isOpen={showHistorialModal}
         onClose={() => setShowHistorialModal(false)}
+      />
+
+      <SociosPrioritariosModal
+        isOpen={showPrioritariosModal}
+        onClose={() => setShowPrioritariosModal(false)}
       />
 
       <TurnoExportModal

@@ -678,25 +678,36 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                   <div key={wl.id} className={`flex justify-between items-center p-2 rounded-lg text-xs shadow-2xs ${
                     wl.esMatrizFija
                       ? 'bg-indigo-50 border border-indigo-300'
-                      : 'bg-white border border-amber-200/80'
+                      : wl.prioritario
+                        ? 'bg-violet-50 border border-violet-300'
+                        : 'bg-white border border-amber-200/80'
                   }`}>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded font-bold ${
                         wl.esMatrizFija
                           ? 'bg-indigo-200 text-indigo-900'
-                          : 'bg-amber-100 text-amber-800'
+                          : wl.prioritario
+                            ? 'bg-violet-200 text-violet-900'
+                            : 'bg-amber-100 text-amber-800'
                       }`}>
                         P{idx + 1}
                       </span>
                       <span className="font-semibold text-zinc-900">{wl.nombre}</span>
-                      {wl.esMatrizFija && (
+                      {wl.esMatrizFija ? (
                         <span
                           className="text-[9px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full tracking-wide flex items-center gap-1 shadow-2xs"
                           title="Espera de Matriz Fija: prioridad absoluta ante cualquier baja"
                         >
                           MATRIZ (PRIORIDAD ABSOLUTA)
                         </span>
-                      )}
+                      ) : wl.prioritario ? (
+                        <span
+                          className="text-[9px] font-bold bg-violet-600 text-white px-2 py-0.5 rounded-full tracking-wide flex items-center gap-1 shadow-2xs"
+                          title="Prioridad máxima en este turno: entra primero en todas las semanas si se libera un lugar"
+                        >
+                          PRIORIDAD
+                        </span>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {!wl.esMatrizFija && waitlistItems.filter(w => !w.esMatrizFija).length >= 2 && (

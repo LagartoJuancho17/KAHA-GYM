@@ -3,6 +3,7 @@
 // La prioridad es por (socio, turno): ser VIP del JUEVES-19:00 no da ventaja en
 // el resto de los horarios. La lógica de orden vive en src/lib/listaEspera.ts.
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
 import { X, Crown, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
 import { SearchableSelect } from '../Common/SearchableSelect';
@@ -101,9 +102,9 @@ export const SociosPrioritariosModal: React.FC<Props> = ({ isOpen, onClose }) =>
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans" id="socios-prioritarios-modal">
-      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-in max-h-[90vh] flex flex-col">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs font-sans" id="socios-prioritarios-modal">
+      <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-in max-h-[92dvh] flex flex-col">
 
         <div className="bg-violet-900 text-white p-5 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
@@ -236,6 +237,7 @@ export const SociosPrioritariosModal: React.FC<Props> = ({ isOpen, onClose }) =>
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
