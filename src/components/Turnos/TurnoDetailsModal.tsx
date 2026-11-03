@@ -1,5 +1,6 @@
 // src/components/Turnos/TurnoDetailsModal.tsx
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
 import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle, History, ArrowLeftRight, ChevronUp } from 'lucide-react';
 import { SearchableSelect } from '../Common/SearchableSelect';
@@ -225,14 +226,14 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
     setTimeout(() => setCellActionSuccess(''), 1500);
   };
 
-  return (
+  return createPortal(
     <div 
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs font-sans text-xs" 
+      className="fixed inset-0 bg-slate-950/70 z-[100] flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs font-sans text-xs" 
       id="grilla-turno-modal"
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92vh] flex flex-col my-auto"
+        className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92dvh] flex flex-col my-auto"
         onClick={e => e.stopPropagation()}
       >
         
@@ -830,6 +831,7 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
         onClose={() => setShowHistorial(false)}
         filtroTurnoIdInicial={turnoId}
       />
-    </div>
+    </div>,
+    document.body
   );
 };

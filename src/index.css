@@ -166,11 +166,11 @@ h1, h2, h3, h4 {
 }
 
 .animate-slide-in-left {
-  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-fade-in {
-  animation: fadeInOverlay 0.25s ease-out forwards;
+  animation: fadeInOverlay 0.25s ease-out;
 }
 
 /* Scale-in for modals */
@@ -181,12 +181,12 @@ h1, h2, h3, h4 {
   }
   100% {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: none;
   }
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Scale-up (alias for scale-in, slightly slower) */
@@ -197,12 +197,12 @@ h1, h2, h3, h4 {
   }
   100% {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: none;
   }
 }
 
 .animate-scale-up {
-  animation: scaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: scaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Flash success banner */

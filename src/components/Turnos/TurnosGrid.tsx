@@ -288,37 +288,40 @@ export const TurnosGrid: React.FC = () => {
           <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200 gap-1 w-full sm:w-auto">
             <button
               onClick={() => setSubTab('TIEMPO_REAL')}
-              className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center ${
+              className={`flex-1 sm:flex-initial px-2 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center whitespace-nowrap ${
                 subTab === 'TIEMPO_REAL'
                   ? 'bg-white text-zinc-900 shadow-sm font-bold'
                   : 'text-zinc-500 hover:text-zinc-950'
               }`}
               id="subtab-tiemporeal-trigger"
             >
-              Turnera Tiempo Real
+              <span className="sm:hidden">Tiempo Real</span>
+              <span className="hidden sm:inline">Turnera Tiempo Real</span>
             </button>
             <button
               onClick={() => setSubTab('GRILLA')}
-              className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center ${
+              className={`flex-1 sm:flex-initial px-2 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center whitespace-nowrap ${
                 subTab === 'GRILLA'
                   ? 'bg-white text-zinc-950 shadow-sm font-semibold'
                   : 'text-zinc-500 hover:text-zinc-950'
               }`}
               id="subtab-grilla-trigger"
             >
-              Matriz Semanal
+              <span className="sm:hidden">Matriz Fija</span>
+              <span className="hidden sm:inline">Matriz Semanal</span>
             </button>
             <button
               onClick={() => setSubTab('ASISTENCIAS')}
-              className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center flex items-center justify-center gap-1.5 ${
+              className={`flex-1 sm:flex-initial px-2 sm:px-3 py-1.5 rounded-md transition-all font-medium text-[11px] sm:text-xs cursor-pointer border-none bg-transparent text-center flex items-center justify-center gap-1 whitespace-nowrap ${
                 subTab === 'ASISTENCIAS'
                   ? 'bg-white text-emerald-900 shadow-sm font-bold'
                   : 'text-zinc-500 hover:text-zinc-950'
               }`}
               id="subtab-asistencias-trigger"
             >
-              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Registro de Presentes</span>
+              <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="sm:hidden">Presentes</span>
+              <span className="hidden sm:inline">Registro de Presentes</span>
             </button>
           </div>
         </div>

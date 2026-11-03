@@ -1,5 +1,6 @@
 // src/components/Turnos/ControlPresentesModal.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
 import { Turno, Cliente } from '../../types';
 import {
@@ -392,15 +393,19 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in font-sans"
+      className="fixed inset-0 z-[110] flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in font-sans"
       role="dialog"
       aria-modal="true"
       aria-labelledby="presentes-modal-title"
       ref={modalRef}
+      onClick={onClose}
     >
-      <div className="bg-white sm:border border-slate-200 sm:shadow-2xl sm:rounded-2xl w-full max-w-4xl h-full sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden text-slate-800">
+      <div
+        className="bg-white sm:border border-slate-200 sm:shadow-2xl sm:rounded-2xl w-full max-w-4xl h-full sm:h-auto sm:max-h-[92dvh] flex flex-col overflow-hidden text-slate-800"
+        onClick={e => e.stopPropagation()}
+      >
         
         {/* HEADER PRINCIPAL RESPONSIVE */}
         <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-800 text-white px-3.5 sm:px-5 py-2.5 sm:py-3.5 border-b border-zinc-700 flex items-center justify-between gap-2 shrink-0">
@@ -883,6 +888,7 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

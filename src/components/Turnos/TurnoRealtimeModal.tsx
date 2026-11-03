@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { X, Clock, Trash2, Plus, MessageCircle, Send, Search, UserCheck, History, ListOrdered, Check, CheckCircle2, AlertTriangle, Mail, CalendarOff } from 'lucide-react';
@@ -426,28 +427,36 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     setCustomMensaje(`Hola {nombre}! Te avisamos que por cuestiones climáticas la clase de hoy ${selectedSlot.id.split('-')[0]} ${selectedSlot.id.split('-')[1]}hs en KAHA GYM queda suspendida. Se te reintegra la clase.`);
   };
 
-  return (
+  return createPortal(
     <div 
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs font-sans text-xs" 
+      className="fixed inset-0 bg-slate-950/70 z-[100] flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs font-sans text-xs" 
       id="realtime-turno-modal"
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92vh] flex flex-col my-auto"
+        className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92dvh] flex flex-col my-auto"
         onClick={e => e.stopPropagation()}
       >
         
         {/* Header (Fijo en el tope del modal) */}
-        <div className="bg-slate-900 text-white p-4 sm:p-5 flex justify-between items-center shrink-0 border-b border-slate-800 sticky top-0 z-10">
-          <div className="min-w-0 pr-2">
-            <h3 className="text-sm font-bold tracking-tight flex items-center gap-1.5 animate-pulse truncate">
-              <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Control Tiempo Real: {selectedSlot.id.split('-')[0]} — {selectedSlot.id.split('-')[1]} hs</span>
+        <div className="bg-slate-900 text-white px-3.5 py-3 sm:p-5 flex justify-between items-center gap-2 shrink-0 border-b border-slate-800 sticky top-0 z-10">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xs sm:text-sm font-bold tracking-tight flex items-center gap-1.5 truncate">
+              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">
+                <span className="hidden sm:inline">Control Tiempo Real: </span>
+                {selectedSlot.id.split('-')[0]} — {selectedSlot.id.split('-')[1]} hs
+              </span>
             </h3>
             <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1 truncate">
-              <span>Fecha de la clase:</span>
-              <strong className="text-emerald-400 font-mono capitalize">
-                {new Date(selectedSlot.date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} ({(() => { const p = selectedSlot.date.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : selectedSlot.date; })()})
+              <span className="hidden sm:inline">Fecha de la clase:</span>
+              <strong className="text-emerald-400 font-mono capitalize truncate">
+                <span className="sm:hidden">
+                  {new Date(selectedSlot.date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })} ({(() => { const p = selectedSlot.date.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : selectedSlot.date; })()})
+                </span>
+                <span className="hidden sm:inline">
+                  {new Date(selectedSlot.date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} ({(() => { const p = selectedSlot.date.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : selectedSlot.date; })()})
+                </span>
               </strong>
             </p>
           </div>
@@ -455,25 +464,28 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
             <button
               type="button"
               onClick={() => setShowPresentesModal(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer border border-emerald-500/40"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer border border-emerald-500/40"
               title="Tomar lista y presentes de esta clase"
             >
-              <UserCheck className="w-3.5 h-3.5 text-lime-300" />
+              <UserCheck className="w-3.5 h-3.5 text-lime-300 shrink-0" />
+              <span className="sm:hidden">Presentes</span>
               <span className="hidden sm:inline">Tomar Presentes</span>
             </button>
             <button
               type="button"
               onClick={() => setShowHistorial(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer border border-slate-700"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-zinc-200 text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer border border-slate-700"
               title="Ver historial de movimientos de este turno y fecha"
             >
-              <History className="w-3.5 h-3.5 text-lime-400" />
+              <History className="w-3.5 h-3.5 text-lime-400 shrink-0" />
               <span className="hidden sm:inline">Historial</span>
             </button>
             <button
+              type="button"
               onClick={onClose}
-              className="text-zinc-400 hover:text-white bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer border-none"
+              className="text-zinc-300 hover:text-white bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer border border-slate-700 shrink-0"
               title="Cerrar modal"
+              aria-label="Cerrar modal"
             >
               <X className="w-4 h-4" />
             </button>
@@ -481,7 +493,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         </div>
 
         {/* Body (Scrollable independiente) */}
-        <div className="p-4 sm:p-5 space-y-5 overflow-y-auto flex-1">
+        <div className="p-3.5 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
           {/* Feriado Alert Banner */}
           {statusFeriado.esFeriado && (
             <div className={`p-3.5 rounded-xl border flex items-start gap-3 ${
@@ -847,13 +859,13 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                       value={guestName}
                       onChange={(e) => { setGuestName(e.target.value); setGuestNameConfirmed(false); }}
                       onKeyDown={(e) => { if (e.key === 'Enter' && guestName.trim()) { e.preventDefault(); setGuestNameConfirmed(true); } }}
-                      className="flex-1 border border-zinc-300 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
+                      className="flex-1 min-w-0 border border-zinc-300 rounded-lg p-2 text-xs bg-white outline-hidden font-medium"
                     />
                     <button
                       type="button"
                       disabled={!guestName.trim()}
                       onClick={() => setGuestNameConfirmed(true)}
-                      className="px-3 py-2 bg-zinc-900 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border-none shrink-0"
+                      className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border-none shrink-0"
                     >
                       Usar
                     </button>
@@ -1030,8 +1042,15 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
 
       {/* MODAL / SUB-PANEL: AVISO MASIVO WHATSAPP */}
       {showWspModal && (
-        <div className="fixed inset-0 bg-slate-950/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs" id="wsp-broadcast-modal">
-          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
+        <div
+          className="fixed inset-0 bg-slate-950/80 z-[110] flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs font-sans text-xs"
+          id="wsp-broadcast-modal"
+          onClick={e => { e.stopPropagation(); setShowWspModal(false); }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden animate-scale-in max-h-[90dvh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Header */}
             <div className="bg-emerald-950 text-white p-4 flex justify-between items-center">
               <div className="flex items-center gap-2.5">
@@ -1217,6 +1236,7 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
         turnoIdInicial={selectedSlot.id}
         fechaInicial={selectedSlot.date}
       />
-    </div>
+    </div>,
+    document.body
   );
 };

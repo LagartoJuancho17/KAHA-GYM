@@ -1,5 +1,6 @@
 // src/components/Turnos/TurnoExportModal.tsx
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
 import { Cliente, Turno } from '../../types';
 import { 
@@ -614,9 +615,9 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-2 sm:p-5 backdrop-blur-md font-sans text-xs">
-      <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-5xl max-h-[96vh] flex flex-col overflow-hidden animate-scale-up">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-2 sm:p-5 backdrop-blur-md font-sans text-xs">
+      <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-5xl max-h-[92dvh] flex flex-col overflow-hidden animate-scale-up">
         
         {/* MODAL HEADER */}
         <div className="bg-zinc-950 text-white p-3.5 sm:p-5 flex justify-between items-center shrink-0 border-b border-zinc-800">
@@ -866,6 +867,7 @@ export const TurnoExportModal: React.FC<TurnoExportModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

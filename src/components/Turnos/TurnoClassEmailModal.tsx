@@ -1,5 +1,6 @@
 // src/components/Turnos/TurnoClassEmailModal.tsx
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Mail, Send, Copy, ExternalLink, Check, AlertCircle, Sparkles, Users, Info } from 'lucide-react';
 import { useGym } from '../../GymContext';
 import {
@@ -239,9 +240,16 @@ export const TurnoClassEmailModal: React.FC<TurnoClassEmailModalProps> = ({
       })
     : mensaje;
 
-  return (
-    <div className="fixed inset-0 bg-black/75 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs font-sans text-xs" id="turno-class-email-modal">
-      <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-2xl overflow-hidden relative animate-scale-up max-h-[92vh] flex flex-col">
+  return createPortal(
+    <div
+      className="fixed inset-0 bg-slate-950/75 z-[110] flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs font-sans text-xs"
+      id="turno-class-email-modal"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-2xl overflow-hidden relative animate-scale-up max-h-[92dvh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
         
         {/* HEADER */}
         <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-900 text-white p-4 sm:p-5 flex justify-between items-start shrink-0 border-b border-zinc-800">
@@ -522,6 +530,7 @@ export const TurnoClassEmailModal: React.FC<TurnoClassEmailModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

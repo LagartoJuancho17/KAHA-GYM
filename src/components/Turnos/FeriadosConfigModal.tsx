@@ -1,5 +1,6 @@
 // src/components/Turnos/FeriadosConfigModal.tsx
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
 import { Feriado, TipoFeriado } from '../../types';
 import { 
@@ -370,10 +371,10 @@ Tu turno habitual correspondiente a ese día se da de baja automáticamente y tu
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in font-sans text-xs">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in font-sans text-xs">
       <div 
-        className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden relative"
+        className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden relative"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-feriados-title"
@@ -939,6 +940,7 @@ Tu turno habitual correspondiente a ese día se da de baja automáticamente y tu
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

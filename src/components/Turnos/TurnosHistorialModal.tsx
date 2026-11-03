@@ -1,5 +1,6 @@
 // src/components/Turnos/TurnosHistorialModal.tsx
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
 import { AuditLog } from '../../types';
 import { 
@@ -202,9 +203,16 @@ export const TurnosHistorialModal: React.FC<TurnosHistorialModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-5 backdrop-blur-xs font-sans text-xs animate-fade-in" id="modal-historial-turnos">
-      <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-scale-in">
+  return createPortal(
+    <div
+      className="fixed inset-0 bg-slate-950/70 z-[110] flex items-center justify-center p-2 sm:p-5 backdrop-blur-xs font-sans text-xs animate-fade-in"
+      id="modal-historial-turnos"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-4xl max-h-[92dvh] flex flex-col overflow-hidden animate-scale-in"
+        onClick={e => e.stopPropagation()}
+      >
         
         {/* HEADER */}
         <div className="bg-zinc-900 text-white p-5 sm:p-6 flex justify-between items-center shrink-0">
@@ -361,6 +369,7 @@ export const TurnosHistorialModal: React.FC<TurnosHistorialModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

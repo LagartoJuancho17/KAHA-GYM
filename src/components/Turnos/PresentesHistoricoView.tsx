@@ -253,9 +253,9 @@ export const PresentesHistoricoView: React.FC<PresentesHistoricoViewProps> = ({
         </div>
 
         {/* Selector de horario + buscador */}
-        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-1 sm:flex-initial justify-end">
           {/* Selector horario */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <select
               value={filtroHorario}
               onChange={e => setFiltroHorario(e.target.value)}
@@ -269,7 +269,7 @@ export const PresentesHistoricoView: React.FC<PresentesHistoricoViewProps> = ({
           </div>
 
           {/* Buscador */}
-          <div className="relative w-44 sm:w-60">
+          <div className="relative flex-1 min-w-0 sm:w-60">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
             <input
               type="text"
