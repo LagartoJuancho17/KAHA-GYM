@@ -334,7 +334,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const stored = localStorage.getItem('gym_feriados');
       if (stored) {
-        return JSON.parse(stored);
+        const parsed: Feriado[] = JSON.parse(stored);
+        const migrated = parsed.map(f =>
+          f.fecha === '2026-11-20'
+            ? { ...f, fecha: '2026-11-23', nombre: 'Día de la Soberanía Nacional (Trasladado)' }
+            : f
+        );
+        if (migrated.some((f, idx) => f.fecha !== parsed[idx].fecha)) {
+          localStorage.setItem('gym_feriados', JSON.stringify(migrated));
+        }
+        return migrated;
       }
     } catch (e) {}
     const anioActual = new Date().getFullYear();
@@ -527,8 +536,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const { data: feriadosDb, error: feriadosErr } = await supabase.from('feriados').select('*').order('fecha', { ascending: true });
         if (!feriadosErr && feriadosDb && feriadosDb.length > 0) {
-          setFeriados(feriadosDb);
-          localStorage.setItem('gym_feriados', JSON.stringify(feriadosDb));
+          // Migrar feriado de Soberanía Nacional 2026 del viernes 20/11 al lunes 23/11 si quedó con la fecha vieja
+          const viejoSoberania = feriadosDb.filter((f: Feriado) => f.fecha === '2026-11-20');
+          if (viejoSoberania.length > 0) {
+            await supabase
+              .from('feriados')
+              .update({ fecha: '2026-11-23', nombre: 'Día de la Soberanía Nacional (Trasladado)' })
+              .eq('fecha', '2026-11-20');
+          }
+          const normalizados = feriadosDb
+            .map((f: Feriado) =>
+              f.fecha === '2026-11-20'
+                ? { ...f, fecha: '2026-11-23', nombre: 'Día de la Soberanía Nacional (Trasladado)' }
+                : f
+            )
+            .sort((a: Feriado, b: Feriado) => a.fecha.localeCompare(b.fecha));
+          setFeriados(normalizados);
+          localStorage.setItem('gym_feriados', JSON.stringify(normalizados));
         } else if (!feriadosErr && feriadosDb && feriadosDb.length === 0) {
           const anioActual = new Date().getFullYear();
           const seed = generarFeriadosNacionales(anioActual).map((f, i) => ({

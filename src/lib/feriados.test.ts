@@ -56,8 +56,8 @@ describe('Gestión de Feriados - KAHA GYM', () => {
     },
     {
       id: 'f-5',
-      fecha: '2026-11-20',
-      nombre: 'Día de la Soberanía Nacional',
+      fecha: '2026-11-23',
+      nombre: 'Día de la Soberanía Nacional (Trasladado)',
       tipo: 'TRASLADABLE',
       cerrado: false,
       hora_desde: '10:00',
@@ -120,15 +120,15 @@ describe('Gestión de Feriados - KAHA GYM', () => {
 
   it('estadoTurnoFeriado: feriado con rango horario respeta hora_desde y hora_hasta', () => {
     // 11:30 está dentro de 10:00 a 18:00
-    const status1130 = estadoTurnoFeriado('2026-11-20', '11:30', mockFeriados);
+    const status1130 = estadoTurnoFeriado('2026-11-23', '11:30', mockFeriados);
     assert.equal(status1130.cerrado, false);
 
     // 07:30 está antes de las 10:00
-    const status0730 = estadoTurnoFeriado('2026-11-20', '07:30', mockFeriados);
+    const status0730 = estadoTurnoFeriado('2026-11-23', '07:30', mockFeriados);
     assert.equal(status0730.cerrado, true);
 
     // 20:00 está después de las 18:00
-    const status2000 = estadoTurnoFeriado('2026-11-20', '20:00', mockFeriados);
+    const status2000 = estadoTurnoFeriado('2026-11-23', '20:00', mockFeriados);
     assert.equal(status2000.cerrado, true);
   });
 
@@ -150,7 +150,7 @@ describe('Gestión de Feriados - KAHA GYM', () => {
     assert.equal(proximos.length, 3);
     assert.equal(proximos[0].fecha, '2026-05-25');
     assert.equal(proximos[1].fecha, '2026-06-20');
-    assert.equal(proximos[2].fecha, '2026-11-20');
+    assert.equal(proximos[2].fecha, '2026-11-23');
   });
 
   it('generarFeriadosNacionales genera lista de feriados oficiales de Argentina para 2026', () => {

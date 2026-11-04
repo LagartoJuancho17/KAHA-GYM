@@ -72,7 +72,7 @@ export const FERIADOS_OFICIALES_ARGENTINA: Record<number, Array<{
     { fecha: '2026-07-10', nombre: 'Feriado Puente Turístico', tipo: 'PUENTE' },
     { fecha: '2026-08-17', nombre: 'Paso a la Inmortalidad del Gral. José de San Martín', tipo: 'TRASLADABLE' },
     { fecha: '2026-10-12', nombre: 'Día del Respeto a la Diversidad Cultural', tipo: 'TRASLADABLE' },
-    { fecha: '2026-11-20', nombre: 'Día de la Soberanía Nacional', tipo: 'TRASLADABLE' },
+    { fecha: '2026-11-23', nombre: 'Día de la Soberanía Nacional (Trasladado)', tipo: 'TRASLADABLE' },
     { fecha: '2026-12-08', nombre: 'Inmaculada Concepción de María', tipo: 'INAMOVIBLE' },
     { fecha: '2026-12-25', nombre: 'Navidad', tipo: 'INAMOVIBLE' },
   ],
