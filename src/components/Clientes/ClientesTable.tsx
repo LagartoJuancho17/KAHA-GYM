@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User, RotateCcw, Clock, PauseCircle, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { Calendar, MoreVertical, Eye, Edit2, Trash2, Check, CalendarX, CreditCard, User, RotateCcw, Clock, PauseCircle, ArrowUp, ArrowDown, ChevronsUpDown, Play } from 'lucide-react';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 import { ordenarSocios, alternarOrden, ORDEN_POR_DEFECTO, CampoOrdenSocios, OrdenSocios } from '../../lib/ordenSocios';
 import { estaEnReposo } from '../../lib/reposo';
+import { estaPausado } from '../../lib/pausa';
 
 interface ClientesTableProps {
   clientesFiltrados: Cliente[];
@@ -29,6 +30,9 @@ const getEstadoBadge = (c: Cliente): { badgeClass: string; estadoLabel: string }
   // lee como "Inactivo" y no se distingue de una baja definitiva.
   if (estaEnReposo(c)) {
     return { badgeClass: 'bg-amber-100 text-amber-900 border-amber-300 font-bold', estadoLabel: 'En reposo' };
+  }
+  if (estaPausado(c)) {
+    return { badgeClass: 'bg-amber-100 text-amber-900 border-amber-300 font-bold', estadoLabel: 'En Pausa' };
   }
   if (c.autorizado === false) {
     return { badgeClass: 'bg-amber-100 text-amber-900 border-amber-200 animate-pulse', estadoLabel: 'Pendiente' };
@@ -87,7 +91,7 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
   onSelectCliente, onManageTurnos, onStartEdit, onDeleteClick,
   onStartAuthorization, onOpenBajaClases, onAssignPlan
 }) => {
-  const { autorizarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, googleUser } = useGym();
+  const { autorizarCliente, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, retomarSocioPausado, googleUser } = useGym();
   return (
     <div className="relative shrink-0">
       <button
@@ -174,10 +178,20 @@ const SocioActionsMenu: React.FC<SocioActionsMenuProps> = ({
                 Prorrogar Deuda (1 sem)
               </button>
             )}
-            {c.exencion_cobro !== 'SUSPENDIDO' && (
+            {c.exencion_cobro === 'SUSPENDIDO' ? (
+              <button
+                onClick={() => { close(); retomarSocioPausado(c.id, googleUser?.email); }}
+                className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 text-emerald-800 font-bold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+                id={`btn-menu-despausar-${c.id}`}
+              >
+                <Play className="w-3.5 h-3.5 text-emerald-600 fill-current" />
+                Despausar / Reanudar Socio
+              </button>
+            ) : (
               <button
                 onClick={() => { close(); pausarSocio(c.id, googleUser?.email); }}
                 className="w-full text-left px-4 py-2.5 hover:bg-amber-50 text-amber-800 font-semibold flex items-center gap-2 transition-colors cursor-pointer border-t border-zinc-100"
+                id={`btn-menu-pausar-${c.id}`}
               >
                 <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
                 Pausar Socio (Cobro susp.)

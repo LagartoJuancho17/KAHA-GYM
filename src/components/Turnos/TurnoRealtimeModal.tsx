@@ -8,6 +8,7 @@ import { TurnoClassEmailModal } from './TurnoClassEmailModal';
 import { ControlPresentesModal } from './ControlPresentesModal';
 import { esperaDelTurno, esPrioritario } from '../../lib/listaEspera';
 import { estaSuspendido } from '../../lib/ocupacion';
+import { estaPausado } from '../../lib/pausa';
 import { esEmailValido, AlumnoClaseEmail } from '../../lib/emailClase';
 import { esFeriado, estadoTurnoFeriado } from '../../lib/feriados';
 
@@ -32,7 +33,8 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     crearReservaIndividual, cancelarReservaIndividual, suspenderClaseFija, revertirSuspensionClaseFija,
     actualizarEstadoRecupero, addCliente, notificarBajaClase, asignarClienteFijo,
     profesores, novedadesProfesores, registrarNovedadProfesor, eliminarNovedadProfesor,
-    reordenarEsperaTurno, procesarPromocionListaEspera, sincronizarEsperaTurno, promoverDeListaEspera
+    reordenarEsperaTurno, procesarPromocionListaEspera, sincronizarEsperaTurno, promoverDeListaEspera,
+    retomarSocioPausado, googleUser
   } = useGym();
 
   const [realtimeCandidateClient, setRealtimeCandidateClient] = useState('');
@@ -302,12 +304,14 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
     // Fijos (Activos + Suspendidos)
     rtData.fijos.forEach(c => {
       const esAusente = rtData.suspendidos.some(s => s.id === c.id);
+      const enPausa = estaPausado(c);
       items.push({
         id: c.id,
         clienteId: c.id,
         nombre: `${c.apellido}, ${c.nombre}`,
         tipo: 'FIJO',
         presente: !esAusente,
+        info: enPausa ? 'Membresía en pausa este mes' : undefined,
         key: `fijo-${c.id}`
       });
     });
@@ -388,6 +392,18 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
           setRealtimeError(res.message);
         }
       } else {
+        const socio = clientes.find(c => c.id === item.clienteId);
+        if (socio && estaPausado(socio)) {
+          const res = retomarSocioPausado(item.clienteId, googleUser?.email);
+          if (res.success) {
+            setRealtimeSuccess(`✅ ¡${socio.nombre} ${socio.apellido} fue despausado/a y volvió a figurar en la Turnera!`);
+            setTimeout(() => setRealtimeSuccess(null), 4000);
+          } else {
+            setRealtimeError(res.message);
+          }
+          return;
+        }
+
         const res = revertirSuspensionClaseFija(item.clienteId, selectedSlot.id, selectedSlot.date);
         if (res.success) {
           setRealtimeSuccess(res.message);
@@ -639,9 +655,22 @@ export const TurnoRealtimeModal: React.FC<TurnoRealtimeModalProps> = ({ selected
                       
                       <div className="shrink-0 pl-2">
                         {item.tipo === 'FIJO' && (
-                          <span className="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-sm bg-sky-50 text-sky-700 border border-sky-100">
-                            Fijo
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-sm bg-sky-50 text-sky-700 border border-sky-100">
+                              Fijo
+                            </span>
+                            {(() => {
+                              const socio = clientes.find(c => c.id === item.clienteId);
+                              if (socio && estaPausado(socio)) {
+                                return (
+                                  <span className="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 border border-amber-200" title="Socio en pausa: tildá la casilla para despausar">
+                                    En Pausa
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                         )}
                         {item.tipo === 'VARIABLE' && (
                           <span className="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-sm bg-violet-50 text-violet-700 border border-violet-100">

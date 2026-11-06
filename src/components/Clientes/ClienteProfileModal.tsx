@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard, PauseCircle, RotateCcw } from 'lucide-react';
+import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard, PauseCircle, RotateCcw, Play } from 'lucide-react';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 import { estaEnReposo, etiquetaReposo, calcularFinDeReposo, MESES_DE_REPOSO } from '../../lib/reposo';
@@ -38,7 +38,7 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
   onManageTurnos,
   onAssignPlan
 }) => {
-  const { clientes, planes, pagos, turnos, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, ponerEnReposo, sacarDeReposo, googleUser } = useGym();
+  const { clientes, planes, pagos, turnos, perdonarDeudaSocio, revertirPerdonDeuda, prorrogarDeudaSocio, pausarSocio, retomarSocioPausado, ponerEnReposo, sacarDeReposo, googleUser } = useGym();
 
   const [confirmandoReposo, setConfirmandoReposo] = React.useState(false);
   const [motivoReposo, setMotivoReposo] = React.useState('');
@@ -200,19 +200,47 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
                     Prorrogar Deuda (1 semana)
                   </button>
                 )}
-                {selectedCliente.exencion_cobro !== 'SUSPENDIDO' && (
+                {selectedCliente.exencion_cobro === 'SUSPENDIDO' ? (
+                  <button
+                    onClick={() => retomarSocioPausado(selectedCliente.id, googleUser?.email)}
+                    className="w-full text-center px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1"
+                    title="Reanudar actividad del socio y volver a habilitarlo en la Turnera"
+                    id="btn-despausar-socio"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Despausar Socio</span>
+                  </button>
+                ) : (
                   <button
                     onClick={() => pausarSocio(selectedCliente.id, googleUser?.email)}
                     className="w-full text-center px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded text-[9px] font-bold border border-amber-300 transition-colors cursor-pointer"
+                    title="Suspender cobro este mes"
+                    id="btn-pausar-socio"
                   >
-                    Pausar Socio (Cobro suspendido)
+                    Pausar Socio (Cobro susp.)
                   </button>
                 )}
               </div>
             </div>
             {selectedCliente.exencion_cobro === 'SUSPENDIDO' && (
-              <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 col-span-1 sm:col-span-3 flex items-center justify-between">
-                <span className="text-amber-800 font-bold text-xs">Socio en pausa (Cobro suspendido este mes)</span>
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-300 col-span-1 sm:col-span-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <PauseCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div>
+                    <span className="text-amber-900 font-bold text-xs block">Socio en pausa (Cobro suspendido este mes)</span>
+                    <span className="text-amber-700 text-[10px]">Conserva sus turnos en la Matriz Fija pero no figura en la Turnera diaria.</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => retomarSocioPausado(selectedCliente.id, googleUser?.email)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs shrink-0"
+                  id="btn-banner-despausar"
+                  title="Reactivar membresía y turnos diarios de Juana"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Despausar / Reanudar</span>
+                </button>
               </div>
             )}
             {selectedCliente.exencion_cobro === 'POSTERGADO' && (

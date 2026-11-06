@@ -54,6 +54,7 @@ export const ClientesFilter: React.FC<ClientesFilterProps> = ({
             <option value="ACTIVO">Al Día</option>
             <option value="CON_DEUDA">Con Deuda</option>
             <option value="MOROSO">Morosos</option>
+            <option value="PAUSADO">En Pausa</option>
           </select>
         </div>
       </div>

@@ -1,5 +1,5 @@
 // src/components/Dashboard.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGym } from '../GymContext';
 import { 
   Users, AlertTriangle, TrendingUp, DollarSign, 
@@ -18,7 +18,7 @@ import { FeriadosConfigModal } from './Turnos/FeriadosConfigModal';
 import { ControlPresentesModal } from './Turnos/ControlPresentesModal';
 import { hoyArgentina } from '../lib/fechas';
 import { estaEmailInicioMesEnviado } from '../lib/emailInicioMes';
-import { pausadosPendientesDeRevision } from '../lib/pausa';
+import { pausadosPendientesDeRevision, estaPausado } from '../lib/pausa';
 import { proximosFeriados } from '../lib/feriados';
 
 interface DashboardProps {
@@ -138,6 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Socios que finalizaron su mes de pausa y deben ser revisados (retomar, postergar o dar de baja)
   const pausadosPorRevisar = pausadosPendientesDeRevision(clientes, mesActual);
+  const totalPausados = useMemo(() => clientes.filter(c => estaPausado(c) && c.activo !== false).length, [clientes]);
 
   // Ingresos reales de este mes
   const pagosDeEsteMes = pagos.filter(p => p.mes_correspondiente === mesActual);
@@ -391,15 +392,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
           )}
 
-          {pausadosPorRevisar.length > 0 && (
+          {totalPausados > 0 && (
             <button
               onClick={() => setShowPausadosModal(true)}
               className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
               id="quick-pausados-review-btn"
-              title="Revisar socios que completaron su mes de pausa"
+              title="Ver socios en pausa (reanudar, postergar o dar de baja)"
             >
               <PauseCircle className="w-3.5 h-3.5" />
-              Revisar Pausados ({pausadosPorRevisar.length})
+              Socios en Pausa ({totalPausados})
             </button>
           )}
         </div>

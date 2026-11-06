@@ -42,6 +42,14 @@ export const AdminPausadosReviewModal: React.FC<AdminPausadosReviewModalProps> =
 
   const listaActual = filtro === 'PENDIENTES' ? pausadosVencidos : todosLosPausados;
 
+  React.useEffect(() => {
+    if (isOpen) {
+      if (pausadosVencidos.length === 0 && todosLosPausados.length > 0) {
+        setFiltro('TODOS');
+      }
+    }
+  }, [isOpen, pausadosVencidos.length, todosLosPausados.length]);
+
   const filteredPausados = useMemo(() => {
     if (!searchText.trim()) return listaActual;
     const q = searchText.toLowerCase();

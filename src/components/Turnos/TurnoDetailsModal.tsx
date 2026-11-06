@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useGym } from '../../GymContext';
-import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle, History, ArrowLeftRight, ChevronUp } from 'lucide-react';
+import { X, Clock, Trash2, ListOrdered, Plus, ShieldCheck, AlertTriangle, History, ArrowLeftRight, ChevronUp, Play } from 'lucide-react';
 import { SearchableSelect } from '../Common/SearchableSelect';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { ordenarEsperaSemanal, esPrioritario } from '../../lib/listaEspera';
@@ -19,7 +19,8 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   const { 
     turnos, clientes, planes, profesores,
     asignarClienteFijo, removerAsignacionFija, checkInFlexible, updateCliente,
-    modificarPrecioOCupoTurno, asignarProfesorTurno, sociosPrioritarios
+    modificarPrecioOCupoTurno, asignarProfesorTurno, sociosPrioritarios,
+    retomarSocioPausado, googleUser
   } = useGym();
 
   const [selectedClientToAssignId, setSelectedClientToAssignId] = useState('');
@@ -438,9 +439,20 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-zinc-900">{cl.apellido}, {cl.nombre}</span>
                         {estaPausado(cl) && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-200" title="Socio en pausa: liberado de la Turnera este mes, conserva su lugar en la Matriz">
-                            En Pausa
-                          </span>
+                          <div className="inline-flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-200" title="Socio en pausa: liberado de la Turnera este mes, conserva su lugar en la Matriz">
+                              En Pausa
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => retomarSocioPausado(cl.id, googleUser?.email)}
+                              className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Despausar socio para que vuelva a figurar en la Turnera"
+                            >
+                              <Play className="w-2.5 h-2.5 fill-current" />
+                              <span>Despausar</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                       <button

@@ -4,6 +4,7 @@ import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
 import { Plus, ChevronDown, Upload, Download, AlertCircle, Check, X, PauseCircle } from 'lucide-react';
 import { estaEnReposo } from '../../lib/reposo';
+import { estaPausado } from '../../lib/pausa';
 
 // Import subcomponents
 import { ClientesFilter } from './ClientesFilter';
@@ -143,7 +144,9 @@ export const ClientesCRUD: React.FC<ClientesCRUDProps> = ({
     }
 
     // Estado
-    if (filtroEstado !== 'TODOS') {
+    if (filtroEstado === 'PAUSADO') {
+      result = result.filter(c => estaPausado(c));
+    } else if (filtroEstado !== 'TODOS') {
       result = result.filter(c => c.estado === filtroEstado);
     }
 
