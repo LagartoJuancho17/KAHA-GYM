@@ -1,5 +1,12 @@
 // src/lib/prs.ts
-import { EjercicioPR, RepMaxKey, SocioEjercicioPR, HistorialPRItem } from '../types';
+import {
+  EjercicioPR,
+  RepMaxKey,
+  SocioEjercicioPR,
+  HistorialPRItem,
+  RutinaTiempoPR,
+  RegistroTiempoRutinaPR
+} from '../types';
 
 export const PORCENTAJES_PR: readonly number[] = [
   105, 100, 95, 90,
@@ -203,3 +210,107 @@ export function aplicarActualizacionPR(params: {
     actualizado_at: nowIso
   };
 }
+
+export const DEFAULT_RUTINAS_PR: RutinaTiempoPR[] = [
+  {
+    id: 'rutina-bulger',
+    titulo: 'BULGER',
+    subtitulo: 'Ten rounds for time of:',
+    items: [
+      'Run 150 meters',
+      '7 Chest to bar pull-ups',
+      '135/95 pound Front squat, 7 reps',
+      '7 Handstand push-ups'
+    ],
+    movimientos: [
+      { id: 'mov-c2b', nombre: 'Chest-to-Bar Pull-up', videos_count: 2 },
+      { id: 'mov-fs', nombre: 'Front Squat', videos_count: 1 },
+      { id: 'mov-hspu', nombre: 'Handstand Push-Up', videos_count: 2 },
+      { id: 'mov-run', nombre: 'Run', videos_count: 0 }
+    ],
+    asignado_todos: true,
+    clientes_ids: [],
+    activo: true,
+    creado_at: '2026-07-30T12:00:00.000Z'
+  }
+];
+
+/**
+ * Parsea un string de tiempo (ej: "23:30", "1:05:20" o "23") a segundos totales.
+ */
+export function parsearTiempoASegundos(raw: string): number | null {
+  const limpio = raw.trim();
+  if (!limpio) return null;
+
+  const partes = limpio.split(':').map(p => p.trim());
+  if (partes.some(p => p === '' || !/^\d+$/.test(p))) {
+    return null;
+  }
+
+  if (partes.length === 1) {
+    const mins = Number(partes[0]);
+    return mins > 0 ? mins * 60 : null;
+  }
+
+  if (partes.length === 2) {
+    const mins = Number(partes[0]);
+    const secs = Number(partes[1]);
+    if (secs >= 60) return null;
+    const total = mins * 60 + secs;
+    return total > 0 ? total : null;
+  }
+
+  if (partes.length === 3) {
+    const hrs = Number(partes[0]);
+    const mins = Number(partes[1]);
+    const secs = Number(partes[2]);
+    if (mins >= 60 || secs >= 60) return null;
+    const total = hrs * 3600 + mins * 60 + secs;
+    return total > 0 ? total : null;
+  }
+
+  return null;
+}
+
+/**
+ * Formatea segundos totales a "MM:SS" o "H:MM:SS" (ej: 1410 -> "23:30").
+ */
+export function formatearSegundosATiempo(segundos: number): string {
+  if (!Number.isFinite(segundos) || segundos <= 0) return '--:--';
+  const total = Math.round(segundos);
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  const ss = String(secs).padStart(2, '0');
+  if (hrs > 0) {
+    const mm = String(mins).padStart(2, '0');
+    return `${hrs}:${mm}:${ss}`;
+  }
+  return `${mins}:${ss}`;
+}
+
+/**
+ * Formatea una fecha YYYY-MM-DD al formato de la captura ("30 jul 2026").
+ */
+export function formatearFechaRutinaPR(fechaIso: string): string {
+  if (!fechaIso) return '';
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const partes = fechaIso.slice(0, 10).split('-');
+  if (partes.length !== 3) return fechaIso;
+  const anio = partes[0];
+  const mesIdx = parseInt(partes[1], 10) - 1;
+  const dia = parseInt(partes[2], 10);
+  if (isNaN(mesIdx) || mesIdx < 0 || mesIdx > 11 || isNaN(dia)) return fechaIso;
+  return `${dia} ${meses[mesIdx]} ${anio}`;
+}
+
+/**
+ * Devuelve el menor tiempo (en segundos) de una lista de registros para marcar el PR.
+ */
+export function obtenerMejorTiempoSegundos(registros: RegistroTiempoRutinaPR[]): number | null {
+  const validos = registros.filter(r => Number.isFinite(r.tiempo_segundos) && r.tiempo_segundos > 0);
+  if (validos.length === 0) return null;
+  return Math.min(...validos.map(r => r.tiempo_segundos));
+}
+

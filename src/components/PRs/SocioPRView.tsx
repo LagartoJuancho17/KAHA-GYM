@@ -20,8 +20,10 @@ import {
   X,
   Check,
   Sparkles,
-  History
+  History,
+  Timer
 } from 'lucide-react';
+import { RutinaTiempoCard } from './RutinaTiempoCard';
 
 interface SocioPRViewProps {
   socio: Cliente;
@@ -29,8 +31,18 @@ interface SocioPRViewProps {
 }
 
 export const SocioPRView: React.FC<SocioPRViewProps> = ({ socio, compact = false }) => {
-  const { ejerciciosPR, registrosPR, guardarPRSocio, eliminarHistorialPRItem } = useGym();
+  const { ejerciciosPR, registrosPR, rutinasPR, guardarPRSocio, eliminarHistorialPRItem } = useGym();
   const baseId = useId();
+
+  const [modoVista, setModoVista] = useState<'PESOS' | 'RUTINAS'>('PESOS');
+
+  const rutinasAsignadasSocio = useMemo(
+    () =>
+      rutinasPR.filter(
+        r => r.activo && (r.asignado_todos || (r.clientes_ids || []).includes(socio.id))
+      ),
+    [rutinasPR, socio.id]
+  );
 
   const ejerciciosActivos = useMemo(
     () => [...ejerciciosPR].filter(e => e.activo).sort((a, b) => a.orden - b.orden),
@@ -134,7 +146,7 @@ export const SocioPRView: React.FC<SocioPRViewProps> = ({ socio, compact = false
     <div className="space-y-4 font-sans select-none" id="socio-pr-view">
       {/* HEADER Y SELECTOR DE EJERCICIOS (5 ejercicios base o los configurados por el Admin) */}
       <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
               <Dumbbell className="w-5 h-5" />
@@ -142,86 +154,119 @@ export const SocioPRView: React.FC<SocioPRViewProps> = ({ socio, compact = false
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                  Mis PRs · Marcas Personales
+                  Mis PRs · Marcas y WODS
                 </h2>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase">
-                  { unidad.toUpperCase() }
+                  {unidad.toUpperCase()}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Seleccioná un ejercicio para ver y editar tus RMs y tabla de porcentajes
+                {modoVista === 'PESOS'
+                  ? 'Seleccioná un ejercicio para ver y editar tus RMs y tabla de porcentajes'
+                  : 'Completá en cuánto tiempo realizaste los WODS asignados por tu profe'}
               </p>
             </div>
           </div>
-          {!compact && (
-            <div className="text-right hidden sm:block">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
-                Atleta
-              </span>
-              <span className="text-xs font-bold text-slate-800">
-                {socio.nombre} {socio.apellido}
-              </span>
-            </div>
-          )}
+
+          <div
+            role="tablist"
+            aria-label="Modo de PRs del socio"
+            className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 self-start sm:self-auto"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoVista === 'PESOS'}
+              onClick={() => setModoVista('PESOS')}
+              className={`relative px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border-none ${
+                modoVista === 'PESOS'
+                  ? 'bg-white text-zinc-900 shadow-xs after:content-[""] after:absolute after:inset-x-3 after:bottom-0.5 after:border-b-2 after:border-emerald-600'
+                  : 'bg-transparent text-slate-600 hover:text-zinc-900'
+              }`}
+            >
+              <Dumbbell className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Pesos y % RM</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoVista === 'RUTINAS'}
+              onClick={() => setModoVista('RUTINAS')}
+              className={`relative px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border-none ${
+                modoVista === 'RUTINAS'
+                  ? 'bg-white text-zinc-900 shadow-xs after:content-[""] after:absolute after:inset-x-3 after:bottom-0.5 after:border-b-2 after:border-[#1890ff]'
+                  : 'bg-transparent text-slate-600 hover:text-zinc-900'
+              }`}
+            >
+              <Timer className="w-3.5 h-3.5 text-[#1890ff]" />
+              <span>WODS ({rutinasAsignadasSocio.length})</span>
+            </button>
+          </div>
         </div>
 
-        {/* TABS DE EJERCICIOS */}
-        <div
-          role="tablist"
-          aria-label="Ejercicios de PR"
-          className="flex items-center gap-2 overflow-x-auto pt-3 pb-1 no-scrollbar"
-          style={{ scrollSnapType: 'inline proximity' }}
-        >
-          {ejerciciosActivos.map((ej) => {
-            const isSelected = ej.id === ejercicioActual.id;
-            const regEj = registrosPR.find(
-              r => r.cliente_id === socio.id && r.ejercicio_id === ej.id
-            );
-            const best1RM = regEj?.rm_1;
+        {/* TABS DE EJERCICIOS (SOLO EN MODO PESOS) */}
+        {modoVista === 'PESOS' && (
+          <div
+            role="tablist"
+            aria-label="Ejercicios de PR"
+            className="flex items-center gap-2 overflow-x-auto pt-3 pb-1 no-scrollbar"
+            style={{ scrollSnapType: 'inline proximity' }}
+          >
+            {ejerciciosActivos.map((ej) => {
+              const isSelected = ej.id === ejercicioActual.id;
+              const regEj = registrosPR.find(
+                r => r.cliente_id === socio.id && r.ejercicio_id === ej.id
+              );
+              const best1RM = regEj?.rm_1;
 
-            return (
-              <button
-                key={ej.id}
-                type="button"
-                role="tab"
-                id={`${baseId}-tab-ej-${ej.id}`}
-                aria-selected={isSelected}
-                onClick={(e) => {
-                  setSelectedEjercicioId(ej.id);
-                  setShowInstruccion(false);
-                  e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-                }}
-                className={`relative flex-none px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
-                  isSelected
-                    ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm after:content-[""] after:absolute after:inset-x-3 after:bottom-0 after:border-b-2 after:border-lime-400'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span>{ej.nombre}</span>
-                {best1RM != null && best1RM > 0 && (
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md font-extrabold ${
-                      isSelected
-                        ? 'bg-lime-400/20 text-lime-300'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}
-                  >
-                    {formatearPesoPR(best1RM)}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={ej.id}
+                  type="button"
+                  role="tab"
+                  id={`${baseId}-tab-ej-${ej.id}`}
+                  aria-selected={isSelected}
+                  onClick={(e) => {
+                    setSelectedEjercicioId(ej.id);
+                    setShowInstruccion(false);
+                    e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                  }}
+                  className={`relative flex-none px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm after:content-[""] after:absolute after:inset-x-3 after:bottom-0 after:border-b-2 after:border-lime-400'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                  }`}
+                  style={{ scrollSnapAlign: 'start' }}
+                >
+                  <span>{ej.nombre}</span>
+                  {best1RM != null && best1RM > 0 && (
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md font-extrabold ${
+                        isSelected
+                          ? 'bg-lime-400/20 text-lime-300'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {formatearPesoPR(best1RM)}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* TARJETA PRINCIPAL ESTILO IMAGEN DE REFERENCIA */}
-      <div
-        role="tabpanel"
-        aria-labelledby={`${baseId}-tab-ej-${ejercicioActual.id}`}
-        className="max-w-xl mx-auto"
-      >
+      {/* VISTA RUTINAS POR TIEMPO (EJ: BULGER) */}
+      {modoVista === 'RUTINAS' ? (
+        <RutinaTiempoCard socio={socio} rutinasDisponibles={rutinasAsignadasSocio} />
+      ) : (
+        /* TARJETA PRINCIPAL ESTILO IMAGEN DE REFERENCIA */
+        <div
+          role="tabpanel"
+          aria-labelledby={`${baseId}-tab-ej-${ejercicioActual.id}`}
+          className="max-w-xl mx-auto"
+        >
         <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
           {/* CABECERA DEL EJERCICIO ACTIVO */}
           <div className="px-6 pt-5 pb-2 flex items-center justify-between border-b border-slate-100">
@@ -461,6 +506,7 @@ export const SocioPRView: React.FC<SocioPRViewProps> = ({ socio, compact = false
           </div>
         </div>
       </div>
+      )}
 
       {/* MODAL PARA EDITAR PRs */}
       {isEditModalOpen &&

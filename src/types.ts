@@ -273,4 +273,37 @@ export interface SocioEjercicioPR {
   actualizado_at: string;
 }
 
+export interface MovimientoRutinaPR {
+  id: string;
+  nombre: string; // ej: "Chest-to-Bar Pull-up"
+  videos_count: number; // ej: 2 ("2 vídeos")
+  video_url?: string;
+}
+
+export interface RutinaTiempoPR {
+  id: string;
+  titulo: string; // ej: "BULGER"
+  subtitulo: string; // ej: "Ten rounds for time of:"
+  items: string[]; // ej: ["Run 150 meters", "7 Chest to bar pull-ups", ...]
+  movimientos: MovimientoRutinaPR[];
+  asignado_todos: boolean; // true = visible para todos los socios, false = solo clientes_ids
+  clientes_ids: string[]; // IDs de socios seleccionados por el admin/profe
+  creado_por?: string;
+  activo: boolean;
+  creado_at: string;
+}
+
+export interface RegistroTiempoRutinaPR {
+  id: string;
+  rutina_id: string;
+  cliente_id: string;
+  tiempo_segundos: number; // ej: 23*60 + 30 = 1410
+  tiempo_texto: string; // ej: "23:30"
+  fecha: string; // 'YYYY-MM-DD'
+  nota?: string; // ej: "Vertical + Push up"
+  registrado_por?: string;
+  creado_at: string;
+}
+
+
 

@@ -3,7 +3,8 @@ import {
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, PagoEnRevision,
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
   ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, OrigenGasto, Profesor, NovedadProfesor, WaitlistReserva,
-  ToastMessage, PagadorExterno, Feriado, TipoFeriado, EjercicioPR, SocioEjercicioPR, RepMaxKey
+  ToastMessage, PagadorExterno, Feriado, TipoFeriado, EjercicioPR, SocioEjercicioPR, RepMaxKey,
+  RutinaTiempoPR, RegistroTiempoRutinaPR, MovimientoRutinaPR
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -19,7 +20,13 @@ import { iniciarReposo } from './lib/reposo';
 import { calcularDeudaYEstadoCliente, calcularDiferenciaPlan, precioPlanSocio } from './lib/calculoDeuda';
 import { generarNotaPausa, removerNotaPausa } from './lib/pausa';
 import { generarFeriadosNacionales, generarNovedadDeFeriado } from './lib/feriados';
-import { DEFAULT_EJERCICIOS_PR, aplicarActualizacionPR } from './lib/prs';
+import {
+  DEFAULT_EJERCICIOS_PR,
+  DEFAULT_RUTINAS_PR,
+  aplicarActualizacionPR,
+  parsearTiempoASegundos,
+  formatearSegundosATiempo
+} from './lib/prs';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -184,6 +191,21 @@ interface GymContextType {
     nota?: string;
   }) => Promise<{ success: boolean; message: string; registro?: SocioEjercicioPR }>;
   eliminarHistorialPRItem: (cliente_id: string, ejercicio_id: string, itemId: string) => Promise<{ success: boolean; message: string }>;
+
+  // Rutinas por Tiempo (WODs / Benchmarks con PR de tiempo)
+  rutinasPR: RutinaTiempoPR[];
+  registrosRutinaPR: RegistroTiempoRutinaPR[];
+  agregarRutinaPR: (data: Omit<RutinaTiempoPR, 'id' | 'creado_at'>) => Promise<{ success: boolean; message: string; rutina?: RutinaTiempoPR }>;
+  editarRutinaPR: (id: string, updates: Partial<RutinaTiempoPR>) => Promise<{ success: boolean; message: string }>;
+  eliminarRutinaPR: (id: string) => Promise<{ success: boolean; message: string }>;
+  registrarTiempoRutinaPR: (params: {
+    rutina_id: string;
+    cliente_id: string;
+    tiempo_texto: string;
+    fecha?: string;
+    nota?: string;
+  }) => Promise<{ success: boolean; message: string; registro?: RegistroTiempoRutinaPR }>;
+  eliminarTiempoRutinaPR: (id: string) => Promise<{ success: boolean; message: string }>;
 
   // Toasts / Feedback Methods
   toasts: ToastMessage[];
@@ -396,6 +418,29 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [registrosPR, setRegistrosPR] = useState<SocioEjercicioPR[]>(() => {
     try {
       const stored = localStorage.getItem('gym_registros_pr');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+  const [rutinasPR, setRutinasPR] = useState<RutinaTiempoPR[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_rutinas_pr');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    try {
+      localStorage.setItem('gym_rutinas_pr', JSON.stringify(DEFAULT_RUTINAS_PR));
+    } catch (e) {}
+    return DEFAULT_RUTINAS_PR;
+  });
+  const [registrosRutinaPR, setRegistrosRutinaPR] = useState<RegistroTiempoRutinaPR[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_registros_rutina_pr');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) return parsed;
@@ -6347,6 +6392,123 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Entrada de historial eliminada.' };
   };
 
+  // --- Rutinas por Tiempo (WODs / Benchmarks con PR de tiempo) ---
+  const agregarRutinaPR = async (
+    data: Omit<RutinaTiempoPR, 'id' | 'creado_at'>
+  ): Promise<{ success: boolean; message: string; rutina?: RutinaTiempoPR }> => {
+    const tituloLimpio = (data.titulo || '').trim();
+    if (!tituloLimpio) {
+      return { success: false, message: 'El título de la rutina es obligatorio.' };
+    }
+    const nueva: RutinaTiempoPR = {
+      id: `rutina-${tituloLimpio.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
+      titulo: tituloLimpio.toUpperCase(),
+      subtitulo: (data.subtitulo || 'For time of:').trim(),
+      items: (data.items || []).map(i => i.trim()).filter(Boolean),
+      movimientos: data.movimientos || [],
+      asignado_todos: data.asignado_todos,
+      clientes_ids: data.clientes_ids || [],
+      creado_por: googleUser?.email || 'admin@kaha.fit',
+      activo: data.activo !== false,
+      creado_at: new Date().toISOString()
+    };
+
+    const actualizadas = [nueva, ...rutinasPR];
+    setRutinasPR(actualizadas);
+    localStorage.setItem('gym_rutinas_pr', JSON.stringify(actualizadas));
+
+    addAuditLog('PR_RUTINA_CREADA', { id: nueva.id, titulo: nueva.titulo }, googleUser?.email);
+    addToast('add', `Rutina "${nueva.titulo}" creada y asignada.`);
+    return { success: true, message: 'Rutina creada con éxito.', rutina: nueva };
+  };
+
+  const editarRutinaPR = async (
+    id: string,
+    updates: Partial<RutinaTiempoPR>
+  ): Promise<{ success: boolean; message: string }> => {
+    const target = rutinasPR.find(r => r.id === id);
+    if (!target) return { success: false, message: 'Rutina no encontrada.' };
+
+    const actualizadas = rutinasPR.map(r => (r.id === id ? { ...r, ...updates } : r));
+    setRutinasPR(actualizadas);
+    localStorage.setItem('gym_rutinas_pr', JSON.stringify(actualizadas));
+
+    addAuditLog('PR_RUTINA_EDITADA', { id, updates }, googleUser?.email);
+    addToast('success', `Rutina "${updates.titulo || target.titulo}" actualizada.`);
+    return { success: true, message: 'Rutina actualizada con éxito.' };
+  };
+
+  const eliminarRutinaPR = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const target = rutinasPR.find(r => r.id === id);
+    if (!target) return { success: false, message: 'Rutina no encontrada.' };
+
+    const filtradas = rutinasPR.filter(r => r.id !== id);
+    setRutinasPR(filtradas);
+    localStorage.setItem('gym_rutinas_pr', JSON.stringify(filtradas));
+
+    addAuditLog('PR_RUTINA_ELIMINADA', { id, titulo: target.titulo }, googleUser?.email);
+    addToast('delete', `Rutina "${target.titulo}" eliminada.`);
+    return { success: true, message: 'Rutina eliminada.' };
+  };
+
+  const registrarTiempoRutinaPR = async (params: {
+    rutina_id: string;
+    cliente_id: string;
+    tiempo_texto: string;
+    fecha?: string;
+    nota?: string;
+  }): Promise<{ success: boolean; message: string; registro?: RegistroTiempoRutinaPR }> => {
+    const { rutina_id, cliente_id, tiempo_texto } = params;
+    const segundos = parsearTiempoASegundos(tiempo_texto);
+    if (segundos === null) {
+      addToast('error', 'Ingresá un tiempo válido en formato MM:SS (ej: 23:30).');
+      return { success: false, message: 'Formato de tiempo inválido. Usá MM:SS (ej: 23:30).' };
+    }
+
+    const nuevo: RegistroTiempoRutinaPR = {
+      id: `reg-rut-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      rutina_id,
+      cliente_id,
+      tiempo_segundos: segundos,
+      tiempo_texto: formatearSegundosATiempo(segundos),
+      fecha: params.fecha || hoyArgentina(),
+      nota: params.nota?.trim() || undefined,
+      registrado_por: googleUser?.email || 'socio@kaha.fit',
+      creado_at: new Date().toISOString()
+    };
+
+    setRegistrosRutinaPR(prev => {
+      const actualizados = [nuevo, ...prev];
+      localStorage.setItem('gym_registros_rutina_pr', JSON.stringify(actualizados));
+      return actualizados;
+    });
+
+    const rut = rutinasPR.find(r => r.id === rutina_id);
+    addAuditLog(
+      'PR_TIEMPO_RUTINA_REGISTRADO',
+      {
+        rutina: rut?.titulo || rutina_id,
+        cliente_id,
+        tiempo: nuevo.tiempo_texto,
+        nota: nuevo.nota
+      },
+      googleUser?.email
+    );
+
+    addToast('success', `Tiempo ${nuevo.tiempo_texto} registrado en ${rut?.titulo || 'la rutina'}.`);
+    return { success: true, message: 'Tiempo registrado con éxito.', registro: nuevo };
+  };
+
+  const eliminarTiempoRutinaPR = async (id: string): Promise<{ success: boolean; message: string }> => {
+    setRegistrosRutinaPR(prev => {
+      const filtrados = prev.filter(r => r.id !== id);
+      localStorage.setItem('gym_registros_rutina_pr', JSON.stringify(filtrados));
+      return filtrados;
+    });
+    addToast('delete', 'Registro de tiempo eliminado.');
+    return { success: true, message: 'Registro eliminado.' };
+  };
+
   const borrarHistorial = () => {
     localStorage.removeItem('gym_clientes');
     localStorage.removeItem('gym_planes');
@@ -6400,6 +6562,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, novedades,
       feriados, agregarFeriado, editarFeriado, eliminarFeriado, toggleFeriadoActivo, cargarFeriadosNacionales, publicarFeriadoComoNovedad,
       ejerciciosPR, registrosPR, agregarEjercicioPR, editarEjercicioPR, eliminarEjercicioPR, guardarPRSocio, eliminarHistorialPRItem,
+      rutinasPR, registrosRutinaPR, agregarRutinaPR, editarRutinaPR, eliminarRutinaPR, registrarTiempoRutinaPR, eliminarTiempoRutinaPR,
       notificaciones, gastos, profesores, novedadesProfesores, rolActivo,
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,

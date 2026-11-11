@@ -3,11 +3,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_EJERCICIOS_PR,
+  DEFAULT_RUTINAS_PR,
   PORCENTAJES_PR,
   calcularTablaPorcentajes,
   formatearFechaCortaPR,
   aplicarActualizacionPR,
-  obtenerPesoPorReps
+  obtenerPesoPorReps,
+  parsearTiempoASegundos,
+  formatearSegundosATiempo,
+  formatearFechaRutinaPR,
+  obtenerMejorTiempoSegundos
 } from './prs';
 
 test('incluye los 5 ejercicios base por defecto', () => {
@@ -55,3 +60,35 @@ test('aplicarActualizacionPR actualiza marcas y agrega entrada al historial auto
   assert.equal(obtenerPesoPorReps(reg1, 1), 100);
   assert.equal(obtenerPesoPorReps(reg1, 2), null);
 });
+
+test('parsea y formatea tiempos de rutinas (BULGER 23:30) y detecta el menor tiempo como PR', () => {
+  assert.equal(DEFAULT_RUTINAS_PR[0].titulo, 'BULGER');
+  const segs = parsearTiempoASegundos('23:30');
+  assert.equal(segs, 1410);
+  assert.equal(formatearSegundosATiempo(segs!), '23:30');
+  assert.equal(formatearFechaRutinaPR('2026-07-30'), '30 jul 2026');
+
+  const mejor = obtenerMejorTiempoSegundos([
+    {
+      id: '1',
+      rutina_id: 'rutina-bulger',
+      cliente_id: 's1',
+      tiempo_segundos: 1500,
+      tiempo_texto: '25:00',
+      fecha: '2026-07-01',
+      creado_at: '2026-07-01T10:00:00Z'
+    },
+    {
+      id: '2',
+      rutina_id: 'rutina-bulger',
+      cliente_id: 's1',
+      tiempo_segundos: 1410,
+      tiempo_texto: '23:30',
+      fecha: '2026-07-30',
+      nota: 'Vertical + Push up',
+      creado_at: '2026-07-30T10:00:00Z'
+    }
+  ]);
+  assert.equal(mejor, 1410);
+});
+
