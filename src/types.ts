@@ -237,3 +237,40 @@ export interface Feriado {
   creado_at: string;
 }
 
+export type RepMaxKey = 1 | 2 | 3 | 5;
+
+export interface EjercicioPR {
+  id: string;
+  nombre: string; // ej: "Clean", "Back Squat", "Bench Press", "Deadlift", "Snatch"
+  categoria?: string; // ej: "Olímpico", "Fuerza"
+  instruccion_titulo?: string; // ej: "Squat Clean"
+  instruccion_detalle?: string; // Explicación técnica del movimiento
+  unidad?: 'kg' | 'lb';
+  orden: number;
+  activo: boolean;
+  creado_at: string;
+}
+
+export interface HistorialPRItem {
+  id: string;
+  fecha: string; // 'YYYY-MM-DD'
+  reps: RepMaxKey; // 1, 2, 3 o 5
+  peso: number;
+  nota?: string;
+  registrado_por?: string; // email del socio o admin
+  creado_at: string;
+}
+
+export interface SocioEjercicioPR {
+  id: string; // `${cliente_id}__${ejercicio_id}`
+  cliente_id: string;
+  ejercicio_id: string;
+  rm_1?: number | null; // 1 REP MAX
+  rm_2?: number | null; // 2 REP MAX
+  rm_3?: number | null; // 3 REP MAX
+  rm_5?: number | null; // 5 REP MAX
+  historial: HistorialPRItem[];
+  actualizado_at: string;
+}
+
+

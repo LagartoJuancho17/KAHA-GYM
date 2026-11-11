@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { 
   AlertTriangle, Megaphone, Award, QrCode, Barcode, CreditCard, 
-  Loader2, Home, User, CalendarDays, Receipt, LogOut, PartyPopper, X
+  Loader2, Home, User, CalendarDays, Receipt, LogOut, PartyPopper, X, Dumbbell
 } from 'lucide-react';
 
 import { SocioHeader } from './SocioHeader';
@@ -12,6 +12,8 @@ import { SocioCalendario } from './SocioCalendario';
 import { SocioPerfil } from './SocioPerfil';
 import { SocioPagos } from './SocioPagos';
 import { SocioNovedades } from './SocioNovedades';
+import { SocioPRView } from '../PRs/SocioPRView';
+import { formatearPesoPR } from '../../lib/prs';
 import { SocioPaymentChoiceModal } from './SocioPaymentChoiceModal';
 import { SocioWaitlistPromotedModal } from './SocioWaitlistPromotedModal';
 import { OnboardingModal } from '../Onboarding/OnboardingModal';
@@ -30,10 +32,11 @@ import { hoyArgentina } from '../../lib/fechas';
 export const SocioPanel: React.FC = () => {
   const { 
     clientes, planes, selectedSocioId, googleUser,
-    novedades, setRolActivo, signOutGoogle, loading, turnos, pagos
+    novedades, setRolActivo, signOutGoogle, loading, turnos, pagos,
+    ejerciciosPR, registrosPR
   } = useGym();
 
-  const [activeTabSection, setActiveTabSection] = useState<'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES'>('HOME');
+  const [activeTabSection, setActiveTabSection] = useState<'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES' | 'PRS'>('HOME');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -448,6 +451,70 @@ export const SocioPanel: React.FC = () => {
             </div>
           </section>
 
+          {/* ACCESO DIRECTO A MIS PRs Y PORCENTAJES DESDE EL HOME */}
+          <div
+            onClick={() => setActiveTabSection('PRS')}
+            className="bg-white border border-slate-200 hover:border-emerald-300 rounded-3xl p-6 shadow-xs transition-all cursor-pointer group"
+            id="socio-prs-home-card"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-zinc-900 text-lime-300 flex items-center justify-center shrink-0 shadow-xs">
+                  <Dumbbell className="w-5.5 h-5.5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-600 font-bold">
+                    Entrenamiento & Fuerza
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">
+                    Mis PRs y Porcentajes de Carga
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Consultá y editá tus 1RM, 2RM, 3RM y 5RM con calculadora automática del 105% al 30%.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveTabSection('PRS');
+                }}
+                className="px-4 py-2.5 rounded-xl bg-zinc-900 group-hover:bg-emerald-600 text-white font-bold text-xs transition-colors cursor-pointer border-none self-start sm:self-auto shrink-0"
+              >
+                Abrir Mis PRs →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-4">
+              {ejerciciosPR
+                .filter(e => e.activo)
+                .sort((a, b) => a.orden - b.orden)
+                .slice(0, 5)
+                .map((ej) => {
+                  const reg = registrosPR.find(
+                    r => r.cliente_id === socio.id && r.ejercicio_id === ej.id
+                  );
+                  return (
+                    <div
+                      key={ej.id}
+                      className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-center"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block truncate">
+                        {ej.nombre}
+                      </span>
+                      <span className="text-lg font-black text-zinc-900 block mt-0.5 font-sans">
+                        {formatearPesoPR(reg?.rm_1)}
+                      </span>
+                      <span className="text-[9px] font-mono text-slate-400 uppercase">
+                        1 REP MAX ({ej.unidad || 'kg'})
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
           {/* Soporte card */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5" id="socio-soporte-home">
             <div className="flex-1 space-y-2">
@@ -497,6 +564,10 @@ export const SocioPanel: React.FC = () => {
 
       {activeTabSection === 'NOVEDADES' && (
         <SocioNovedades />
+      )}
+
+      {activeTabSection === 'PRS' && (
+        <SocioPRView socio={socio} />
       )}
 
       {/* FOOTER GENERAL */}
@@ -573,6 +644,17 @@ export const SocioPanel: React.FC = () => {
           <span className={`text-[9px] font-black uppercase tracking-wider mt-0.5 font-sans transition-colors ${
             activeTabSection === 'HOME' ? 'text-emerald-600' : 'text-slate-500'
           }`}>Home</span>
+        </button>
+
+        {/* PRs (MARCAS PERSONALES) */}
+        <button
+          onClick={() => setActiveTabSection('PRS')}
+          className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer min-w-[48px] border-none bg-transparent relative"
+          id="bottom-nav-prs"
+        >
+          <Dumbbell className={`w-5 h-5 transition-colors ${activeTabSection === 'PRS' ? 'text-emerald-600' : 'text-slate-400'}`} />
+          <span className={`text-[9px] font-bold uppercase tracking-wider font-sans transition-colors ${activeTabSection === 'PRS' ? 'text-emerald-600' : 'text-slate-400'}`}>PRs</span>
+          <span className="absolute bottom-0 inset-x-3 h-0.5 rounded-full transition-opacity" style={{ backgroundColor: activeTabSection === 'PRS' ? 'rgb(16 185 129)' : 'transparent' }} />
         </button>
 
         {/* PLAN VIGENTE (PAGOS) */}

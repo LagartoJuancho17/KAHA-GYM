@@ -1,11 +1,12 @@
 import React from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard, PauseCircle, RotateCcw, Play } from 'lucide-react';
+import { Edit2, X, Trash2, Calendar, Clock, Users, BookOpen, CheckCircle, CreditCard, PauseCircle, RotateCcw, Play, Dumbbell } from 'lucide-react';
 import { normalizarTelefonoWhatsApp } from '../../lib/telefono';
 import { formatearDeudaVisual } from '../../lib/calculoDeuda';
 import { estaEnReposo, etiquetaReposo, calcularFinDeReposo, MESES_DE_REPOSO } from '../../lib/reposo';
 import { hoyArgentina } from '../../lib/fechas';
+import { SocioPRView } from '../PRs/SocioPRView';
 
 interface ClienteProfileModalProps {
   isOpen: boolean;
@@ -42,9 +43,10 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
 
   const [confirmandoReposo, setConfirmandoReposo] = React.useState(false);
   const [motivoReposo, setMotivoReposo] = React.useState('');
+  const [mostrarPRs, setMostrarPRs] = React.useState(false);
 
   React.useEffect(() => {
-    if (!isOpen) { setConfirmandoReposo(false); setMotivoReposo(''); }
+    if (!isOpen) { setConfirmandoReposo(false); setMotivoReposo(''); setMostrarPRs(false); }
   }, [isOpen, clienteId]);
 
   if (!isOpen || !clienteId) return null;
@@ -453,6 +455,30 @@ export const ClienteProfileModal: React.FC<ClienteProfileModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* PRs / Marcas Personales del Socio */}
+          <div className="border border-zinc-200 p-4 rounded-xl bg-zinc-50/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Dumbbell className="w-4 h-4 text-emerald-600" />
+                <h4 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-sans">
+                  PRs y Porcentajes de Carga
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarPRs(!mostrarPRs)}
+                className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-emerald-600 text-white text-xs font-bold transition-colors cursor-pointer border-none"
+              >
+                {mostrarPRs ? 'Ocultar PRs' : 'Ver / Editar PRs'}
+              </button>
+            </div>
+            {mostrarPRs && (
+              <div className="mt-4 pt-3 border-t border-zinc-200">
+                <SocioPRView socio={selectedCliente} compact />
+              </div>
+            )}
+          </div>
 
           {/* Historial de Pagos */}
           <div className="border border-zinc-200 p-4 rounded-xl">

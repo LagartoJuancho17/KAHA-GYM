@@ -2,12 +2,12 @@
 import React, { useRef, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { Cliente } from '../../types';
-import { Menu, Sparkles, Home, User, CalendarDays, Receipt, Megaphone, ChevronDown, LogOut, Shield, X, Barcode, Info, Bell } from 'lucide-react';
+import { Menu, Sparkles, Home, User, CalendarDays, Receipt, Megaphone, ChevronDown, LogOut, Shield, X, Barcode, Info, Bell, Dumbbell } from 'lucide-react';
 import logoKaha from '../../assets/logokaha.png';
 
 interface SocioHeaderProps {
-  activeTabSection: 'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES';
-  setActiveTabSection: (tab: 'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES') => void;
+  activeTabSection: 'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES' | 'PRS';
+  setActiveTabSection: (tab: 'HOME' | 'PERFIL' | 'RESERVAS' | 'PAGOS' | 'NOVEDADES' | 'PRS') => void;
   drawerOpen: boolean;
   setDrawerOpen: (open: boolean) => void;
   isDropdownOpen: boolean;
@@ -106,6 +106,18 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
           >
             <CalendarDays className={`w-4 h-4 transition-colors ${activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-400'}`} />
             <span>Reservas y Horarios</span>
+          </button>
+          <button
+            onClick={() => setActiveTabSection('PRS')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border-none bg-transparent ${
+              activeTabSection === 'PRS'
+                ? 'bg-white text-emerald-700 shadow-xs border border-emerald-50/50'
+                : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'
+            }`}
+            id="web-navbar-prs-btn"
+          >
+            <Dumbbell className={`w-4 h-4 transition-colors ${activeTabSection === 'PRS' ? 'text-emerald-600' : 'text-slate-400'}`} />
+            <span>Mis PRs</span>
           </button>
           <button
             onClick={() => setActiveTabSection('PAGOS')}
@@ -339,6 +351,22 @@ export const SocioHeader: React.FC<SocioHeaderProps> = ({
               >
                 <CalendarDays className={`w-4 h-4 transition-colors ${activeTabSection === 'RESERVAS' ? 'text-emerald-600' : 'text-slate-500'}`} />
                 <span>Reservas y Horarios</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTabSection('PRS');
+                  setDrawerOpen(false);
+                }}
+                className={`w-full px-4 py-3 rounded-xl text-xs font-bold text-left flex items-center gap-3 transition-all cursor-pointer border-none bg-transparent ${
+                  activeTabSection === 'PRS' 
+                    ? 'bg-emerald-50/80 text-emerald-700 border-l-4 border-emerald-600 pl-3 shadow-xs' 
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+                id="drawer-link-prs"
+              >
+                <Dumbbell className={`w-4 h-4 transition-colors ${activeTabSection === 'PRS' ? 'text-emerald-600' : 'text-slate-500'}`} />
+                <span>Mis PRs (Marcas y %)</span>
               </button>
 
               <button

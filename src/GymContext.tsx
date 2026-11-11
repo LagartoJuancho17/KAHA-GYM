@@ -3,7 +3,7 @@ import {
   Cliente, Plan, HistorialPrecioPlan, Turno, Pago, PagoEnRevision,
   RecuperoTurno, AuditLog, RolUsuario, TipoCliente, EstadoCliente, MedioPago, Novedad,
   ReservaIndividual, ClaseSuspendida, AlertaNotificacion, Gasto, OrigenGasto, Profesor, NovedadProfesor, WaitlistReserva,
-  ToastMessage, PagadorExterno, Feriado, TipoFeriado
+  ToastMessage, PagadorExterno, Feriado, TipoFeriado, EjercicioPR, SocioEjercicioPR, RepMaxKey
 } from './types';
 import { 
   INITIAL_PLANES, INITIAL_HISTORIAL_PRECIOS, generarTurnosIniciales, 
@@ -19,6 +19,7 @@ import { iniciarReposo } from './lib/reposo';
 import { calcularDeudaYEstadoCliente, calcularDiferenciaPlan, precioPlanSocio } from './lib/calculoDeuda';
 import { generarNotaPausa, removerNotaPausa } from './lib/pausa';
 import { generarFeriadosNacionales, generarNovedadDeFeriado } from './lib/feriados';
+import { DEFAULT_EJERCICIOS_PR, aplicarActualizacionPR } from './lib/prs';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -165,6 +166,24 @@ interface GymContextType {
   toggleFeriadoActivo: (id: string) => Promise<{ success: boolean; message: string }>;
   cargarFeriadosNacionales: (anio?: number) => Promise<{ success: boolean; message: string; agregados: number }>;
   publicarFeriadoComoNovedad: (feriadoId: string) => Promise<{ success: boolean; message: string }>;
+
+  // PRs (Personal Records)
+  ejerciciosPR: EjercicioPR[];
+  registrosPR: SocioEjercicioPR[];
+  agregarEjercicioPR: (data: Omit<EjercicioPR, 'id' | 'creado_at' | 'orden'>) => Promise<{ success: boolean; message: string; ejercicio?: EjercicioPR }>;
+  editarEjercicioPR: (id: string, updates: Partial<EjercicioPR>) => Promise<{ success: boolean; message: string }>;
+  eliminarEjercicioPR: (id: string) => Promise<{ success: boolean; message: string }>;
+  guardarPRSocio: (params: {
+    cliente_id: string;
+    ejercicio_id: string;
+    rm_1?: number | null;
+    rm_2?: number | null;
+    rm_3?: number | null;
+    rm_5?: number | null;
+    fecha?: string;
+    nota?: string;
+  }) => Promise<{ success: boolean; message: string; registro?: SocioEjercicioPR }>;
+  eliminarHistorialPRItem: (cliente_id: string, ejercicio_id: string, itemId: string) => Promise<{ success: boolean; message: string }>;
 
   // Toasts / Feedback Methods
   toasts: ToastMessage[];
@@ -361,6 +380,29 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [novedadesProfesores, setNovedadesProfesores] = useState<NovedadProfesor[]>([]);
+  const [ejerciciosPR, setEjerciciosPR] = useState<EjercicioPR[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_ejercicios_pr');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    try {
+      localStorage.setItem('gym_ejercicios_pr', JSON.stringify(DEFAULT_EJERCICIOS_PR));
+    } catch (e) {}
+    return DEFAULT_EJERCICIOS_PR;
+  });
+  const [registrosPR, setRegistrosPR] = useState<SocioEjercicioPR[]>(() => {
+    try {
+      const stored = localStorage.getItem('gym_registros_pr');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
   const [sociosPrioritarios, setSociosPrioritarios] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('gym_socios_prioritarios');
@@ -1020,6 +1062,59 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
         } catch (e) {}
+      }
+
+      // --- PRs: cargar catálogo de ejercicios y registros de PR de Supabase (con fallback a localStorage) ---
+      try {
+        const [{ data: ejDb, error: ejErr }, { data: regDb, error: regErr }] = await Promise.all([
+          supabase.from('ejercicios_pr').select('*').order('orden', { ascending: true }),
+          supabase.from('registros_pr').select('*')
+        ]);
+
+        if (!ejErr && Array.isArray(ejDb) && ejDb.length > 0) {
+          const mappedEj: EjercicioPR[] = ejDb.map((e: any, idx: number) => ({
+            id: e.id,
+            nombre: e.nombre,
+            categoria: e.categoria || 'Fuerza',
+            instruccion_titulo: e.instruccion_titulo || e.nombre,
+            instruccion_detalle: e.instruccion_detalle || '',
+            unidad: (e.unidad as 'kg' | 'lb') || 'kg',
+            orden: Number(e.orden ?? idx + 1),
+            activo: e.activo !== false,
+            creado_at: e.creado_at || new Date().toISOString()
+          }));
+          setEjerciciosPR(mappedEj);
+          localStorage.setItem('gym_ejercicios_pr', JSON.stringify(mappedEj));
+        } else if (!ejErr && Array.isArray(ejDb) && ejDb.length === 0) {
+          // Sembrar los 5 ejercicios por defecto en Supabase si la tabla está vacía
+          supabase.from('ejercicios_pr').upsert(DEFAULT_EJERCICIOS_PR).then();
+        }
+
+        if (!regErr && Array.isArray(regDb)) {
+          const localRegRaw = localStorage.getItem('gym_registros_pr');
+          const localRegs: SocioEjercicioPR[] = localRegRaw ? JSON.parse(localRegRaw) : [];
+          const dbIds = new Set(regDb.map((r: any) => r.id));
+          const mappedRegs: SocioEjercicioPR[] = regDb.map((r: any) => ({
+            id: r.id,
+            cliente_id: r.cliente_id,
+            ejercicio_id: r.ejercicio_id,
+            rm_1: r.rm_1 != null ? Number(r.rm_1) : null,
+            rm_2: r.rm_2 != null ? Number(r.rm_2) : null,
+            rm_3: r.rm_3 != null ? Number(r.rm_3) : null,
+            rm_5: r.rm_5 != null ? Number(r.rm_5) : null,
+            historial: Array.isArray(r.historial) ? r.historial : [],
+            actualizado_at: r.actualizado_at || new Date().toISOString()
+          }));
+          const faltantes = localRegs.filter(lr => !dbIds.has(lr.id));
+          if (faltantes.length > 0) {
+            supabase.from('registros_pr').upsert(faltantes).then();
+          }
+          const mergedRegs = [...mappedRegs, ...faltantes];
+          setRegistrosPR(mergedRegs);
+          localStorage.setItem('gym_registros_pr', JSON.stringify(mergedRegs));
+        }
+      } catch (prErr) {
+        console.warn('[KAHA] Tablas de PR no disponibles en Supabase aún, usando localStorage:', prErr);
       }
 
       console.log('✅ Sincronización exitosa desde Supabase completada');
@@ -6063,6 +6158,195 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: false, message: 'No se pudo publicar la novedad.' };
   };
 
+  // --- PRs (Personal Records) Methods ---
+  const agregarEjercicioPR = async (
+    data: Omit<EjercicioPR, 'id' | 'creado_at' | 'orden'>
+  ): Promise<{ success: boolean; message: string; ejercicio?: EjercicioPR }> => {
+    const nombreLimpio = (data.nombre || '').trim();
+    if (!nombreLimpio) {
+      return { success: false, message: 'El nombre del ejercicio es obligatorio.' };
+    }
+    const maxOrden = ejerciciosPR.reduce((acc, e) => Math.max(acc, e.orden || 0), 0);
+    const nuevo: EjercicioPR = {
+      id: `pr-${nombreLimpio.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
+      nombre: nombreLimpio,
+      categoria: data.categoria?.trim() || 'Fuerza',
+      instruccion_titulo: data.instruccion_titulo?.trim() || nombreLimpio,
+      instruccion_detalle: data.instruccion_detalle?.trim() || '',
+      unidad: data.unidad || 'kg',
+      orden: maxOrden + 1,
+      activo: data.activo !== false,
+      creado_at: new Date().toISOString()
+    };
+
+    const actualizados = [...ejerciciosPR, nuevo].sort((a, b) => a.orden - b.orden);
+    setEjerciciosPR(actualizados);
+    localStorage.setItem('gym_ejercicios_pr', JSON.stringify(actualizados));
+
+    if (supabase) {
+      try {
+        await supabase.from('ejercicios_pr').upsert(nuevo);
+      } catch (e) {
+        console.warn('[Supabase] Error guardando ejercicio PR:', e);
+      }
+    }
+
+    addAuditLog('PR_EJERCICIO_AGREGADO', { id: nuevo.id, nombre: nuevo.nombre }, googleUser?.email);
+    addToast('add', `Ejercicio "${nuevo.nombre}" agregado al catálogo de PRs.`);
+    return { success: true, message: 'Ejercicio agregado con éxito.', ejercicio: nuevo };
+  };
+
+  const editarEjercicioPR = async (
+    id: string,
+    updates: Partial<EjercicioPR>
+  ): Promise<{ success: boolean; message: string }> => {
+    const target = ejerciciosPR.find(e => e.id === id);
+    if (!target) return { success: false, message: 'Ejercicio no encontrado.' };
+
+    const actualizados = ejerciciosPR
+      .map(e => (e.id === id ? { ...e, ...updates } : e))
+      .sort((a, b) => a.orden - b.orden);
+    setEjerciciosPR(actualizados);
+    localStorage.setItem('gym_ejercicios_pr', JSON.stringify(actualizados));
+
+    if (supabase) {
+      try {
+        await supabase.from('ejercicios_pr').update(updates).eq('id', id);
+      } catch (e) {
+        console.warn('[Supabase] Error actualizando ejercicio PR:', e);
+      }
+    }
+
+    addAuditLog('PR_EJERCICIO_EDITADO', { id, updates }, googleUser?.email);
+    addToast('success', `Ejercicio "${updates.nombre || target.nombre}" actualizado.`);
+    return { success: true, message: 'Ejercicio modificado con éxito.' };
+  };
+
+  const eliminarEjercicioPR = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const target = ejerciciosPR.find(e => e.id === id);
+    if (!target) return { success: false, message: 'Ejercicio no encontrado.' };
+
+    const filtrados = ejerciciosPR.filter(e => e.id !== id);
+    setEjerciciosPR(filtrados);
+    localStorage.setItem('gym_ejercicios_pr', JSON.stringify(filtrados));
+
+    if (supabase) {
+      try {
+        await supabase.from('ejercicios_pr').delete().eq('id', id);
+      } catch (e) {
+        console.warn('[Supabase] Error eliminando ejercicio PR:', e);
+      }
+    }
+
+    addAuditLog('PR_EJERCICIO_ELIMINADO', { id, nombre: target.nombre }, googleUser?.email);
+    addToast('delete', `Ejercicio "${target.nombre}" eliminado.`);
+    return { success: true, message: 'Ejercicio eliminado.' };
+  };
+
+  const guardarPRSocio = async (params: {
+    cliente_id: string;
+    ejercicio_id: string;
+    rm_1?: number | null;
+    rm_2?: number | null;
+    rm_3?: number | null;
+    rm_5?: number | null;
+    fecha?: string;
+    nota?: string;
+  }): Promise<{ success: boolean; message: string; registro?: SocioEjercicioPR }> => {
+    const { cliente_id, ejercicio_id } = params;
+    if (!cliente_id || !ejercicio_id) {
+      return { success: false, message: 'Faltan datos del socio o del ejercicio.' };
+    }
+
+    const recordId = `${cliente_id}__${ejercicio_id}`;
+    const actual = registrosPR.find(r => r.id === recordId || (r.cliente_id === cliente_id && r.ejercicio_id === ejercicio_id)) || null;
+
+    const actualizado = aplicarActualizacionPR({
+      actual,
+      cliente_id,
+      ejercicio_id,
+      rm_1: params.rm_1,
+      rm_2: params.rm_2,
+      rm_3: params.rm_3,
+      rm_5: params.rm_5,
+      fecha: params.fecha || hoyArgentina(),
+      nota: params.nota,
+      registrado_por: googleUser?.email || 'socio@kaha.fit'
+    });
+
+    const nuevaLista = actual
+      ? registrosPR.map(r => (r.id === actual.id ? actualizado : r))
+      : [actualizado, ...registrosPR];
+
+    setRegistrosPR(nuevaLista);
+    localStorage.setItem('gym_registros_pr', JSON.stringify(nuevaLista));
+
+    if (supabase) {
+      try {
+        await supabase.from('registros_pr').upsert({
+          id: actualizado.id,
+          cliente_id: actualizado.cliente_id,
+          ejercicio_id: actualizado.ejercicio_id,
+          rm_1: actualizado.rm_1,
+          rm_2: actualizado.rm_2,
+          rm_3: actualizado.rm_3,
+          rm_5: actualizado.rm_5,
+          historial: actualizado.historial,
+          actualizado_at: actualizado.actualizado_at
+        });
+      } catch (e) {
+        console.warn('[Supabase] Error guardando PR de socio:', e);
+      }
+    }
+
+    const ej = ejerciciosPR.find(e => e.id === ejercicio_id);
+    const cli = clientes.find(c => c.id === cliente_id);
+    addAuditLog(
+      'PR_SOCIO_ACTUALIZADO',
+      {
+        cliente_id,
+        socio: cli ? `${cli.nombre} ${cli.apellido}` : cliente_id,
+        ejercicio: ej?.nombre || ejercicio_id,
+        rm_1: actualizado.rm_1,
+        rm_2: actualizado.rm_2,
+        rm_3: actualizado.rm_3,
+        rm_5: actualizado.rm_5
+      },
+      googleUser?.email
+    );
+
+    addToast('success', `Marcas de ${ej?.nombre || 'ejercicio'} guardadas correctamente.`);
+    return { success: true, message: 'PRs actualizados correctamente.', registro: actualizado };
+  };
+
+  const eliminarHistorialPRItem = async (
+    cliente_id: string,
+    ejercicio_id: string,
+    itemId: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const recordId = `${cliente_id}__${ejercicio_id}`;
+    const actual = registrosPR.find(r => r.id === recordId || (r.cliente_id === cliente_id && r.ejercicio_id === ejercicio_id));
+    if (!actual) return { success: false, message: 'Registro no encontrado.' };
+
+    const actualizado: SocioEjercicioPR = {
+      ...actual,
+      historial: (actual.historial || []).filter(h => h.id !== itemId),
+      actualizado_at: new Date().toISOString()
+    };
+
+    const nuevaLista = registrosPR.map(r => (r.id === actual.id ? actualizado : r));
+    setRegistrosPR(nuevaLista);
+    localStorage.setItem('gym_registros_pr', JSON.stringify(nuevaLista));
+
+    if (supabase) {
+      try {
+        await supabase.from('registros_pr').upsert(actualizado);
+      } catch (e) {}
+    }
+
+    return { success: true, message: 'Entrada de historial eliminada.' };
+  };
+
   const borrarHistorial = () => {
     localStorage.removeItem('gym_clientes');
     localStorage.removeItem('gym_planes');
@@ -6115,6 +6399,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <GymContext.Provider value={{
       clientes, planes, historialPrecios, turnos, pagos, recuperos, auditLogs, novedades,
       feriados, agregarFeriado, editarFeriado, eliminarFeriado, toggleFeriadoActivo, cargarFeriadosNacionales, publicarFeriadoComoNovedad,
+      ejerciciosPR, registrosPR, agregarEjercicioPR, editarEjercicioPR, eliminarEjercicioPR, guardarPRSocio, eliminarHistorialPRItem,
       notificaciones, gastos, profesores, novedadesProfesores, rolActivo,
       setRolActivo: handleSetRolActivo,
       selectedSocioId, setSelectedSocioId,

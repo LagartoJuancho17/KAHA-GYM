@@ -18,16 +18,17 @@ import { AuthorizeClientModal } from './components/Clientes/AuthorizeClientModal
 import { ControlPresentesModal } from './components/Turnos/ControlPresentesModal';
 import { Footer } from './components/Common/Footer';
 import { MensajeMensualReminder } from './components/Notifications/MensajeMensualReminder';
+import { AdminPRControl } from './components/PRs/AdminPRControl';
 import logoKaha from './assets/logokaha.png';
 
 import { 
   Dribbble, Landmark, LayoutDashboard, Users, CreditCard, 
   CalendarRange, ShieldAlert, LineChart, ShieldCheck,
   Menu, X, MapPin, Shield, Megaphone, Check, Bell, Trash2,
-  CheckCircle2, AlertTriangle, UserCheck
+  CheckCircle2, AlertTriangle, UserCheck, Dumbbell
 } from 'lucide-react';
 
-type TabID = 'DASHBOARD' | 'CLIENTES' | 'PLANES' | 'TURNOS' | 'PAGOS' | 'MOROSIDAD' | 'PROYECCIONES' | 'AUDITORIA' | 'NOVEDADES';
+type TabID = 'DASHBOARD' | 'CLIENTES' | 'PLANES' | 'TURNOS' | 'PRS' | 'PAGOS' | 'MOROSIDAD' | 'PROYECCIONES' | 'AUDITORIA' | 'NOVEDADES';
 
 export default function App() {
   return (
@@ -315,6 +316,7 @@ function InnerApp() {
     { id: 'CLIENTES' as TabID, label: 'Socios', icon: Users, desc: 'Gestión Integral de Socios', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'PLANES' as TabID, label: 'Planes', icon: Dribbble, desc: 'Control de Membresías y Planes', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'TURNOS' as TabID, label: 'Cupos y Turnos', icon: CalendarRange, desc: 'Grilla de Horarios y Reservas', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
+    { id: 'PRS' as TabID, label: 'PRs y Marcas', icon: Dumbbell, desc: 'Récords Personales y Porcentajes de Carga', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'PAGOS' as TabID, label: 'Economía', icon: Landmark, desc: 'Libro Contable, Egresos y Liquidación', roles: ['ADMIN'] },
     { id: 'NOVEDADES' as TabID, label: 'Novedades', icon: Megaphone, desc: 'Gestión de Comunicados y Novedades', roles: ['ADMIN', 'OPERADOR', 'PROFESOR'] },
     { id: 'MOROSIDAD' as TabID, label: 'Control de Mora', icon: ShieldAlert, desc: 'Seguimiento de Deudas', roles: ['ADMIN'] },
@@ -352,6 +354,8 @@ function InnerApp() {
         return <PlanesPricing />;
       case 'TURNOS':
         return <TurnosGrid />;
+      case 'PRS':
+        return <AdminPRControl />;
       case 'PAGOS':
         return (
           <PagosLog 
