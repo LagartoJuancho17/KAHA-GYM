@@ -12,7 +12,8 @@ import {
   parsearTiempoASegundos,
   formatearSegundosATiempo,
   formatearFechaRutinaPR,
-  obtenerMejorTiempoSegundos
+  obtenerMejorTiempoSegundos,
+  reconstruirPRsDesdeAuditLogs
 } from './prs';
 
 test('incluye los 5 ejercicios base por defecto', () => {
@@ -91,4 +92,76 @@ test('parsea y formatea tiempos de rutinas (BULGER 23:30) y detecta el menor tie
   ]);
   assert.equal(mejor, 1410);
 });
+
+test('reconstruirPRsDesdeAuditLogs reconstruye ejercicios personalizados, RMs, historial y WODs entre dispositivos', () => {
+  const res = reconstruirPRsDesdeAuditLogs({
+    logs: [
+      {
+        id: 'log-ej-1',
+        accion: 'PR_EJERCICIO_AGREGADO',
+        detalles: { id: 'pr-trap-bar-mwdpg5zp', nombre: 'Trap bar' },
+        creado_at: '2026-11-12T15:30:50.606Z',
+        usuario_email: 'ianvelazquez97@gmail.com'
+      },
+      {
+        id: 'log-rm-1',
+        accion: 'PR_SOCIO_ACTUALIZADO',
+        detalles: {
+          cliente_id: 'socio-mel',
+          socio: 'Mel Galeano',
+          ejercicio: 'Clean',
+          rm_1: 65,
+          rm_2: 60,
+          rm_3: null,
+          rm_5: 50
+        },
+        creado_at: '2026-11-12T15:32:00.000Z',
+        usuario_email: 'ianvelazquez97@gmail.com'
+      },
+      {
+        id: 'log-rm-2',
+        accion: 'PR_SOCIO_ACTUALIZADO',
+        detalles: {
+          cliente_id: 'socio-mel',
+          socio: 'Mel Galeano',
+          ejercicio: 'Trap bar',
+          rm_1: 110,
+          rm_2: null,
+          rm_3: null,
+          rm_5: null
+        },
+        creado_at: '2026-11-12T15:35:00.000Z',
+        usuario_email: 'ianvelazquez97@gmail.com'
+      },
+      {
+        id: 'log-wod-1',
+        accion: 'PR_TIEMPO_RUTINA_REGISTRADO',
+        detalles: {
+          rutina: 'BULGER',
+          cliente_id: 'socio-mel',
+          tiempo: '23:20'
+        },
+        creado_at: '2026-11-12T15:40:00.000Z',
+        usuario_email: 'ianvelazquez97@gmail.com'
+      }
+    ]
+  });
+
+  assert.ok(res.ejercicios.some(e => e.id === 'pr-trap-bar-mwdpg5zp' && e.nombre === 'Trap bar'));
+  const cleanMel = res.registros.find(r => r.cliente_id === 'socio-mel' && r.ejercicio_id === 'pr-clean');
+  assert.ok(cleanMel);
+  assert.equal(cleanMel.rm_1, 65);
+  assert.equal(cleanMel.rm_2, 60);
+  assert.equal(cleanMel.rm_5, 50);
+  assert.equal(cleanMel.historial.length, 3);
+
+  const trapMel = res.registros.find(r => r.cliente_id === 'socio-mel' && r.ejercicio_id === 'pr-trap-bar-mwdpg5zp');
+  assert.ok(trapMel);
+  assert.equal(trapMel.rm_1, 110);
+
+  assert.equal(res.registrosRutina.length, 1);
+  assert.equal(res.registrosRutina[0].tiempo_segundos, 1400);
+  assert.equal(res.registrosRutina[0].tiempo_texto, '23:20');
+});
+
 

@@ -40,6 +40,7 @@ export interface RegistroAsistenciaClase {
   notas?: string;
   actualizadoAt: string;
   guardadoPor?: string;
+  esReconstruidoParcial?: boolean;
 }
 
 /**
@@ -284,9 +285,17 @@ export function leerTodasLasAsistencias(): Record<string, RegistroAsistenciaClas
   return memoryStoreAsistencias;
 }
 
-export function guardarRegistroAsistencia(registro: RegistroAsistenciaClase): void {
-  const todas = leerTodasLasAsistencias();
-  todas[registro.id] = registro;
+function notificarCambioAsistencias(): void {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('kaha-asistencias-updated'));
+    } catch {
+      // Ignorar en entornos sin CustomEvent
+    }
+  }
+}
+
+export function reemplazarTodasLasAsistencias(todas: Record<string, RegistroAsistenciaClase>): void {
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       window.localStorage.setItem(STORAGE_KEY_ASISTENCIAS, JSON.stringify(todas));
@@ -295,19 +304,19 @@ export function guardarRegistroAsistencia(registro: RegistroAsistenciaClase): vo
     }
   }
   memoryStoreAsistencias = todas;
+  notificarCambioAsistencias();
+}
+
+export function guardarRegistroAsistencia(registro: RegistroAsistenciaClase): void {
+  const todas = leerTodasLasAsistencias();
+  todas[registro.id] = registro;
+  reemplazarTodasLasAsistencias(todas);
 }
 
 export function eliminarRegistroAsistencia(id: string): void {
   const todas = leerTodasLasAsistencias();
   delete todas[id];
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      window.localStorage.setItem(STORAGE_KEY_ASISTENCIAS, JSON.stringify(todas));
-    } catch {
-      // Fallback
-    }
-  }
-  memoryStoreAsistencias = todas;
+  reemplazarTodasLasAsistencias(todas);
 }
 
 export function obtenerRegistroAsistencia(fecha: string, turnoId: string): RegistroAsistenciaClase | null {
@@ -367,7 +376,9 @@ export function calcularMetricasHistoricas(
     totalWalkins += walkCount;
 
     (r.presentesIds || []).forEach(id => {
-      conteoPorSocio.set(id, (conteoPorSocio.get(id) || 0) + 1);
+      if (!id.startsWith('asistente-')) {
+        conteoPorSocio.set(id, (conteoPorSocio.get(id) || 0) + 1);
+      }
     });
   });
 
@@ -393,4 +404,176 @@ export function calcularMetricasHistoricas(
     rankingSocios
   };
 }
+
+export interface AuditLogAsistenciaInput {
+  id?: string;
+  accion: string;
+  detalles: any;
+  creado_at: string;
+  usuario_email?: string;
+}
+
+export interface ResultadoSincronizacionAsistencias {
+  asistencias: Record<string, RegistroAsistenciaClase>;
+  registrosParaBackfill: RegistroAsistenciaClase[];
+}
+
+/**
+ * Reconstruye y sincroniza las planillas de presentes (`kaha_asistencias_v1`)
+ * desde `logs_auditoria` de Supabase combinadas con las guardadas en `localStorage`.
+ * - Si un dispositivo (ej: el celular) tiene planillas locales con `presentesIds` exactos que aún
+ *   no están en Supabase con `presentesIds`, las marca en `registrosParaBackfill` para subirlas.
+ * - Si un dispositivo (ej: la compu) recibe logs históricos que solo tenían contadores (`presentes`, `ausentes`),
+ *   reconstruye la planilla a partir de los alumnos convocados de ese turno y fecha.
+ */
+export function sincronizarAsistenciasDesdeAuditLogs(params: {
+  logs: AuditLogAsistenciaInput[];
+  locales: Record<string, RegistroAsistenciaClase>;
+  contexto?: {
+    turnos: Turno[];
+    clientes: Cliente[];
+    recuperos: RecuperoTurno[];
+    planes: Plan[];
+    mesActual: string;
+  };
+}): ResultadoSincronizacionAsistencias {
+  const { logs = [], locales = {}, contexto } = params;
+
+  const logsOrdenados = [...logs].sort((a, b) =>
+    String(a.creado_at || '').localeCompare(String(b.creado_at || ''))
+  );
+
+  const desdeLogs: Record<string, RegistroAsistenciaClase> = {};
+  const keysConIdsExactosEnDb = new Set<string>();
+  const keysEliminadasEnDb = new Set<string>();
+
+  for (const log of logsOrdenados) {
+    const det = log.detalles || {};
+    if (log.accion === 'CONTROL_ASISTENCIA_ELIMINADA') {
+      const key = det.id || (det.fecha && det.turno_id ? generarClaveAsistencia(det.fecha, det.turno_id) : null);
+      if (key) {
+        delete desdeLogs[key];
+        keysConIdsExactosEnDb.delete(key);
+        keysEliminadasEnDb.add(key);
+      }
+      continue;
+    }
+
+    if (log.accion !== 'CONTROL_ASISTENCIA_REGISTRADA') continue;
+
+    const fecha = String(det.fecha || '').trim();
+    const turnoId = String(det.turno_id || det.turnoId || '').trim();
+    if (!fecha || !turnoId) continue;
+
+    const key = generarClaveAsistencia(fecha, turnoId);
+    keysEliminadasEnDb.delete(key);
+    const turnoObj = contexto?.turnos.find(t => t.id === turnoId);
+    const partesTurno = turnoId.split('-');
+    const dia = det.dia || turnoObj?.dia || partesTurno[0] || '';
+    const hora = det.hora || turnoObj?.hora || partesTurno[1] || '';
+    const profesor = det.profesor ?? turnoObj?.profesor;
+
+    if (Array.isArray(det.presentesIds)) {
+      keysConIdsExactosEnDb.add(key);
+      desdeLogs[key] = {
+        id: key,
+        fecha,
+        turnoId,
+        dia,
+        hora,
+        profesor,
+        presentesIds: det.presentesIds.map(String),
+        ausentesIds: Array.isArray(det.ausentesIds) ? det.ausentesIds.map(String) : [],
+        walkins: Array.isArray(det.walkins) ? det.walkins : [],
+        notas: det.notas || undefined,
+        actualizadoAt: det.actualizadoAt || log.creado_at || new Date().toISOString(),
+        guardadoPor: log.usuario_email || det.guardadoPor || 'admin',
+        esReconstruidoParcial: false
+      };
+    } else if (!keysConIdsExactosEnDb.has(key)) {
+      // Reconstrucción de planilla histórica que solo guardó los contadores (presentes / ausentes)
+      const convocados =
+        turnoObj && contexto
+          ? obtenerAlumnosConvocados({
+              turno: turnoObj,
+              fecha,
+              clientes: contexto.clientes,
+              recuperos: contexto.recuperos,
+              planes: contexto.planes,
+              mesActual: contexto.mesActual
+            })
+          : [];
+
+      const cantPresentes = Math.max(0, Number(det.presentes ?? 0));
+      const cantAusentes = Math.max(0, Number(det.ausentes ?? 0));
+      const idsConvocados = convocados.map(a => a.clienteId);
+
+      const presentesIds = idsConvocados.slice(0, cantPresentes);
+      // Si había más presentes que fijos actuales (ej: walk-in o cambio de turno), completar para preservar la métrica
+      while (presentesIds.length < cantPresentes) {
+        presentesIds.push(`asistente-${key}-${presentesIds.length + 1}`);
+      }
+
+      const restantesIds = idsConvocados.slice(cantPresentes);
+      const ausentesIds = restantesIds.slice(0, cantAusentes);
+      while (ausentesIds.length < cantAusentes) {
+        ausentesIds.push(`ausente-${key}-${ausentesIds.length + 1}`);
+      }
+
+      desdeLogs[key] = {
+        id: key,
+        fecha,
+        turnoId,
+        dia,
+        hora,
+        profesor,
+        presentesIds,
+        ausentesIds,
+        walkins: [],
+        notas: det.notas || undefined,
+        actualizadoAt: log.creado_at || new Date().toISOString(),
+        guardadoPor: log.usuario_email || 'admin',
+        esReconstruidoParcial: true
+      };
+    }
+  }
+
+  const combinadas: Record<string, RegistroAsistenciaClase> = { ...desdeLogs };
+  const registrosParaBackfill: RegistroAsistenciaClase[] = [];
+
+  for (const [key, localReg] of Object.entries(locales)) {
+    if (!localReg || !localReg.fecha || !localReg.turnoId) continue;
+    if (keysEliminadasEnDb.has(key)) continue;
+
+    const tieneIdsRealesLocales =
+      !localReg.esReconstruidoParcial &&
+      (localReg.presentesIds || []).every(id => !id.startsWith('asistente-')) &&
+      (localReg.ausentesIds || []).every(id => !id.startsWith('ausente-'));
+
+    const remoto = combinadas[key];
+
+    if (!remoto) {
+      combinadas[key] = localReg;
+      if (tieneIdsRealesLocales) {
+        registrosParaBackfill.push(localReg);
+      }
+    } else if (tieneIdsRealesLocales && !keysConIdsExactosEnDb.has(key)) {
+      // El dispositivo local (ej: celular) tiene los IDs reales exactos y la base solo tenía el resumen
+      combinadas[key] = { ...localReg, esReconstruidoParcial: false };
+      registrosParaBackfill.push(localReg);
+    } else if (
+      tieneIdsRealesLocales &&
+      String(localReg.actualizadoAt || '') > String(remoto.actualizadoAt || '')
+    ) {
+      combinadas[key] = { ...localReg, esReconstruidoParcial: false };
+      registrosParaBackfill.push(localReg);
+    }
+  }
+
+  return {
+    asistencias: combinadas,
+    registrosParaBackfill
+  };
+}
+
 

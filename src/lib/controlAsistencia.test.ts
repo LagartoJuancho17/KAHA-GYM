@@ -11,7 +11,8 @@ import {
   obtenerRegistroAsistencia,
   obtenerTurnosConAsistenciaDelDia,
   eliminarRegistroAsistencia,
-  calcularMetricasHistoricas
+  calcularMetricasHistoricas,
+  sincronizarAsistenciasDesdeAuditLogs
 } from './controlAsistencia';
 import { Cliente, RecuperoTurno, Turno, Plan } from '../types';
 
@@ -243,5 +244,69 @@ describe('Control de Asistencia y Presentes', () => {
     // c1 vino a las 2 clases
     assert.equal(stats.rankingSocios[0].clienteId, 'c1');
     assert.equal(stats.rankingSocios[0].totalPresentes, 2);
+  });
+
+  it('sincronizarAsistenciasDesdeAuditLogs reconstruye presentes entre celular y compu y detecta backfill', () => {
+    const resCompu = sincronizarAsistenciasDesdeAuditLogs({
+      logs: [
+        {
+          id: 'log-asis-1',
+          accion: 'CONTROL_ASISTENCIA_REGISTRADA',
+          detalles: {
+            fecha: '2026-11-02',
+            turno_id: 'LUNES-18:00',
+            hora: '18:00',
+            presentes: 2,
+            ausentes: 1,
+            inscriptos: 3
+          },
+          creado_at: '2026-11-02T21:30:07.004Z',
+          usuario_email: 'ianvelazquez97@gmail.com'
+        }
+      ],
+      locales: {}
+    });
+
+    const planillaReconstruida = resCompu.asistencias['2026-11-02_LUNES-18:00'];
+    assert.ok(planillaReconstruida);
+    assert.equal(planillaReconstruida.presentesIds.length, 2);
+    assert.equal(planillaReconstruida.ausentesIds.length, 1);
+
+    // Cuando el celular abre la app con los IDs reales en localStorage, pisa la parcial y la marca para backfill
+    const resCelu = sincronizarAsistenciasDesdeAuditLogs({
+      logs: [
+        {
+          id: 'log-asis-1',
+          accion: 'CONTROL_ASISTENCIA_REGISTRADA',
+          detalles: {
+            fecha: '2026-11-02',
+            turno_id: 'LUNES-18:00',
+            hora: '18:00',
+            presentes: 2,
+            ausentes: 1,
+            inscriptos: 3
+          },
+          creado_at: '2026-11-02T21:30:07.004Z',
+          usuario_email: 'ianvelazquez97@gmail.com'
+        }
+      ],
+      locales: {
+        '2026-11-02_LUNES-18:00': {
+          id: '2026-11-02_LUNES-18:00',
+          fecha: '2026-11-02',
+          turnoId: 'LUNES-18:00',
+          dia: 'LUNES',
+          hora: '18:00',
+          presentesIds: ['uuid-socio-1', 'uuid-socio-2'],
+          ausentesIds: ['uuid-socio-3'],
+          walkins: [],
+          actualizadoAt: '2026-11-02T21:30:07.004Z',
+          guardadoPor: 'ianvelazquez97@gmail.com'
+        }
+      }
+    });
+
+    assert.deepEqual(resCelu.asistencias['2026-11-02_LUNES-18:00'].presentesIds, ['uuid-socio-1', 'uuid-socio-2']);
+    assert.equal(resCelu.registrosParaBackfill.length, 1);
   });
 });

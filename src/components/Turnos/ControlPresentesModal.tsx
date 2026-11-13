@@ -110,11 +110,18 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
   // Timestamp de último guardado
   const [ultimoGuardadoHora, setUltimoGuardadoHora] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [syncTick, setSyncTick] = useState(0);
+
+  useEffect(() => {
+    const onSync = () => setSyncTick(t => t + 1);
+    window.addEventListener('kaha-asistencias-updated', onSync);
+    return () => window.removeEventListener('kaha-asistencias-updated', onSync);
+  }, []);
 
   // Turnos que ya tienen asistencia guardada hoy
   const turnosGuardadosSet = useMemo(() => {
     return obtenerTurnosConAsistenciaDelDia(fechaSeleccionada);
-  }, [fechaSeleccionada, ultimoGuardadoHora]);
+  }, [fechaSeleccionada, ultimoGuardadoHora, syncTick]);
 
   // Inicializar o auto-detectar turno al abrir o cambiar de fecha
   useEffect(() => {
@@ -185,7 +192,7 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
       setNotasClase('');
       setUltimoGuardadoHora(null);
     }
-  }, [fechaSeleccionada, turnoActual, isOpen]);
+  }, [fechaSeleccionada, turnoActual, isOpen, syncTick]);
 
   // Métricas en tiempo real
   const metricas = useMemo(() => {
@@ -304,18 +311,26 @@ export const ControlPresentesModal: React.FC<ControlPresentesModalProps> = ({
         }
       });
 
-      // Registrar auditoría en la base
+      // Registrar auditoría en la base (incluyendo IDs exactos para sincronización multi-dispositivo)
       addAuditLog(
         'CONTROL_ASISTENCIA_REGISTRADA',
         {
+          id: registro.id,
           fecha: fechaSeleccionada,
           turno_id: turnoActual.id,
+          dia: turnoActual.dia,
           hora: turnoActual.hora,
+          profesor: turnoActual.profesor,
           presentes: metricas.totalPresentes,
           ausentes: metricas.totalAusentes,
           inscriptos: metricas.totalInscriptos,
+          presentesIds: presentesArray,
+          ausentesIds: ausentesArray,
+          walkins,
           recuperos_completados: recuperosCompletadosCount,
-          notas: notasClase.trim() || undefined
+          notas: notasClase.trim() || undefined,
+          actualizadoAt: registro.actualizadoAt,
+          guardadoPor: registro.guardadoPor
         },
         googleUser?.email
       );

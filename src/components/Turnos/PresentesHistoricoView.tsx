@@ -1,5 +1,5 @@
 // src/components/Turnos/PresentesHistoricoView.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useGym } from '../../GymContext';
 import { 
   UserCheck, Users, Calendar, Clock, Search, ChevronDown, ChevronUp,
@@ -21,7 +21,7 @@ interface PresentesHistoricoViewProps {
 export const PresentesHistoricoView: React.FC<PresentesHistoricoViewProps> = ({
   onAbrirTomarPresentes
 }) => {
-  const { clientes, turnos, addToast } = useGym();
+  const { clientes, turnos, addToast, addAuditLog, googleUser } = useGym();
   const hoyArg = hoyArgentina();
 
   // Mapa rápido de clientes para lookup por ID
@@ -45,6 +45,12 @@ export const PresentesHistoricoView: React.FC<PresentesHistoricoViewProps> = ({
   const recargarRegistros = () => {
     setRegistrosDict(leerTodasLasAsistencias());
   };
+
+  useEffect(() => {
+    const onSync = () => setRegistrosDict(leerTodasLasAsistencias());
+    window.addEventListener('kaha-asistencias-updated', onSync);
+    return () => window.removeEventListener('kaha-asistencias-updated', onSync);
+  }, []);
 
   // Convertir a lista y ordenar cronológicamente (más recientes primero)
   const listaRegistros = useMemo(() => {
@@ -139,6 +145,7 @@ export const PresentesHistoricoView: React.FC<PresentesHistoricoViewProps> = ({
     e.stopPropagation();
     if (window.confirm('¿Eliminar esta planilla de asistencia guardada?')) {
       eliminarRegistroAsistencia(id);
+      addAuditLog('CONTROL_ASISTENCIA_ELIMINADA', { id }, googleUser?.email);
       recargarRegistros();
       addToast('delete', 'Planilla de asistencia eliminada.');
     }
@@ -427,13 +434,15 @@ export const PresentesHistoricoView: React.FC<PresentesHistoricoViewProps> = ({
                           <div className="flex flex-wrap gap-1.5">
                             {r.presentesIds.map(id => {
                               const cli = clientesMap.get(id);
+                              const walkinMatch = (r.walkins || []).find(w => w.clienteId === id);
+                              const label = cli?.nombreCompleto || walkinMatch?.nombreCompleto || (id.startsWith('asistente-') ? 'Socio asistente' : id);
                               return (
                                 <span
                                   key={id}
                                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-slate-800 text-[11px] font-medium shadow-2xs"
                                 >
                                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  <span>{cli?.nombreCompleto || id}</span>
+                                  <span>{label}</span>
                                 </span>
                               );
                             })}
@@ -450,13 +459,14 @@ export const PresentesHistoricoView: React.FC<PresentesHistoricoViewProps> = ({
                           <div className="flex flex-wrap gap-1.5">
                             {r.ausentesIds.map(id => {
                               const cli = clientesMap.get(id);
+                              const label = cli?.nombreCompleto || (id.startsWith('ausente-') ? 'Socio ausente' : id);
                               return (
                                 <span
                                   key={id}
                                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-500 text-[11px]"
                                 >
                                   <UserX className="w-3 h-3 text-slate-400" />
-                                  <span>{cli?.nombreCompleto || id}</span>
+                                  <span>{label}</span>
                                 </span>
                               );
                             })}

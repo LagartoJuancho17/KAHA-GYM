@@ -25,8 +25,14 @@ import {
   DEFAULT_RUTINAS_PR,
   aplicarActualizacionPR,
   parsearTiempoASegundos,
-  formatearSegundosATiempo
+  formatearSegundosATiempo,
+  reconstruirPRsDesdeAuditLogs
 } from './lib/prs';
+import {
+  leerTodasLasAsistencias,
+  reemplazarTodasLasAsistencias,
+  sincronizarAsistenciasDesdeAuditLogs
+} from './lib/controlAsistencia';
 
 interface GymContextType {
   clientes: Cliente[];
@@ -1109,15 +1115,104 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (e) {}
       }
 
-      // --- PRs: cargar catálogo de ejercicios y registros de PR de Supabase (con fallback a localStorage) ---
+      // --- PRs, WODs y Presentes: sincronizar desde tablas dedicadas y/o logs_auditoria en Supabase ---
       try {
+        const { data: syncLogsDb } = await supabase
+          .from('logs_auditoria')
+          .select('*')
+          .or('accion.like.PR_%,accion.eq.CONTROL_ASISTENCIA_REGISTRADA,accion.eq.CONTROL_ASISTENCIA_ELIMINADA')
+          .order('creado_at', { ascending: true })
+          .limit(2000);
+
+        const logsMap = new Map<string, AuditLog>();
+        for (const l of logsUnidos) {
+          if (l && l.id) logsMap.set(l.id, l);
+        }
+        for (const l of syncLogsDb || []) {
+          if (l && l.id) {
+            logsMap.set(l.id, {
+              id: l.id,
+              usuario_id: l.usuario_id || '',
+              usuario_email: l.usuario_email || '',
+              accion: l.accion,
+              detalles: l.detalles,
+              creado_at: l.creado_at
+            });
+          }
+        }
+        const todosLogsSync = Array.from(logsMap.values());
+
+        // 1. Sincronizar Planillas de Presentes / Asistencias (celular <-> compu)
+        const localesAsistencias = leerTodasLasAsistencias();
+        const resAsistencias = sincronizarAsistenciasDesdeAuditLogs({
+          logs: todosLogsSync,
+          locales: localesAsistencias,
+          contexto: {
+            turnos: shiftList,
+            clientes: clientList,
+            recuperos: mappedRecs,
+            planes: mappedPlanes,
+            mesActual
+          }
+        });
+        reemplazarTodasLasAsistencias(resAsistencias.asistencias);
+
+        if (resAsistencias.registrosParaBackfill.length > 0) {
+          const logsAsistenciaBackfill = resAsistencias.registrosParaBackfill.map(reg => ({
+            id: nuevoLogId(),
+            usuario_email: reg.guardadoPor || 'admin@gimnasio.com.ar',
+            accion: 'CONTROL_ASISTENCIA_REGISTRADA',
+            detalles: {
+              id: reg.id,
+              fecha: reg.fecha,
+              turno_id: reg.turnoId,
+              dia: reg.dia,
+              hora: reg.hora,
+              profesor: reg.profesor,
+              presentes: (reg.presentesIds || []).length,
+              ausentes: (reg.ausentesIds || []).length,
+              inscriptos: (reg.presentesIds || []).length + (reg.ausentesIds || []).length,
+              presentesIds: reg.presentesIds || [],
+              ausentesIds: reg.ausentesIds || [],
+              walkins: reg.walkins || [],
+              notas: reg.notas || undefined,
+              actualizadoAt: reg.actualizadoAt,
+              guardadoPor: reg.guardadoPor
+            },
+            creado_at: reg.actualizadoAt || new Date().toISOString()
+          }));
+          supabase.from('logs_auditoria').upsert(logsAsistenciaBackfill, { onConflict: 'id' }).then(({ error }) => {
+            if (!error) {
+              console.log(`✅ Presentes: ${logsAsistenciaBackfill.length} planilla(s) sincronizadas a Supabase`);
+            }
+          });
+        }
+
+        // 2. Sincronizar PRs (ejercicios y marcas RM) y WODs (rutinas y tiempos)
+        const parseLocalList = <T,>(key: string, fallback: T[]): T[] => {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return fallback;
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : fallback;
+          } catch {
+            return fallback;
+          }
+        };
+
+        let baseEjercicios = parseLocalList<EjercicioPR>('gym_ejercicios_pr', DEFAULT_EJERCICIOS_PR);
+        let baseRegistros = parseLocalList<SocioEjercicioPR>('gym_registros_pr', []);
+        const baseRutinas = parseLocalList<RutinaTiempoPR>('gym_rutinas_pr', DEFAULT_RUTINAS_PR);
+        const baseRegistrosRutina = parseLocalList<RegistroTiempoRutinaPR>('gym_registros_rutina_pr', []);
+
+        // Intentar leer también las tablas dedicadas si existen en Supabase
         const [{ data: ejDb, error: ejErr }, { data: regDb, error: regErr }] = await Promise.all([
           supabase.from('ejercicios_pr').select('*').order('orden', { ascending: true }),
           supabase.from('registros_pr').select('*')
         ]);
 
         if (!ejErr && Array.isArray(ejDb) && ejDb.length > 0) {
-          const mappedEj: EjercicioPR[] = ejDb.map((e: any, idx: number) => ({
+          baseEjercicios = ejDb.map((e: any, idx: number) => ({
             id: e.id,
             nombre: e.nombre,
             categoria: e.categoria || 'Fuerza',
@@ -1128,17 +1223,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             activo: e.activo !== false,
             creado_at: e.creado_at || new Date().toISOString()
           }));
-          setEjerciciosPR(mappedEj);
-          localStorage.setItem('gym_ejercicios_pr', JSON.stringify(mappedEj));
-        } else if (!ejErr && Array.isArray(ejDb) && ejDb.length === 0) {
-          // Sembrar los 5 ejercicios por defecto en Supabase si la tabla está vacía
-          supabase.from('ejercicios_pr').upsert(DEFAULT_EJERCICIOS_PR).then();
         }
 
-        if (!regErr && Array.isArray(regDb)) {
-          const localRegRaw = localStorage.getItem('gym_registros_pr');
-          const localRegs: SocioEjercicioPR[] = localRegRaw ? JSON.parse(localRegRaw) : [];
-          const dbIds = new Set(regDb.map((r: any) => r.id));
+        if (!regErr && Array.isArray(regDb) && regDb.length > 0) {
           const mappedRegs: SocioEjercicioPR[] = regDb.map((r: any) => ({
             id: r.id,
             cliente_id: r.cliente_id,
@@ -1150,16 +1237,64 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             historial: Array.isArray(r.historial) ? r.historial : [],
             actualizado_at: r.actualizado_at || new Date().toISOString()
           }));
-          const faltantes = localRegs.filter(lr => !dbIds.has(lr.id));
-          if (faltantes.length > 0) {
-            supabase.from('registros_pr').upsert(faltantes).then();
-          }
-          const mergedRegs = [...mappedRegs, ...faltantes];
-          setRegistrosPR(mergedRegs);
-          localStorage.setItem('gym_registros_pr', JSON.stringify(mergedRegs));
+          const mapComb = new Map<string, SocioEjercicioPR>();
+          baseRegistros.forEach(r => mapComb.set(r.id, r));
+          mappedRegs.forEach(r => mapComb.set(r.id, r));
+          baseRegistros = Array.from(mapComb.values());
+        }
+
+        const resPRs = reconstruirPRsDesdeAuditLogs({
+          logs: todosLogsSync,
+          ejerciciosLocales: baseEjercicios,
+          registrosLocales: baseRegistros,
+          rutinasLocales: baseRutinas,
+          registrosRutinaLocales: baseRegistrosRutina
+        });
+
+        setEjerciciosPR(resPRs.ejercicios);
+        localStorage.setItem('gym_ejercicios_pr', JSON.stringify(resPRs.ejercicios));
+
+        setRegistrosPR(resPRs.registros);
+        localStorage.setItem('gym_registros_pr', JSON.stringify(resPRs.registros));
+
+        setRutinasPR(resPRs.rutinas);
+        localStorage.setItem('gym_rutinas_pr', JSON.stringify(resPRs.rutinas));
+
+        setRegistrosRutinaPR(resPRs.registrosRutina);
+        localStorage.setItem('gym_registros_rutina_pr', JSON.stringify(resPRs.registrosRutina));
+
+        if (resPRs.registrosParaBackfill.length > 0) {
+          const ejLookup = new Map<string, EjercicioPR>(resPRs.ejercicios.map(e => [e.id, e]));
+          const cliLookup = new Map<string, Cliente>(clientList.map(c => [c.id, c]));
+          const logsPRBackfill = resPRs.registrosParaBackfill.map(reg => {
+            const ej = ejLookup.get(reg.ejercicio_id);
+            const cli = cliLookup.get(reg.cliente_id);
+            return {
+              id: nuevoLogId(),
+              usuario_email: 'admin@gimnasio.com.ar',
+              accion: 'PR_SOCIO_ACTUALIZADO',
+              detalles: {
+                cliente_id: reg.cliente_id,
+                ejercicio_id: reg.ejercicio_id,
+                socio: cli ? `${cli.nombre} ${cli.apellido}` : reg.cliente_id,
+                ejercicio: ej?.nombre || reg.ejercicio_id,
+                rm_1: reg.rm_1,
+                rm_2: reg.rm_2,
+                rm_3: reg.rm_3,
+                rm_5: reg.rm_5,
+                registro: reg
+              },
+              creado_at: reg.actualizado_at || new Date().toISOString()
+            };
+          });
+          supabase.from('logs_auditoria').upsert(logsPRBackfill, { onConflict: 'id' }).then(({ error }) => {
+            if (!error) {
+              console.log(`✅ PRs: ${logsPRBackfill.length} registro(s) locales sincronizados a Supabase`);
+            }
+          });
         }
       } catch (prErr) {
-        console.warn('[KAHA] Tablas de PR no disponibles en Supabase aún, usando localStorage:', prErr);
+        console.warn('[KAHA] Error al sincronizar PRs y Presentes desde Supabase:', prErr);
       }
 
       console.log('✅ Sincronización exitosa desde Supabase completada');
@@ -6236,7 +6371,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    addAuditLog('PR_EJERCICIO_AGREGADO', { id: nuevo.id, nombre: nuevo.nombre }, googleUser?.email);
+    addAuditLog('PR_EJERCICIO_AGREGADO', { id: nuevo.id, nombre: nuevo.nombre, ejercicio: nuevo }, googleUser?.email);
     addToast('add', `Ejercicio "${nuevo.nombre}" agregado al catálogo de PRs.`);
     return { success: true, message: 'Ejercicio agregado con éxito.', ejercicio: nuevo };
   };
@@ -6262,7 +6397,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    addAuditLog('PR_EJERCICIO_EDITADO', { id, updates }, googleUser?.email);
+    addAuditLog('PR_EJERCICIO_EDITADO', { id, updates, ejercicio: { ...target, ...updates } }, googleUser?.email);
     addToast('success', `Ejercicio "${updates.nombre || target.nombre}" actualizado.`);
     return { success: true, message: 'Ejercicio modificado con éxito.' };
   };
@@ -6350,12 +6485,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'PR_SOCIO_ACTUALIZADO',
       {
         cliente_id,
+        ejercicio_id,
         socio: cli ? `${cli.nombre} ${cli.apellido}` : cliente_id,
         ejercicio: ej?.nombre || ejercicio_id,
         rm_1: actualizado.rm_1,
         rm_2: actualizado.rm_2,
         rm_3: actualizado.rm_3,
-        rm_5: actualizado.rm_5
+        rm_5: actualizado.rm_5,
+        fecha: params.fecha || hoyArgentina(),
+        nota: params.nota,
+        registro: actualizado
       },
       googleUser?.email
     );
@@ -6389,6 +6528,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) {}
     }
 
+    addAuditLog('PR_HISTORIAL_ITEM_ELIMINADO', { cliente_id, ejercicio_id, item_id: itemId }, googleUser?.email);
+
     return { success: true, message: 'Entrada de historial eliminada.' };
   };
 
@@ -6417,7 +6558,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRutinasPR(actualizadas);
     localStorage.setItem('gym_rutinas_pr', JSON.stringify(actualizadas));
 
-    addAuditLog('PR_RUTINA_CREADA', { id: nueva.id, titulo: nueva.titulo }, googleUser?.email);
+    addAuditLog('PR_RUTINA_CREADA', { id: nueva.id, titulo: nueva.titulo, rutina: nueva }, googleUser?.email);
     addToast('add', `Rutina "${nueva.titulo}" creada y asignada.`);
     return { success: true, message: 'Rutina creada con éxito.', rutina: nueva };
   };
@@ -6433,7 +6574,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRutinasPR(actualizadas);
     localStorage.setItem('gym_rutinas_pr', JSON.stringify(actualizadas));
 
-    addAuditLog('PR_RUTINA_EDITADA', { id, updates }, googleUser?.email);
+    addAuditLog('PR_RUTINA_EDITADA', { id, updates, rutina: { ...target, ...updates } }, googleUser?.email);
     addToast('success', `Rutina "${updates.titulo || target.titulo}" actualizada.`);
     return { success: true, message: 'Rutina actualizada con éxito.' };
   };
@@ -6487,10 +6628,15 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog(
       'PR_TIEMPO_RUTINA_REGISTRADO',
       {
+        id: nuevo.id,
+        rutina_id,
         rutina: rut?.titulo || rutina_id,
         cliente_id,
         tiempo: nuevo.tiempo_texto,
-        nota: nuevo.nota
+        tiempo_segundos: nuevo.tiempo_segundos,
+        fecha: nuevo.fecha,
+        nota: nuevo.nota,
+        registro: nuevo
       },
       googleUser?.email
     );
@@ -6505,6 +6651,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('gym_registros_rutina_pr', JSON.stringify(filtrados));
       return filtrados;
     });
+    addAuditLog('PR_TIEMPO_RUTINA_ELIMINADO', { id }, googleUser?.email);
     addToast('delete', 'Registro de tiempo eliminado.');
     return { success: true, message: 'Registro eliminado.' };
   };

@@ -314,3 +314,348 @@ export function obtenerMejorTiempoSegundos(registros: RegistroTiempoRutinaPR[]):
   return Math.min(...validos.map(r => r.tiempo_segundos));
 }
 
+export interface AuditLogPRInput {
+  id?: string;
+  accion: string;
+  detalles: any;
+  creado_at: string;
+  usuario_email?: string;
+}
+
+export interface ResultadoReconstruccionPR {
+  ejercicios: EjercicioPR[];
+  registros: SocioEjercicioPR[];
+  rutinas: RutinaTiempoPR[];
+  registrosRutina: RegistroTiempoRutinaPR[];
+  registrosParaBackfill: SocioEjercicioPR[];
+}
+
+/**
+ * Reconstruye y sincroniza el catálogo de ejercicios, PRs de socios, WODs y tiempos
+ * a partir de los logs de auditoría en Supabase (`logs_auditoria`) combinados con `localStorage`.
+ */
+export function reconstruirPRsDesdeAuditLogs(params: {
+  logs: AuditLogPRInput[];
+  ejerciciosLocales?: EjercicioPR[];
+  registrosLocales?: SocioEjercicioPR[];
+  rutinasLocales?: RutinaTiempoPR[];
+  registrosRutinaLocales?: RegistroTiempoRutinaPR[];
+}): ResultadoReconstruccionPR {
+  const {
+    logs = [],
+    ejerciciosLocales = [],
+    registrosLocales = [],
+    rutinasLocales = [],
+    registrosRutinaLocales = []
+  } = params;
+
+  const logsOrdenados = [...logs].sort((a, b) =>
+    String(a.creado_at || '').localeCompare(String(b.creado_at || ''))
+  );
+
+  // 1. Catálogo de Ejercicios
+  const ejerciciosMap = new Map<string, EjercicioPR>();
+  DEFAULT_EJERCICIOS_PR.forEach(e => ejerciciosMap.set(e.id, { ...e }));
+  ejerciciosLocales.forEach(e => {
+    if (e && e.id) {
+      ejerciciosMap.set(e.id, { ...e });
+    }
+  });
+
+  const eliminadosEjercicios = new Set<string>();
+
+  for (const log of logsOrdenados) {
+    const det = log.detalles || {};
+    if (log.accion === 'PR_EJERCICIO_AGREGADO') {
+      const id = det.ejercicio?.id || det.id;
+      const nombre = (det.ejercicio?.nombre || det.nombre || '').trim();
+      if (!id || !nombre) continue;
+      eliminadosEjercicios.delete(id);
+      const maxOrden = Array.from(ejerciciosMap.values()).reduce((acc, e) => Math.max(acc, e.orden || 0), 0);
+      const existente = ejerciciosMap.get(id);
+      ejerciciosMap.set(id, {
+        id,
+        nombre,
+        categoria: det.ejercicio?.categoria || det.categoria || existente?.categoria || 'Fuerza',
+        instruccion_titulo: det.ejercicio?.instruccion_titulo || det.instruccion_titulo || existente?.instruccion_titulo || nombre,
+        instruccion_detalle: det.ejercicio?.instruccion_detalle ?? det.instruccion_detalle ?? existente?.instruccion_detalle ?? '',
+        unidad: (det.ejercicio?.unidad || det.unidad || existente?.unidad || 'kg') as 'kg' | 'lb',
+        orden: det.ejercicio?.orden ?? det.orden ?? existente?.orden ?? (maxOrden + 1),
+        activo: det.ejercicio?.activo !== false && det.activo !== false,
+        creado_at: det.ejercicio?.creado_at || existente?.creado_at || log.creado_at || new Date().toISOString()
+      });
+    } else if (log.accion === 'PR_EJERCICIO_EDITADO') {
+      const id = det.id;
+      const updates = det.updates || det.ejercicio || {};
+      if (id && ejerciciosMap.has(id)) {
+        const actual = ejerciciosMap.get(id)!;
+        ejerciciosMap.set(id, { ...actual, ...updates });
+      }
+    } else if (log.accion === 'PR_EJERCICIO_ELIMINADO') {
+      const id = det.id;
+      if (id) {
+        eliminadosEjercicios.add(id);
+        ejerciciosMap.delete(id);
+      }
+    }
+  }
+
+  const buscarOCrearEjercicioId = (ejercicioRef: string | undefined, ejercicioIdExplicit?: string): string | null => {
+    if (ejercicioIdExplicit && ejerciciosMap.has(ejercicioIdExplicit)) {
+      return ejercicioIdExplicit;
+    }
+    const ref = String(ejercicioRef || ejercicioIdExplicit || '').trim();
+    if (!ref) return null;
+    if (ejerciciosMap.has(ref)) return ref;
+
+    const refLower = ref.toLowerCase();
+    for (const ej of ejerciciosMap.values()) {
+      if (ej.nombre.trim().toLowerCase() === refLower || ej.id.toLowerCase() === refLower) {
+        return ej.id;
+      }
+    }
+
+    // Si un log hace referencia a un ejercicio personalizado cuyo alta no estaba en el lote, lo creamos
+    const slug = refLower.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const newId = ref.startsWith('pr-') ? ref : `pr-${slug || 'custom'}`;
+    if (eliminadosEjercicios.has(newId)) return newId;
+    if (!ejerciciosMap.has(newId)) {
+      const maxOrden = Array.from(ejerciciosMap.values()).reduce((acc, e) => Math.max(acc, e.orden || 0), 0);
+      ejerciciosMap.set(newId, {
+        id: newId,
+        nombre: ref,
+        categoria: 'Fuerza',
+        instruccion_titulo: ref,
+        instruccion_detalle: '',
+        unidad: 'kg',
+        orden: maxOrden + 1,
+        activo: true,
+        creado_at: new Date().toISOString()
+      });
+    }
+    return newId;
+  };
+
+  // 2. Registros de PRs de Socios (1/2/3/5 RM + Historial)
+  const registrosDesdeLogs = new Map<string, SocioEjercicioPR>();
+
+  for (const log of logsOrdenados) {
+    const det = log.detalles || {};
+    if (log.accion === 'PR_SOCIO_ACTUALIZADO') {
+      const cliente_id = det.cliente_id || det.registro?.cliente_id;
+      const ejercicio_id = buscarOCrearEjercicioId(det.ejercicio, det.ejercicio_id || det.registro?.ejercicio_id);
+      if (!cliente_id || !ejercicio_id) continue;
+
+      const recordId = `${cliente_id}__${ejercicio_id}`;
+      const previo = registrosDesdeLogs.get(recordId) || null;
+      const fechaLog = (det.fecha || String(log.creado_at || '').slice(0, 10)) || new Date().toISOString().slice(0, 10);
+
+      const actualizado = aplicarActualizacionPR({
+        actual: previo,
+        cliente_id,
+        ejercicio_id,
+        rm_1: det.rm_1 !== undefined ? det.rm_1 : det.registro?.rm_1,
+        rm_2: det.rm_2 !== undefined ? det.rm_2 : det.registro?.rm_2,
+        rm_3: det.rm_3 !== undefined ? det.rm_3 : det.registro?.rm_3,
+        rm_5: det.rm_5 !== undefined ? det.rm_5 : det.registro?.rm_5,
+        fecha: fechaLog,
+        nota: det.nota || det.registro?.nota,
+        registrado_por: log.usuario_email || det.registrado_por || 'socio@kaha.fit'
+      });
+
+      // Estabilizar IDs de historial generados desde logs para que sean idempotentes
+      const logKey = log.id || log.creado_at;
+      const prevHistLen = previo?.historial?.length || 0;
+      const nuevosCount = actualizado.historial.length - prevHistLen;
+      const historialEstable = actualizado.historial.map((h, idx) => {
+        if (idx < nuevosCount) {
+          return {
+            ...h,
+            id: `hist-${logKey}-${h.reps}`,
+            creado_at: log.creado_at || h.creado_at
+          };
+        }
+        return h;
+      });
+
+      // Si el log nuevo ya traía historial explícito completo, combinar sin perder entradas
+      if (Array.isArray(det.registro?.historial) && det.registro.historial.length > historialEstable.length) {
+        registrosDesdeLogs.set(recordId, {
+          ...actualizado,
+          historial: det.registro.historial,
+          actualizado_at: det.registro.actualizado_at || log.creado_at || actualizado.actualizado_at
+        });
+      } else {
+        registrosDesdeLogs.set(recordId, {
+          ...actualizado,
+          historial: historialEstable,
+          actualizado_at: log.creado_at || actualizado.actualizado_at
+        });
+      }
+    } else if (log.accion === 'PR_HISTORIAL_ITEM_ELIMINADO') {
+      const cliente_id = det.cliente_id;
+      const ejercicio_id = buscarOCrearEjercicioId(det.ejercicio, det.ejercicio_id);
+      const itemId = det.item_id;
+      if (!cliente_id || !ejercicio_id || !itemId) continue;
+      const recordId = `${cliente_id}__${ejercicio_id}`;
+      const actual = registrosDesdeLogs.get(recordId);
+      if (actual) {
+        registrosDesdeLogs.set(recordId, {
+          ...actual,
+          historial: (actual.historial || []).filter(h => h.id !== itemId),
+          actualizado_at: log.creado_at || actual.actualizado_at
+        });
+      }
+    }
+  }
+
+  // Combinar registros reconstruidos desde Supabase con registros locales
+  const registrosFinalesMap = new Map<string, SocioEjercicioPR>(registrosDesdeLogs);
+  const registrosParaBackfill: SocioEjercicioPR[] = [];
+
+  for (const localReg of registrosLocales) {
+    if (!localReg || !localReg.cliente_id || !localReg.ejercicio_id) continue;
+    const recordId = `${localReg.cliente_id}__${localReg.ejercicio_id}`;
+    const enLogs = registrosFinalesMap.get(recordId);
+
+    if (!enLogs) {
+      registrosFinalesMap.set(recordId, { ...localReg, id: recordId });
+      registrosParaBackfill.push({ ...localReg, id: recordId });
+    } else {
+      const mismosRMs =
+        (enLogs.rm_1 ?? null) === (localReg.rm_1 ?? null) &&
+        (enLogs.rm_2 ?? null) === (localReg.rm_2 ?? null) &&
+        (enLogs.rm_3 ?? null) === (localReg.rm_3 ?? null) &&
+        (enLogs.rm_5 ?? null) === (localReg.rm_5 ?? null);
+
+      if (!mismosRMs && String(localReg.actualizado_at || '') > String(enLogs.actualizado_at || '')) {
+        registrosFinalesMap.set(recordId, { ...localReg, id: recordId });
+        registrosParaBackfill.push({ ...localReg, id: recordId });
+      }
+    }
+  }
+
+  // 3. WODs / Rutinas por Tiempo
+  const rutinasMap = new Map<string, RutinaTiempoPR>();
+  DEFAULT_RUTINAS_PR.forEach(r => rutinasMap.set(r.id, { ...r }));
+  rutinasLocales.forEach(r => {
+    if (r && r.id) {
+      rutinasMap.set(r.id, { ...r });
+    }
+  });
+
+  for (const log of logsOrdenados) {
+    const det = log.detalles || {};
+    if (log.accion === 'PR_RUTINA_CREADA') {
+      if (det.rutina && det.rutina.id) {
+        rutinasMap.set(det.rutina.id, { ...det.rutina });
+      } else if (det.id && det.titulo) {
+        const existente = rutinasMap.get(det.id);
+        rutinasMap.set(det.id, {
+          id: det.id,
+          titulo: String(det.titulo).toUpperCase(),
+          subtitulo: det.subtitulo || existente?.subtitulo || 'For time of:',
+          items: Array.isArray(det.items) ? det.items : (existente?.items || []),
+          movimientos: Array.isArray(det.movimientos) ? det.movimientos : (existente?.movimientos || []),
+          asignado_todos: det.asignado_todos ?? existente?.asignado_todos ?? true,
+          clientes_ids: Array.isArray(det.clientes_ids) ? det.clientes_ids : (existente?.clientes_ids || []),
+          creado_por: log.usuario_email || existente?.creado_por || 'admin@kaha.fit',
+          activo: det.activo !== false,
+          creado_at: log.creado_at || existente?.creado_at || new Date().toISOString()
+        });
+      }
+    } else if (log.accion === 'PR_RUTINA_EDITADA') {
+      const id = det.id;
+      const updates = det.updates || det.rutina || {};
+      if (id) {
+        const base = rutinasMap.get(id) || {
+          id,
+          titulo: String(updates.titulo || id).toUpperCase(),
+          subtitulo: updates.subtitulo || 'For time of:',
+          items: [],
+          movimientos: [],
+          asignado_todos: true,
+          clientes_ids: [],
+          activo: true,
+          creado_at: log.creado_at || new Date().toISOString()
+        };
+        rutinasMap.set(id, { ...base, ...updates });
+      }
+    } else if (log.accion === 'PR_RUTINA_ELIMINADA') {
+      const id = det.id;
+      if (id) {
+        rutinasMap.delete(id);
+      }
+    }
+  }
+
+  // 4. Tiempos de WODs
+  const resolverRutinaId = (rutinaRef: string | undefined, rutinaIdExplicit?: string): string | null => {
+    if (rutinaIdExplicit && rutinasMap.has(rutinaIdExplicit)) return rutinaIdExplicit;
+    const ref = String(rutinaRef || rutinaIdExplicit || '').trim();
+    if (!ref) return null;
+    if (rutinasMap.has(ref)) return ref;
+    const refLower = ref.toLowerCase();
+    for (const r of rutinasMap.values()) {
+      if (r.titulo.trim().toLowerCase() === refLower || r.id.toLowerCase() === refLower) {
+        return r.id;
+      }
+    }
+    return ref;
+  };
+
+  const tiemposEliminados = new Set<string>();
+  const tiemposDesdeLogs: RegistroTiempoRutinaPR[] = [];
+
+  for (const log of logsOrdenados) {
+    const det = log.detalles || {};
+    if (log.accion === 'PR_TIEMPO_RUTINA_ELIMINADO') {
+      if (det.id) tiemposEliminados.add(String(det.id));
+    } else if (log.accion === 'PR_TIEMPO_RUTINA_REGISTRADO') {
+      const regExplicito = det.registro as RegistroTiempoRutinaPR | undefined;
+      const cliente_id = regExplicito?.cliente_id || det.cliente_id;
+      const rutina_id = resolverRutinaId(det.rutina, regExplicito?.rutina_id || det.rutina_id);
+      const tiempoTextoRaw = regExplicito?.tiempo_texto || det.tiempo_texto || det.tiempo;
+      const segundos = regExplicito?.tiempo_segundos ?? (tiempoTextoRaw ? parsearTiempoASegundos(String(tiempoTextoRaw)) : null);
+      if (!cliente_id || !rutina_id || !segundos) continue;
+
+      const id = regExplicito?.id || det.id || `reg-rut-${log.id || log.creado_at}`;
+      tiemposDesdeLogs.push({
+        id,
+        rutina_id,
+        cliente_id,
+        tiempo_segundos: segundos,
+        tiempo_texto: formatearSegundosATiempo(segundos),
+        fecha: regExplicito?.fecha || det.fecha || String(log.creado_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+        nota: regExplicito?.nota || det.nota || undefined,
+        registrado_por: regExplicito?.registrado_por || log.usuario_email || 'socio@kaha.fit',
+        creado_at: regExplicito?.creado_at || log.creado_at || new Date().toISOString()
+      });
+    }
+  }
+
+  // Unir tiempos de logs y locales evitando duplicados
+  const tiemposFinales: RegistroTiempoRutinaPR[] = [];
+  const clavesVistas = new Set<string>();
+
+  for (const t of [...registrosRutinaLocales, ...tiemposDesdeLogs]) {
+    if (!t || tiemposEliminados.has(t.id)) continue;
+    const firma = `${t.rutina_id}__${t.cliente_id}__${t.tiempo_segundos}__${t.fecha}__${t.nota || ''}__${t.creado_at.slice(0, 16)}`;
+    if (clavesVistas.has(t.id) || clavesVistas.has(firma)) continue;
+    clavesVistas.add(t.id);
+    clavesVistas.add(firma);
+    tiemposFinales.push(t);
+  }
+
+  tiemposFinales.sort((a, b) => String(b.creado_at || '').localeCompare(String(a.creado_at || '')));
+
+  return {
+    ejercicios: Array.from(ejerciciosMap.values()).sort((a, b) => (a.orden || 0) - (b.orden || 0)),
+    registros: Array.from(registrosFinalesMap.values()),
+    rutinas: Array.from(rutinasMap.values()),
+    registrosRutina: tiemposFinales,
+    registrosParaBackfill
+  };
+}
+
+
