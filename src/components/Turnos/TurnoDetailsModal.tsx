@@ -7,21 +7,38 @@ import { SearchableSelect } from '../Common/SearchableSelect';
 import { TurnosHistorialModal } from './TurnosHistorialModal';
 import { ordenarEsperaSemanal, esPrioritario } from '../../lib/listaEspera';
 import { estaPausado } from '../../lib/pausa';
+import { ProfesoresAdminModal } from '../Profesores/ProfesoresAdminModal';
 
 interface TurnoDetailsModalProps {
   turnoId: string;
   onClose: () => void;
 }
 
-const PROFE_PRESETS = ['Juanchi', 'Rulo', 'Lucas', 'Denise'];
+const BASE_PROFE_PRESETS = ['Juanchi', 'Rulo', 'Lucas', 'Denise', 'Christian Martínez'];
 
 export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, onClose }) => {
   const { 
-    turnos, clientes, planes, profesores,
+    turnos, clientes, planes, profesores, rolActivo,
     asignarClienteFijo, removerAsignacionFija, checkInFlexible, updateCliente,
     modificarPrecioOCupoTurno, asignarProfesorTurno, sociosPrioritarios,
     retomarSocioPausado, googleUser
   } = useGym();
+  const [showProfesoresModal, setShowProfesoresModal] = useState(false);
+
+  const PROFE_PRESETS = useMemo(() => {
+    const vistos = new Set<string>();
+    const lista: string[] = [];
+    for (const nombre of [...BASE_PROFE_PRESETS, ...profesores.filter(p => p.activo !== false).map(p => p.nombre)]) {
+      const limpio = (nombre || '').trim();
+      if (!limpio) continue;
+      const key = limpio.toLowerCase();
+      if (!vistos.has(key)) {
+        vistos.add(key);
+        lista.push(limpio);
+      }
+    }
+    return lista;
+  }, [profesores]);
 
   const [selectedClientToAssignId, setSelectedClientToAssignId] = useState('');
   const [nuevoCupoMaximo, setNuevoCupoMaximo] = useState('');
@@ -331,15 +348,26 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
 
           {/* 1. PROFESOR FIJO */}
           <form onSubmit={handleSaveProfesor} className="bg-zinc-50 p-3.5 rounded-xl border border-zinc-200 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <label className="font-bold text-[10px] text-zinc-500 uppercase tracking-widest block font-sans">
                 Profesor Fijo / Clase
               </label>
-              {localProfesor && (
-                <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Asignado: {localProfesor}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {localProfesor && (
+                  <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Asignado: {localProfesor}
+                  </span>
+                )}
+                {rolActivo === 'ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowProfesoresModal(true)}
+                    className="text-[10px] font-bold text-violet-700 hover:text-violet-900 bg-violet-50 hover:bg-violet-100 border border-violet-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                  >
+                    Gestionar Profesores →
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Presets: Juanchi, Rulo, Lucas, Denise + Otro */}
@@ -842,6 +870,12 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
         isOpen={showHistorial}
         onClose={() => setShowHistorial(false)}
         filtroTurnoIdInicial={turnoId}
+      />
+
+      {/* MODAL GESTIÓN DE PROFESORES */}
+      <ProfesoresAdminModal
+        isOpen={showProfesoresModal}
+        onClose={() => setShowProfesoresModal(false)}
       />
     </div>,
     document.body

@@ -19,6 +19,7 @@ import { ControlPresentesModal } from './components/Turnos/ControlPresentesModal
 import { Footer } from './components/Common/Footer';
 import { MensajeMensualReminder } from './components/Notifications/MensajeMensualReminder';
 import { AdminPRControl } from './components/PRs/AdminPRControl';
+import { ProfesoresAdminModal } from './components/Profesores/ProfesoresAdminModal';
 import logoKaha from './assets/logokaha.png';
 
 import { 
@@ -47,6 +48,7 @@ function InnerApp() {
   const [authorizingClientId, setAuthorizingClientId] = useState<string | null>(null);
   const [clientToOpenTurnosAfterAuth, setClientToOpenTurnosAfterAuth] = useState<string | null>(null);
   const [showPresentesModal, setShowPresentesModal] = useState(false);
+  const [showProfesoresModal, setShowProfesoresModal] = useState(false);
 
   const handleStartAuthorization = (clientId: string) => {
     setAuthorizingClientId(clientId);
@@ -502,6 +504,21 @@ function InnerApp() {
               <span>Tomar Presentes</span>
             </button>
           )}
+
+          {/* GESTIÓN DE PROFESORES EN SIDEBAR (SOLO ADMIN) */}
+          {rolActivo === 'ADMIN' && (
+            <button
+              onClick={() => {
+                setIsSidebarOpen(false);
+                setShowProfesoresModal(true);
+              }}
+              className="w-full px-3 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-violet-200 shrink-0"
+              id="sidebar-profesores-trigger"
+            >
+              <Shield className="w-4 h-4 text-violet-600 shrink-0" />
+              <span>Gestionar Profesores</span>
+            </button>
+          )}
         </div>
 
         {/* LOGGED CONTEXT CARD (Dynamic Google user) */}
@@ -574,6 +591,19 @@ function InnerApp() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* GESTIÓN DE PROFESORES TRIGGER (SOLO ADMIN) */}
+            {rolActivo === 'ADMIN' && (
+              <button
+                onClick={() => setShowProfesoresModal(true)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-violet-50 hover:bg-violet-100 text-violet-800 font-bold text-xs transition-all cursor-pointer border border-violet-200"
+                id="admin-header-profesores-trigger"
+                title="Agregar o editar profesores y sus accesos al Panel de Profesor"
+              >
+                <Shield className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+                <span className="hidden sm:inline">Profesores</span>
+              </button>
+            )}
+
             {/* CONTROL DE PRESENTES TRIGGER */}
             {['ADMIN', 'OPERADOR', 'PROFESOR'].includes(rolActivo) && (
               <button
@@ -723,6 +753,11 @@ function InnerApp() {
       <ControlPresentesModal
         isOpen={showPresentesModal}
         onClose={() => setShowPresentesModal(false)}
+      />
+
+      <ProfesoresAdminModal
+        isOpen={showProfesoresModal}
+        onClose={() => setShowProfesoresModal(false)}
       />
       {/* BARRA DE ACCESOS DIRECTOS FIJA INFERIOR (MOBILE/TABLET) */}
       <nav

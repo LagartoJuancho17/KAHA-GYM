@@ -16,6 +16,7 @@ import { PagosTable } from './PagosTable';
 import { PagoDeleteModal } from './PagoDeleteModal';
 import { PagoEditModal } from './PagoEditModal';
 import { BalanceTab } from './BalanceTab';
+import { ProfesoresAdminModal } from '../Profesores/ProfesoresAdminModal';
 import { hoyArgentina } from '../../lib/fechas';
 
 interface PagosLogProps {
@@ -89,6 +90,7 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
   const [estadosRecibos, setEstadosRecibos] = useState<Record<string, string>>({});
   const [pagoParaEliminar, setPagoParaEliminar] = useState<import('../../types').Pago | null>(null);
   const [pagoParaEditar, setPagoParaEditar] = useState<import('../../types').Pago | null>(null);
+  const [showProfesoresModal, setShowProfesoresModal] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -768,13 +770,22 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
                 {MESES_OPCIONES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
-            <button
-              onClick={() => { setNovedadErr(''); setNovedadOk(''); setShowNovedadModal(true); }}
-              className="bg-zinc-900 hover:bg-zinc-800 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Registrar Novedad
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowProfesoresModal(true)}
+                className="bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5 text-violet-600" />
+                Gestionar Profesores
+              </button>
+              <button
+                onClick={() => { setNovedadErr(''); setNovedadOk(''); setShowNovedadModal(true); }}
+                className="bg-zinc-900 hover:bg-zinc-800 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Registrar Novedad
+              </button>
+            </div>
           </div>
 
           {profesores.filter(p => p.activo).length === 0 && (
@@ -1156,6 +1167,12 @@ export const PagosLog: React.FC<PagosLogProps> = ({ showAddPagoModal, setShowAdd
         isOpen={!!pagoParaEditar}
         onClose={() => setPagoParaEditar(null)}
         pago={pagoParaEditar}
+      />
+
+      {/* GESTIÓN DE PROFESORES MODAL */}
+      <ProfesoresAdminModal
+        isOpen={showProfesoresModal}
+        onClose={() => setShowProfesoresModal(false)}
       />
     </div>
   );

@@ -194,6 +194,7 @@ export interface Profesor {
   telefono: string;
   valor_hora: number;
   activo: boolean;
+  password?: string;
 }
 
 export interface NovedadProfesor {
