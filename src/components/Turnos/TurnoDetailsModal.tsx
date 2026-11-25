@@ -80,18 +80,20 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
   const clientesActivos = useMemo(() => clientes.filter(c => c.activo), [clientes]);
 
   const optionsClientToAssign = useMemo(() => {
-    return clientesActivos
-      .filter(c => !c.turnos_fijos.includes(turnoId))
+    const enEsperaSet = new Set(selectedTurno?.lista_espera_ids || []);
+    return [...clientesActivos]
+      .filter(c => !c.turnos_fijos.includes(turnoId) && !enEsperaSet.has(c.id))
+      .sort((a, b) => `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`))
       .map(cl => {
         const clPlan = planes.find(p => p.id === cl.plan_id);
         const limitText = clPlan ? `${cl.turnos_fijos.length}/${clPlan.dias_por_semana}` : `${cl.turnos_fijos.length}/5`;
         return {
           value: cl.id,
           label: `${cl.apellido}, ${cl.nombre} (${limitText} turnos max)`,
-          searchString: `${cl.nombre} ${cl.apellido}`
+          searchString: `${cl.nombre} ${cl.apellido} ${cl.apellido} ${cl.nombre}`
         };
       });
-  }, [clientesActivos, planes, turnoId]);
+  }, [clientesActivos, planes, turnoId, selectedTurno]);
 
   const optionsCheckInClient = useMemo(() => {
     return clientesActivos.map(cl => {
@@ -581,11 +583,12 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                         : 'bg-emerald-950/70 border border-emerald-500/50 text-emerald-200'
                     }`}>
                       {selectedTurno.asignados_ids.length >= selectedTurno.cupo_maximo
-                        ? `⏳ Turno completo (${selectedTurno.asignados_ids.length}/${selectedTurno.cupo_maximo}). Se registrará en la Lista de Espera de este horario.`
+                        ? `⏳ Turno completo (${selectedTurno.asignados_ids.length}/${selectedTurno.cupo_maximo}). Quedará como suplente en la Lista de Espera de Matriz (si se baja un fijo) y como 1° suplente variable en la Turnera.`
                         : `🟢 Hay cupo (${selectedTurno.asignados_ids.length}/${selectedTurno.cupo_maximo}). Se asignará como turno semanal fijo.`}
                     </div>
 
                     {(() => {
+                      if (selectedTurno.asignados_ids.length >= selectedTurno.cupo_maximo) return null;
                       const socio = clientes.find(c => c.id === selectedClientToAssignId);
                       const pl = planes.find(p => p.id === socio?.plan_id);
                       const maxD = socio?.dias_personalizados ?? (pl ? pl.dias_por_semana : 2);
@@ -615,7 +618,8 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                         Cancelar
                       </button>
                       <button
-                        type="submit"
+                        type="button"
+                        onClick={() => handleAssignFijo(null, false)}
                         className={`flex-2 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-md ${
                           selectedTurno.asignados_ids.length >= selectedTurno.cupo_maximo
                             ? 'bg-amber-400 hover:bg-amber-300 text-zinc-950'
@@ -624,9 +628,29 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
                         id="btn-confirmar-fijo"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Confirmar Asignación</span>
+                        <span>
+                          {selectedTurno.asignados_ids.length >= selectedTurno.cupo_maximo
+                            ? 'Confirmar Suplente en Espera'
+                            : 'Confirmar Asignación'}
+                        </span>
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {cellActionWaitlist && (
+                  <div className="bg-amber-50 text-amber-900 p-2.5 rounded-lg border border-amber-300 text-[11px] font-semibold">
+                    ✅ {cellActionWaitlist}
+                  </div>
+                )}
+                {cellActionSuccess && (
+                  <div className="bg-emerald-50 text-emerald-800 p-2.5 rounded-lg border border-emerald-300 text-[11px] font-semibold">
+                    ✅ {cellActionSuccess}
+                  </div>
+                )}
+                {cellActionError && (
+                  <div className="bg-red-50 text-red-700 p-2.5 rounded-lg border border-red-200 text-[11px] font-semibold">
+                    ⚠️ {cellActionError}
                   </div>
                 )}
               </div>
@@ -693,8 +717,15 @@ export const TurnoDetailsModal: React.FC<TurnoDetailsModalProps> = ({ turnoId, o
 
       {/* MODAL DIÁLOGO DE CONFLICTO DE PLAN (SUPERPUESTO CENTRADO) */}
       {conflictoPlan && (
-        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs animate-fade-in" id="modal-conflicto-plan">
-          <div className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92vh] flex flex-col">
+        <div
+          className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-4 backdrop-blur-xs font-sans text-xs animate-fade-in"
+          id="modal-conflicto-plan"
+          onClick={e => e.stopPropagation()}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full max-w-lg overflow-hidden relative animate-scale-up max-h-[92vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Header */}
             <div className="bg-zinc-950 text-white p-5 flex items-start justify-between border-b border-zinc-800">
               <div className="flex items-start gap-3">

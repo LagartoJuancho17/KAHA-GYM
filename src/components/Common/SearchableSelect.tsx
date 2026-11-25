@@ -45,7 +45,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }
   }, [selectedOption, isOpen]);
 
-  // Filter options based on the search query
+  // Filter options based on the search query (supports multi-word search in any order, ignoring commas/accents)
   const filteredOptions = useMemo(() => {
     if (!search || !isOpen || (selectedOption && search === selectedOption.label)) {
       return options;
@@ -53,8 +53,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     const cleanSearch = search
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, ''); // Remove accents/tildes
-    
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+    const tokens = cleanSearch.split(/[\s,]+/).filter(Boolean);
+    if (tokens.length === 0) return options;
+
     return options.filter(opt => {
       const cleanLabel = opt.label
         .toLowerCase()
@@ -63,8 +67,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       const cleanSearchString = opt.searchString
         ? opt.searchString.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         : '';
-      
-      return cleanLabel.includes(cleanSearch) || cleanSearchString.includes(cleanSearch);
+      const haystack = `${cleanLabel} ${cleanSearchString}`;
+
+      return tokens.every(token => haystack.includes(token));
     });
   }, [options, search, isOpen, selectedOption]);
 
@@ -123,6 +128,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             setIsOpen(true);
             if (selectedOption && search === selectedOption.label) {
               setSearch(''); // Clear text to show all options
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && isOpen && filteredOptions.length > 0) {
+              e.preventDefault();
+              handleSelectOption(filteredOptions[0]);
             }
           }}
           placeholder={selectedOption ? selectedOption.label : placeholder}

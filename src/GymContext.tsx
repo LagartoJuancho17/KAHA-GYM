@@ -3037,7 +3037,95 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return { success: false, message: 'El socio ya tiene asignado este turno fijo.' };
         }
 
-        // Límite estricto de acuerdo al plan seleccionado para el socio.
+        const hoyStr = hoyArgentina();
+
+        // 1. Si el turno fijo semanal está COMPLETO (ej: 7/7 en Matriz), el socio NO ocupa
+        // un cupo fijo todavía: entra directamente a la Lista de Espera de Matriz Fija
+        // (suplente fijo permanente + primer suplente variable con prioridad en la Turnera).
+        // Debe evaluarse ANTES de `excedePlan` y `conflictosAlAgregarFijo` para no bloquear
+        // el ingreso a la lista de espera ni obligar a darle de baja su turno actual antes de tiempo.
+        const ocupadoActualmente = turno.asignados_ids.length;
+        if (ocupadoActualmente >= turno.cupo_maximo) {
+          const actualWaitlist = turno.lista_espera_ids.includes(clienteId);
+          if (actualWaitlist) {
+            const ordenada = ordenarEsperaSemanal(turno.lista_espera_ids, turnoId, sociosPrioritarios);
+            const puesto = ordenada.indexOf(clienteId) + 1;
+            const msg = `${cliente.nombre} ${cliente.apellido} ya está como suplente en la Lista de Espera de ${turnoId} (Puesto P${puesto} de ${ordenada.length} con prioridad de Matriz).`;
+            addToast('success', msg);
+            return {
+              success: true,
+              putInWaitlist: true,
+              yaEnEspera: true,
+              puestoEnEspera: puesto,
+              totalEnEspera: ordenada.length,
+              message: msg
+            };
+          }
+
+          const updatedTurnos = turnos.map(t => {
+            if (t.id === turnoId) {
+              return { ...t, lista_espera_ids: [...t.lista_espera_ids, clienteId] };
+            }
+            return t;
+          });
+
+          saveState(clientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
+
+          // Asegurar filas en lista_espera_reservas para las próximas 6 semanas de este turno
+          const fechas = fechasFuturasDelTurno(turnoId, hoyStr, 6);
+          const nuevasFilasEspera: WaitlistReserva[] = [];
+          fechas.forEach(f => {
+            const yaEspera = waitlistReservas.some(w => w.cliente_id === clienteId && w.turno_id === turnoId && w.fecha === f);
+            const yaReserva = (cliente.reservas_individuales || []).some(r => r.turno_id === turnoId && r.fecha === f);
+            const tieneSuspension = (cliente.clases_suspendidas || []).some(s => s.turno_id === turnoId && s.fecha === f);
+            if (!yaEspera && !yaReserva && !tieneSuspension) {
+              nuevasFilasEspera.push({
+                id: `wl-matriz-${clienteId.slice(0, 8)}-${f}-${Date.now()}`,
+                cliente_id: clienteId,
+                turno_id: turnoId,
+                fecha: f,
+                creado_at: new Date().toISOString()
+              });
+              persistirEsperaEnSupabase('alta', clienteId, turnoId, f);
+            }
+          });
+
+          if (nuevasFilasEspera.length > 0) {
+            setWaitlistReservas(prev => {
+              const unidas = [...prev, ...nuevasFilasEspera];
+              try {
+                localStorage.setItem('gym_waitlist_reservas', JSON.stringify(unidas));
+              } catch (e) {}
+              return unidas;
+            });
+          }
+
+          if (supabase) {
+            resolveTurnoUuid(turnoId).then((turnoUuid) => {
+              if (!turnoUuid) {
+                console.warn(`No se pudo resolver el UUID del turno ${turnoId}; espera no persistida en Supabase.`);
+                addToast('error', 'Se anotó localmente, pero no se pudo guardar la lista de espera en la base. Reintentá desde "Gestionar Turnos".');
+                return;
+              }
+              supabase.from('lista_espera_turnos').upsert({
+                cliente_id: clienteId,
+                turno_id: turnoUuid
+              }, { onConflict: 'turno_id,cliente_id' }).then(({ error }) => {
+                if (error) console.error("Error al agregar a lista de espera en Supabase:", error);
+              });
+            });
+          }
+
+          addAuditLog('TURNO_LISTA_ESPERA_AGREGADO', { cliente: `${cliente.nombre} ${cliente.apellido}`, turno: turnoId });
+          addToast('add', `${cliente.nombre} ${cliente.apellido} quedó como suplente en ${turnoId} (Matriz y Turnera).`);
+          return {
+            success: true,
+            message: `El horario está completo (${turno.asignados_ids.length}/${turno.cupo_maximo}). ${cliente.nombre} ${cliente.apellido} quedó en la Lista de Espera de Matriz (suplente fijo y 1° suplente variable semanal).`,
+            putInWaitlist: true
+          };
+        }
+
+        // Límite estricto de acuerdo al plan seleccionado para el socio (cuando SÍ hay vacante fija).
         // Si viene reemplazarTurnoId se salta esta validación: el admin decidió hacer swap.
         // Si viene nuevoPlanId se evalúa el límite contra el nuevo plan seleccionado.
         const plan = planes.find(p => p.id === cliente.plan_id);
@@ -3060,15 +3148,6 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
 
-        // Un fijo entra TODAS las semanas, así que no alcanza con mirar cuántos fijos hay:
-        // hay que mirar cada fecha futura de este turno que ya tenga reservas puntuales o
-        // recuperos. Antes esto sólo miraba `asignados_ids.length` y era ciego a las fechas,
-        // por eso la matriz fija se veía prolija (7 de 7) y la turnera del día mostraba 8.
-        // hoyArgentina, no toISOString(): esta última siempre da la fecha en UTC, y
-        // entre las 21:00 y las 23:59 hora Argentina ya devuelve la de MAÑANA. Con eso,
-        // una reserva de HOY quedaba fuera del ">= desde" y no se limpiaba como
-        // duplicada, y el gate de conflictos miraba el día equivocado.
-        const hoyStr = hoyArgentina();
         const conflictos = conflictosAlAgregarFijo(turno, clientes, recuperos, hoyStr, clienteId);
         if (conflictos.length > 0 && !opciones?.forzar) {
           const detalle = conflictos
@@ -3080,59 +3159,6 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             conflictos,
             message: `Este turno ya tiene reservas puntuales de otros socios que quedarían por encima del cupo: ${detalle}. Podés asignarlo igual y esas reservas pasarán a lista de espera.`
           };
-        }
-
-        // Verificar cupo máximo semanal (los fijos entre sí)
-        const ocupadoActualmente = turno.asignados_ids.length;
-        if (ocupadoActualmente >= turno.cupo_maximo) {
-          // Mandar a lista de espera automática
-          const actualWaitlist = turno.lista_espera_ids.includes(clienteId);
-          if (actualWaitlist) {
-            // Antes esto decia solo "ya esta en la lista" y era un callejon sin salida:
-            // el admin apretaba Asignar, no pasaba nada visible y parecia que se borraba.
-            // Ahora se le dice en que puesto quedo y si la prioridad ya lo puso primero.
-            const ordenada = ordenarEsperaSemanal(turno.lista_espera_ids, turnoId, sociosPrioritarios);
-            const puesto = ordenada.indexOf(clienteId) + 1;
-            const esVip = sociosPrioritarios.has(clavePrioridad(clienteId, turnoId));
-            return {
-              success: false,
-              yaEnEspera: true,
-              puestoEnEspera: puesto,
-              totalEnEspera: ordenada.length,
-              message: esVip
-                ? `${cliente.nombre} ya está en la lista de espera de ${turnoId}, en el puesto ${puesto} de ${ordenada.length}. Tiene prioridad, así que entra apenas se libere un lugar.`
-                : `${cliente.nombre} ya está en la lista de espera de ${turnoId}, en el puesto ${puesto} de ${ordenada.length}. El turno está completo (${turno.asignados_ids.length}/${turno.cupo_maximo}). Para que entre primero, dale prioridad desde "Socios con Prioridad".`
-            };
-          }
-
-          const updatedTurnos = turnos.map(t => {
-            if (t.id === turnoId) {
-              return { ...t, lista_espera_ids: [...t.lista_espera_ids, clienteId] };
-            }
-            return t;
-          });
-
-          saveState(clientes, planes, historialPrecios, updatedTurnos, pagos, recuperos, auditLogs);
-
-          if (supabase) {
-            resolveTurnoUuid(turnoId).then((turnoUuid) => {
-              if (!turnoUuid) {
-                console.warn(`No se pudo resolver el UUID del turno ${turnoId}; espera no persistida en Supabase.`);
-                addToast('error', 'Se anotó localmente, pero no se pudo guardar la lista de espera en la base. Reintentá desde "Gestionar Turnos".');
-                return;
-              }
-              supabase.from('lista_espera_turnos').insert({
-                cliente_id: clienteId,
-                turno_id: turnoUuid
-              }).then(({ error }) => {
-                if (error) console.error("Error al agregar a lista de espera en Supabase:", error);
-              });
-            });
-          }
-
-          addAuditLog('TURNO_LISTA_ESPERA_AGREGADO', { cliente: `${cliente.nombre} ${cliente.apellido}`, turno: turnoId });
-          addToast('add', 'Socio agregado a la lista de espera.');
-          return { success: true, message: 'El horario está completo. El cliente ha sido registrado en la lista de espera.', putInWaitlist: true };
         }
 
         // Asignación limpia exitosa — calcular diferencia de plan si se está ampliando
